@@ -1,4 +1,9 @@
 set(SOURCE_LIST
+    backend/Command.inc
+    backend/vulkan/Handles.h
+    backend/vulkan/Handles.cpp
+    backend/vulkan/Context.h
+    backend/vulkan/Context.cpp
     backend/vulkan/Driver.h
     backend/vulkan/Driver.cpp
     shaders/triangle.frag

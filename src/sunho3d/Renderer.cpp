@@ -2,9 +2,7 @@
 
 using namespace sunho3d;
 
-Renderer::Renderer(Window* window) : window(window){
-    driver.createLogicalDevice(window);
-    driver.setupPipeline();
+Renderer::Renderer(Window* window) : window(window), driver(window) {
 }
 
 Renderer::~Renderer() {
