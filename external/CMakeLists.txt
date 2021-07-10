@@ -1,0 +1,12 @@
+
+set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(glfw)
+
+add_subdirectory(glm)
+
+find_package(Vulkan)
+add_library(Vulkan INTERFACE)
+target_compile_definitions(Vulkan INTERFACE -DHAVE_VULKAN)
+target_link_libraries(Vulkan INTERFACE Vulkan::Vulkan)
