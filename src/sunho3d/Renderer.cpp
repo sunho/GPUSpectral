@@ -17,7 +17,7 @@ Renderer::~Renderer() {
 void Renderer::run() {
     window->run([&](){
         auto primitive = driver.createPrimitive();
-        AttributeArray attrs = { Attribute{.offset=0, .stride=2} };
+        AttributeArray attrs = { Attribute{.offset=0, .stride=8} };
         auto vertexBuffer = driver.createVertexBuffer(3, 1, attrs);
         auto buffer = driver.createBufferObject(3*2*4);
         auto indexBufer = driver.createIndexBuffer(3);
@@ -30,8 +30,8 @@ void Renderer::run() {
         
         driver.updateIndexBuffer(indexBufer, descriptor, 0);
         glm::vec2* verts = new glm::vec2[3];
-        verts[0] = glm::vec2(0.0, -0.5);
-        verts[1] = glm::vec2(0.5, 0.5);
+        verts[0] = glm::vec2(0.0, -1.0);
+        verts[1] = glm::vec2(0.5, 1.0);
         verts[2] = glm::vec2(-0.5, 0.5);
         descriptor.data = (uint32_t*) verts;
         driver.updateBufferObject(buffer, descriptor, 0);
@@ -47,6 +47,8 @@ void Renderer::run() {
         PipelineState pipe;
         pipe.program = vv;
         driver.draw(pipe, primitive);
+        driver.endRenderPass();
+        driver.commit();
     });
 }
 

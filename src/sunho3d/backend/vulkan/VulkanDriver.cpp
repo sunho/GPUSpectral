@@ -126,8 +126,10 @@ VkRenderPass VulkanDriver::createRenderPass() {
         .attachmentCount = 1,
         .pAttachments = &colorAttachment,
         .subpassCount = 1,
-        .pSubpasses = &subpass
+        .pSubpasses = &subpass,
     };
+    
+    
     
     if (vkCreateRenderPass(context.device, &renderPassInfo, nullptr, &out) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
@@ -174,9 +176,9 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     renderPassInfo.framebuffer = framebuffer;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = surface.extent;
-//    VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-//    renderPassInfo.clearValueCount = 1;
-//    renderPassInfo.pClearValues = &clearColor;
+    VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
     vkCmdBeginRenderPass(cmdbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     
     VkViewport viewport = {
@@ -350,7 +352,7 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     
     const VkCommandBuffer cmdbuffer = surface.currentContext->commands;
 
-    const uint32_t bufferCount = prim->vertex->attributes.size();
+    const uint32_t bufferCount = prim->vertex->attributeCount;
     VkBuffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
     VkDeviceSize offsets[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
     std::vector<VkVertexInputAttributeDescription> attributes(bufferCount);
@@ -359,12 +361,6 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     for (uint32_t i = 0; i < bufferCount; ++i) {
         Attribute attrib = prim->vertex->attributes[i];
         VulkanBufferObject* buffer = prim->vertex->buffer;
-
-        // If the vertex buffer is missing a constituent buffer object, skip the draw call.
-        // There is no need to emit an error message because this is not explicitly forbidden.
-        if (buffer == nullptr) {
-            return;
-        }
 
         buffers[i] = buffer->buffer;
         offsets[i] = attrib.offset;
@@ -376,6 +372,7 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         bindings[i] = {
             .binding = i,
             .stride = attrib.stride,
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
         };
     }
 
@@ -394,6 +391,11 @@ void VulkanDriver::endRenderPass(int dummy) {
 }
 
 void VulkanDriver::commit(int dummy) {
+    uint32_t imageIndex2;
+    vkAcquireNextImageKHR(context.device, surface.swapChain, UINT64_MAX, surface.imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex2);
+    const VkCommandBuffer cmdbuffer = surface.currentContext->commands;
+    vkEndCommandBuffer(cmdbuffer);
+    
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
