@@ -16,7 +16,6 @@
 #define APPLY_N__(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, X, ...) APPLY##X
 #define APPLY(M, ...) EXPAND(EXPAND(APPLY_N__(M, __VA_ARGS__, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0))(M, __VA_ARGS__))
 
-
 #define PAIR_ARGS_0(M, ...)
 #define PAIR_ARGS_1(M, X, Y, ...) M(X, Y)
 #define PAIR_ARGS_2(M, X, Y, ...) M(X, Y), EXPAND(PAIR_ARGS_1(M, __VA_ARGS__))
@@ -51,9 +50,20 @@
 #define VOIDCOMMAND0(N) DECL_VOIDCOMMAND(N, ARG_1(int, dummy=0), PARAM_1(dummy))
 #define COMMAND0(R, N) DECL_COMMAND(R, N, ARG_1(int, dummy=0), PARAM_1(dummy))
 
-COMMAND(UniformBufferHandle, createUniformBuffer, size_t, size)
+COMMAND(VertexBufferHandle, createVertexBuffer, uint32_t, vertexCount, uint8_t, attributeCount, AttributeArray, attributes)
+COMMAND(IndexBufferHandle, createIndexBuffer, uint32_t, indexCount)
+COMMAND(ProgramHandle, createProgram, Program, program)
 COMMAND0(RenderTargetHandle, createDefaultRenderTarget)
-
+COMMAND(BufferObjectHandle, createBufferObject, uint32_t, size)
+COMMAND0(PrimitiveHandle, createPrimitive)
+VOIDCOMMAND(setVertexBuffer, VertexBufferHandle, handle, BufferObjectHandle, bufferObject)
+VOIDCOMMAND(updateBufferObject, BufferObjectHandle, handle, BufferDescriptor, data, uint32_t, offset)
+VOIDCOMMAND(updateIndexBuffer, IndexBufferHandle, handle, BufferDescriptor, data, uint32_t, offset)
+VOIDCOMMAND(setPrimitiveBuffer, PrimitiveHandle, handle, VertexBufferHandle, vertexBuffer, IndexBufferHandle, indexBuffer)
+VOIDCOMMAND(beginRenderPass, RenderTargetHandle, renderTarget, RenderPassParams, params)
+VOIDCOMMAND(draw, PipelineState, pipeline, PrimitiveHandle, primitive)
+VOIDCOMMAND0(endRenderPass)
+VOIDCOMMAND0(commit)
 
 #undef PAIR_ARGS_1
 #undef PAIR_ARGS_2

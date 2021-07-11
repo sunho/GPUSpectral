@@ -21,7 +21,7 @@ int main(int argc, char** argv)
   }
 
   const char* sym = argv[1];
-  FILE* in = open_or_exit(argv[2], "r");
+  FILE* in = open_or_exit(argv[2], "rb");
 
   char symfile[256];
   snprintf(symfile, sizeof(symfile), "%s.c", sym);

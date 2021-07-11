@@ -2,12 +2,18 @@ set(SOURCE_LIST
     backend/Handles.h
     backend/Handles.cpp
     backend/Command.inc
-    backend/vulkan/Handles.h
-    backend/vulkan/Handles.cpp
-    backend/vulkan/Context.h
-    backend/vulkan/Context.cpp
-    backend/vulkan/Driver.h
-    backend/vulkan/Driver.cpp
+    backend/Program.h
+    backend/PipelineState.h
+    backend/DriverBase.h
+    backend/DriverTypes.h
+    backend/vulkan/VulkanHandles.h
+    backend/vulkan/VulkanHandles.cpp
+    backend/vulkan/VulkanContext.h
+    backend/vulkan/VulkanContext.cpp
+    backend/vulkan/VulkanDriver.h
+    backend/vulkan/VulkanDriver.cpp
+    backend/vulkan/VulkanBuffer.h
+    backend/vulkan/VulkanBuffer.cpp
     shaders/triangle.frag
     shaders/triangle.vert
     Engine.h

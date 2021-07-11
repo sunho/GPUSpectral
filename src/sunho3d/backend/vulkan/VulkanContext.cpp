@@ -1,4 +1,4 @@
-#include "Context.h"
+#include "VulkanContext.h"
 #include <sunho3d/Window.h>
 
 #include <optional>
@@ -297,6 +297,7 @@ void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface, sunh
         vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &surface.renderFinishedSemaphore) != VK_SUCCESS) {
         throw std::runtime_error("failed to create semaphores!");
     }
+
 }
 
 void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
@@ -386,6 +387,9 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
             throw std::runtime_error("failed to create image views!");
         }
     }
+    
+    surface.currentContext = &surface.swapContexts[0];
+    surface.swapContextIndex = 0;
 }
 
 void destroyContext(VulkanContext& context, VulkanSurfaceContext& surface) {

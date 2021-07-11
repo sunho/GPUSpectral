@@ -13,6 +13,7 @@ struct VulkanContext {
     uint32_t graphicsFamily;
     VkQueue graphicsQueue;
     VkCommandPool commandPool;
+    VkRenderPass currentRenderPass;
 };
 
 struct VulkanAttachment {
@@ -34,8 +35,10 @@ struct VulkanSurfaceContext {
     VkExtent2D extent;
     VkQueue presentQueue;
     size_t size;
+    VulkanSwapContext* currentContext;
     std::vector<VkSurfaceFormatKHR> availabeFormats;
     std::vector<VulkanSwapContext> swapContexts;
+    int swapContextIndex{0};
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
 };
