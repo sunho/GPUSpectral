@@ -1,4 +1,6 @@
 set(SOURCE_LIST
+    backend/Handles.h
+    backend/Handles.cpp
     backend/Command.inc
     backend/vulkan/Handles.h
     backend/vulkan/Handles.cpp

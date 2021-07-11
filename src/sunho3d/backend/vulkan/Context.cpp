@@ -66,7 +66,7 @@ inline SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, Vk
     return details;
 }
 
-QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
+inline QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKHR surface) {
     QueueFamilyIndices indices;
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
@@ -346,11 +346,10 @@ void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) 
 void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface) {
     uint32_t imageCount = surface.size;
     surface.swapContexts.resize(imageCount);
-     std::vector<VkImage> swapChainImages;
-     swapChainImages.resize(imageCount);
-     vkGetSwapchainImagesKHR(context.device, surface.swapChain, &imageCount, swapChainImages.data());
+    std::vector<VkImage> swapChainImages;
+    swapChainImages.resize(imageCount);
+    vkGetSwapchainImagesKHR(context.device, surface.swapChain, &imageCount, swapChainImages.data());
 
-    
     std::vector<VkCommandBuffer> commandBuffers;
     commandBuffers.resize(imageCount);
     VkCommandBufferAllocateInfo allocInfo{};
@@ -362,33 +361,31 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
     if (vkAllocateCommandBuffers(context.device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate command buffers!");
     }
-    
+
     for (size_t i = 0; i < surface.size; ++i) {
         surface.swapContexts[i].attachment.image = swapChainImages[i];
         surface.swapContexts[i].commands = commandBuffers[i];
     }
-    
-      for (size_t i = 0; i < surface.size; i++) {
-          VkImageViewCreateInfo createInfo{};
-          createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-          createInfo.image = swapChainImages[i];
-          createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-          createInfo.format = surface.format.format;
-          createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-          createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-          createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-          createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-          createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-          createInfo.subresourceRange.baseMipLevel = 0;
-          createInfo.subresourceRange.levelCount = 1;
-          createInfo.subresourceRange.baseArrayLayer = 0;
-          createInfo.subresourceRange.layerCount = 1;
-          if (vkCreateImageView(context.device, &createInfo, nullptr, &surface.swapContexts[i].attachment.view) != VK_SUCCESS) {
-              throw std::runtime_error("failed to create image views!");
-          }
-      }
 
-
+    for (size_t i = 0; i < surface.size; i++) {
+        VkImageViewCreateInfo createInfo{};
+        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        createInfo.image = swapChainImages[i];
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.format = surface.format.format;
+        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        createInfo.subresourceRange.baseMipLevel = 0;
+        createInfo.subresourceRange.levelCount = 1;
+        createInfo.subresourceRange.baseArrayLayer = 0;
+        createInfo.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(context.device, &createInfo, nullptr, &surface.swapContexts[i].attachment.view) != VK_SUCCESS) {
+            throw std::runtime_error("failed to create image views!");
+        }
+    }
 }
 
 void destroyContext(VulkanContext& context, VulkanSurfaceContext& surface) {

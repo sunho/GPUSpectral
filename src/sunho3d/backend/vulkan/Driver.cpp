@@ -12,15 +12,6 @@
 
 using namespace sunho3d;
 
-static const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    "VK_KHR_portability_subset"
-};
-
-static const std::vector<const char*> validationLayers = {
-    "VK_LAYER_KHRONOS_validation",
-};
-
 static void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
@@ -62,6 +53,12 @@ VulkanDriver::~VulkanDriver() {
     DestroyDebugUtilsMessengerEXT(context.instance, debugMessenger, nullptr);
     vkDestroyInstance(context.instance, nullptr);
 
+}
+
+UniformBufferHandle VulkanDriver::createUniformBuffer(size_t size) {
+}
+
+RenderTargetHandle VulkanDriver::createDefaultRenderTarget(int dummy) {
 }
 
 void VulkanDriver::drawFrame() {

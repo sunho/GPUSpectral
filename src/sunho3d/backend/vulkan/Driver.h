@@ -2,6 +2,7 @@
 
 #include <sunho3d/Window.h>
 
+#include "../Handles.h"
 #include "Context.h"
 #include <vulkan/vulkan.h>
 #include <vector>
@@ -13,6 +14,14 @@ class VulkanDriver {
 public:
     VulkanDriver(Window* window);
     ~VulkanDriver();
+
+#define DECL_COMMAND(R, N, ARGS, PARAMS) R N(ARGS);
+#define DECL_VOIDCOMMAND(N, ARGS, PARAMS) void N(ARGS);
+
+#include "../Command.inc"
+
+#undef DECL_VOIDCOMMAND
+#undef DECL_COMMAND
 
     void drawFrame();
 private:
