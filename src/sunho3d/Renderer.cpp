@@ -30,7 +30,7 @@ void Renderer::run() {
         
         driver.updateIndexBuffer(indexBufer, descriptor, 0);
         glm::vec2* verts = new glm::vec2[3];
-        verts[0] = glm::vec2(0.0, -1.0);
+        verts[0] = glm::vec2(rand()/(float)RAND_MAX, -1.0);
         verts[1] = glm::vec2(0.5, 1.0);
         verts[2] = glm::vec2(-0.5, 0.5);
         descriptor.data = (uint32_t*) verts;

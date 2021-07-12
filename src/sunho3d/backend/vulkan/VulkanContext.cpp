@@ -204,6 +204,7 @@ void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
 
 void initSurfaceContext(VulkanContext& context, VulkanSurfaceContext& surface, sunho3d::Window *window) {
     surface.surface = window->createSurface(context.instance);
+    context.surface = &surface;
 }
 
 VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
@@ -291,12 +292,6 @@ void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface, sunh
     surface.extent = extent;
     surface.size = imageCount;
 
-    VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-     if (vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &surface.imageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(context.device, &semaphoreInfo, nullptr, &surface.renderFinishedSemaphore) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create semaphores!");
-    }
 
 }
 
@@ -337,11 +332,13 @@ void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) 
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-    poolInfo.flags = 0; // Optional
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     
     if (vkCreateCommandPool(context.device, &poolInfo, nullptr, &context.commandPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create command pool!");
     }
+    
+    context.commands = VulkanCommands(context);
 }
 
 void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface) {
@@ -350,22 +347,9 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
     std::vector<VkImage> swapChainImages;
     swapChainImages.resize(imageCount);
     vkGetSwapchainImagesKHR(context.device, surface.swapChain, &imageCount, swapChainImages.data());
-
-    std::vector<VkCommandBuffer> commandBuffers;
-    commandBuffers.resize(imageCount);
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = context.commandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = (uint32_t) commandBuffers.size();
-
-    if (vkAllocateCommandBuffers(context.device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate command buffers!");
-    }
-
+    
     for (size_t i = 0; i < surface.size; ++i) {
         surface.swapContexts[i].attachment.image = swapChainImages[i];
-        surface.swapContexts[i].commands = commandBuffers[i];
     }
 
     for (size_t i = 0; i < surface.size; i++) {
@@ -388,13 +372,11 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
         }
     }
     
-    surface.currentContext = &surface.swapContexts[0];
+    context.currentSwapContext = &surface.swapContexts[0];
     surface.swapContextIndex = 0;
 }
 
 void destroyContext(VulkanContext& context, VulkanSurfaceContext& surface) {
-    vkDestroySemaphore(context.device, surface.renderFinishedSemaphore, nullptr);
-    vkDestroySemaphore(context.device, surface.imageAvailableSemaphore, nullptr);
     vkDestroyCommandPool(context.device, context.commandPool, nullptr);
 
     for (auto& ctx : surface.swapContexts) {

@@ -4,6 +4,7 @@
 
 #include "../DriverBase.h"
 #include "../PipelineState.h"
+#include "VulkanPipelineCache.h"
 #include "VulkanHandles.h"
 #include "VulkanContext.h"
 #include "VulkanBuffer.h"
@@ -33,13 +34,8 @@ public:
 
 #undef DECL_VOIDCOMMAND
 #undef DECL_COMMAND
-
-    void drawFrame();
 private:
     void setupDebugMessenger();
-    
-    VkRenderPass createRenderPass();
-    VkPipeline createPipeline(const std::vector<VkVertexInputAttributeDescription>& attributes, const std::vector<VkVertexInputBindingDescription>& bindings, VkShaderModule vertex, VkShaderModule frag);
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
 
@@ -88,12 +84,8 @@ private:
     
     std::map<HandleBase::HandleId, HandleData> handles;
     HandleBase::HandleId nextId { 0 };
-    
-    
-    std::vector<VkRenderPass> renderPasses;
-    VkPipelineLayout pipelineLayout;
-    VkPipeline graphicsPipeline;
-    std::vector<VkFramebuffer> framebuffers;
+
+    VulkanPipelineCache pipelineCache;
     VulkanContext context;
     VulkanSurfaceContext surface;
 };

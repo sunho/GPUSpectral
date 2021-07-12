@@ -54,6 +54,9 @@ struct Viewport {
     uint32_t height;
     int32_t right() const { return left + width; }
     int32_t top() const { return bottom + height; }
+    bool operator==(const Viewport& other) const {
+        return left == other.left && bottom == other.bottom && width == other.width && height == other.height;
+    }
 };
 
 struct RenderPassParams {

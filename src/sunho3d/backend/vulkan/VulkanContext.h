@@ -5,6 +5,11 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 
+#include "VulkanCommands.h"
+
+struct VulkanSwapContext;
+struct VulkanSurfaceContext;
+
 struct VulkanContext {
     VkInstance instance;
     VkDevice device;
@@ -13,6 +18,9 @@ struct VulkanContext {
     uint32_t graphicsFamily;
     VkQueue graphicsQueue;
     VkCommandPool commandPool;
+    VulkanCommands commands;
+    VulkanSurfaceContext* surface;
+    VulkanSwapContext* currentSwapContext;
     VkRenderPass currentRenderPass;
 };
 
@@ -24,7 +32,6 @@ struct VulkanAttachment {
 
 struct VulkanSwapContext {
     VulkanAttachment attachment;
-    VkCommandBuffer commands;
 };
 
 struct VulkanSurfaceContext {
@@ -35,13 +42,10 @@ struct VulkanSurfaceContext {
     VkExtent2D extent;
     VkQueue presentQueue;
     size_t size;
-    VulkanSwapContext* currentContext;
     std::vector<VkSurfaceFormatKHR> availabeFormats;
     std::vector<VulkanSwapContext> swapContexts;
-    int swapContextIndex{0};
-    VkSemaphore imageAvailableSemaphore;
-    VkSemaphore renderFinishedSemaphore;
-};
+    uint32_t swapContextIndex{0};
+};  
 
 void initContext(VulkanContext& context);
 

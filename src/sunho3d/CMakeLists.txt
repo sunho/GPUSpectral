@@ -14,6 +14,10 @@ set(SOURCE_LIST
     backend/vulkan/VulkanDriver.cpp
     backend/vulkan/VulkanBuffer.h
     backend/vulkan/VulkanBuffer.cpp
+    backend/vulkan/VulkanPipelineCache.h
+    backend/vulkan/VulkanPipelineCache.cpp
+    backend/vulkan/VulkanCommands.h
+    backend/vulkan/VulkanCommands.cpp
     shaders/triangle.frag
     shaders/triangle.vert
     Engine.h
