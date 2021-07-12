@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <string>
 
 enum class ElementType : uint8_t {
     BYTE,
@@ -31,9 +32,17 @@ enum class ElementType : uint8_t {
     HALF4,
 };
 
+enum class PrimitiveMode {
+    TRIANGLES,
+    TRIANGLE_FANS,
+    TRIANGLE_STRIPS
+};
+
 struct Attribute {
     static constexpr uint8_t FLAG_NORMALIZED     = 0x1;
     static constexpr uint8_t FLAG_INTEGER_TARGET = 0x2;
+    std::string name;
+    uint32_t index{};
     uint32_t offset{};
     uint8_t stride{};
     ElementType type{ElementType::BYTE};

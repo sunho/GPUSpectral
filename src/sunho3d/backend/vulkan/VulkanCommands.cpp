@@ -16,11 +16,9 @@ VkFence VulkanCommands::fence() {
     return fences[currentFrame];
 }
 
-
 void VulkanCommands::next() { 
     currentFrame = (currentFrame + 1) % VULKAN_COMMANDS_SIZE;
 }
-
 
 VkCommandBuffer VulkanCommands::get() { 
     return cmdBuffers[currentFrame];

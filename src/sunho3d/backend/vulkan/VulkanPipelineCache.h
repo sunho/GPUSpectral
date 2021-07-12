@@ -4,6 +4,8 @@
 #include "VulkanHandles.h"
 #include <vulkan/vulkan.h>
 #include <vector>
+#include <map>
+#include <unordered_map>
 
 struct VulkanPipelineKey {
     std::vector<VkVertexInputAttributeDescription> attributes;
@@ -27,9 +29,28 @@ struct VulkanPipelineKey {
     }
 };
 
+// FIXME: hash more robustly
+struct KeyHasher
+{
+  std::size_t operator()(const VulkanPipelineKey& k) const
+  {
+      return std::hash<VulkanProgram*>()(k.program);
+  }
+};
+
+
 class VulkanPipelineCache {
 public:
-    VkPipeline createPipeline(VulkanContext& context, const VulkanPipelineKey& key);
-    VkFramebuffer createFrameBuffer(VulkanContext& context, VkRenderPass renderPass, VulkanRenderTarget* renderTarget);
-    VkRenderPass createRenderPass(VulkanContext& context, VulkanRenderTarget* renderTarget);
+    void init(VulkanContext& contex);
+    VkPipeline getOrCreatePipeline(VulkanContext& context, const VulkanPipelineKey& key);
+    VkFramebuffer getOrCreateFrameBuffer(VulkanContext& context, VkRenderPass renderPass, VulkanRenderTarget* renderTarget);
+    VkRenderPass getOrCreateRenderPass(VulkanContext& context, VulkanRenderTarget* renderTarget);
+    VkDescriptorSet getOrCreateDescriptorSet(VulkanContext& context, const std::vector<VkDescriptorSetLayoutBinding>& bindings);
+    VkPipelineLayout pipelineLayout;
+private:
+    VkDescriptorPool descriptorPool;
+        VkDescriptorSetLayout descriptorSetLayout;
+    std::unordered_map<VulkanPipelineKey, VkPipeline, KeyHasher> pipelines;
+    std::map<std::pair<VulkanRenderTarget*, VkImageView>, VkFramebuffer> framebuffers;
+    std::unordered_map<VulkanRenderTarget*, VkRenderPass> renderpasses;
 };

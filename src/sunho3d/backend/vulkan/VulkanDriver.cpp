@@ -36,6 +36,7 @@ VulkanDriver::VulkanDriver(Window* window) {
     createSwapChain(context, surface, window);
     populateSwapContexts(context, surface);
     setupDebugMessenger();
+    pipelineCache.init(context);
 }
 
 VulkanDriver::~VulkanDriver() {
@@ -51,7 +52,7 @@ RenderTargetHandle VulkanDriver::createDefaultRenderTarget(int dummy) {
     return handle;
 }
 
-VertexBufferHandle VulkanDriver::createVertexBuffer(uint32_t vertexCount, uint8_t attributeCount, AttributeArray attributes) {
+VertexBufferHandle VulkanDriver::createVertexBuffer(uint32_t bufferCount, uint32_t vertexCount, uint8_t attributeCount, AttributeArray attributes) {
     Handle<HwVertexBuffer> handle = alloc_handle<VulkanVertexBuffer, HwVertexBuffer>();
     construct_handle<VulkanVertexBuffer>(handle, vertexCount, attributeCount, attributes);
     return handle;
@@ -80,8 +81,8 @@ BufferObjectHandle VulkanDriver::createBufferObject(uint32_t size) {
     return handle;
 }
 
-void VulkanDriver::setVertexBuffer(VertexBufferHandle handle, BufferObjectHandle bufferObject) {
-    handle_cast<VulkanVertexBuffer>(handle)->buffer = handle_cast<VulkanBufferObject>(bufferObject);
+void VulkanDriver::setVertexBuffer(VertexBufferHandle handle, uint32_t index, BufferObjectHandle bufferObject) {
+    handle_cast<VulkanVertexBuffer>(handle)->buffers[index] = handle_cast<VulkanBufferObject>(bufferObject);
 }
 
 void VulkanDriver::updateIndexBuffer(IndexBufferHandle handle, BufferDescriptor data, uint32_t offset) {
@@ -99,8 +100,8 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     const VkCommandBuffer cmdbuffer = context.commands.get();
     VulkanRenderTarget* rt = handle_cast<VulkanRenderTarget>(renderTarget);
     
-    VkRenderPass renderPass = pipelineCache.createRenderPass(context, rt);
-    VkFramebuffer frameBuffer = pipelineCache.createFrameBuffer(context, renderPass, rt);
+    VkRenderPass renderPass = pipelineCache.getOrCreateRenderPass(context, rt);
+    VkFramebuffer frameBuffer = pipelineCache.getOrCreateFrameBuffer(context, renderPass, rt);
     
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -134,9 +135,9 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     context.currentRenderPass = renderPass;
 }
 
-PrimitiveHandle VulkanDriver::createPrimitive(int dummy) {
+PrimitiveHandle VulkanDriver::createPrimitive(PrimitiveMode mode) {
     Handle<HwPrimitive> handle = alloc_handle<VulkanPrimitive, HwPrimitive>();
-    construct_handle<VulkanPrimitive>(handle);
+    construct_handle<VulkanPrimitive>(handle, mode);
     return handle;
 }
 
@@ -147,6 +148,102 @@ void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle
     handle_cast<VulkanPrimitive>(handle)->vertex = vertex;
 }
 
+void VulkanDriver::updateUniformBuffer(UniformBufferHandle handle, BufferDescriptor data, uint32_t offset) {
+    handle_cast<VulkanUniformBuffer>(handle)->buffer->upload(context, data);
+}
+
+void VulkanDriver::bindUniformBuffer(uint32_t binding, UniformBufferHandle handle) {
+    const VkCommandBuffer cmdbuffer = context.commands.get();
+    
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    bindings.push_back(VkDescriptorSetLayoutBinding{
+        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .binding = 0,
+        .descriptorCount = 1,
+        .stageFlags = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+    });
+    
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = handle_cast<VulkanUniformBuffer>(handle)->buffer->buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = handle_cast<VulkanUniformBuffer>(handle)->size;
+    VkDescriptorSet descriptorSet = pipelineCache.getOrCreateDescriptorSet(context, bindings);
+    VkWriteDescriptorSet descriptorWrite{};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = descriptorSet;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+    descriptorWrite.pImageInfo = nullptr; // Optional
+    descriptorWrite.pTexelBufferView = nullptr; // Optional
+    vkUpdateDescriptorSets(context.device, 1, &descriptorWrite, 0, nullptr);
+    vkCmdBindDescriptorSets(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineCache.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+   
+}
+
+inline VkFormat getVkFormat(ElementType type, bool normalized, bool integer) {
+    using ElementType = ElementType;
+    if (normalized) {
+        switch (type) {
+            case ElementType::BYTE: return VK_FORMAT_R8_SNORM;
+            case ElementType::UBYTE: return VK_FORMAT_R8_UNORM;
+            case ElementType::SHORT: return VK_FORMAT_R16_SNORM;
+            case ElementType::USHORT: return VK_FORMAT_R16_UNORM;
+            case ElementType::BYTE2: return VK_FORMAT_R8G8_SNORM;
+            case ElementType::UBYTE2: return VK_FORMAT_R8G8_UNORM;
+            case ElementType::SHORT2: return VK_FORMAT_R16G16_SNORM;
+            case ElementType::USHORT2: return VK_FORMAT_R16G16_UNORM;
+            case ElementType::BYTE3: return VK_FORMAT_R8G8B8_SNORM;
+            case ElementType::UBYTE3: return VK_FORMAT_R8G8B8_UNORM;
+            case ElementType::SHORT3: return VK_FORMAT_R16G16B16_SNORM;
+            case ElementType::USHORT3: return VK_FORMAT_R16G16B16_UNORM;
+            case ElementType::BYTE4: return VK_FORMAT_R8G8B8A8_SNORM;
+            case ElementType::UBYTE4: return VK_FORMAT_R8G8B8A8_UNORM;
+            case ElementType::SHORT4: return VK_FORMAT_R16G16B16A16_SNORM;
+            case ElementType::USHORT4: return VK_FORMAT_R16G16B16A16_UNORM;
+            default:
+                return VK_FORMAT_UNDEFINED;
+        }
+    }
+    switch (type) {
+        case ElementType::BYTE: return integer ? VK_FORMAT_R8_SINT : VK_FORMAT_R8_SSCALED;
+        case ElementType::UBYTE: return integer ? VK_FORMAT_R8_UINT : VK_FORMAT_R8_USCALED;
+        case ElementType::SHORT: return integer ? VK_FORMAT_R16_SINT : VK_FORMAT_R16_SSCALED;
+        case ElementType::USHORT: return integer ? VK_FORMAT_R16_UINT : VK_FORMAT_R16_USCALED;
+        case ElementType::HALF: return VK_FORMAT_R16_SFLOAT;
+        case ElementType::INT: return VK_FORMAT_R32_SINT;
+        case ElementType::UINT: return VK_FORMAT_R32_UINT;
+        case ElementType::FLOAT: return VK_FORMAT_R32_SFLOAT;
+        case ElementType::BYTE2: return integer ? VK_FORMAT_R8G8_SINT : VK_FORMAT_R8G8_SSCALED;
+        case ElementType::UBYTE2: return integer ? VK_FORMAT_R8G8_UINT : VK_FORMAT_R8G8_USCALED;
+        case ElementType::SHORT2: return integer ? VK_FORMAT_R16G16_SINT : VK_FORMAT_R16G16_SSCALED;
+        case ElementType::USHORT2: return integer ? VK_FORMAT_R16G16_UINT : VK_FORMAT_R16G16_USCALED;
+        case ElementType::HALF2: return VK_FORMAT_R16G16_SFLOAT;
+        case ElementType::FLOAT2: return VK_FORMAT_R32G32_SFLOAT;
+        case ElementType::BYTE3: return VK_FORMAT_R8G8B8_SINT;
+        case ElementType::UBYTE3: return VK_FORMAT_R8G8B8_UINT;
+        case ElementType::SHORT3: return VK_FORMAT_R16G16B16_SINT;
+        case ElementType::USHORT3: return VK_FORMAT_R16G16B16_UINT;
+        case ElementType::HALF3: return VK_FORMAT_R16G16B16_SFLOAT;
+        case ElementType::FLOAT3: return VK_FORMAT_R32G32B32_SFLOAT;
+        case ElementType::BYTE4: return integer ? VK_FORMAT_R8G8B8A8_SINT : VK_FORMAT_R8G8B8A8_SSCALED;
+        case ElementType::UBYTE4: return integer ? VK_FORMAT_R8G8B8A8_UINT : VK_FORMAT_R8G8B8A8_USCALED;
+        case ElementType::SHORT4: return integer ? VK_FORMAT_R16G16B16A16_SINT : VK_FORMAT_R16G16B16A16_SSCALED;
+        case ElementType::USHORT4: return integer ? VK_FORMAT_R16G16B16A16_UINT : VK_FORMAT_R16G16B16A16_USCALED;
+        case ElementType::HALF4: return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case ElementType::FLOAT4: return VK_FORMAT_R32G32B32A32_SFLOAT;
+    }
+    return VK_FORMAT_UNDEFINED;
+}
+
+Handle<HwUniformBuffer> VulkanDriver::createUniformBuffer(uint32_t size) {
+    Handle<HwUniformBuffer> handle = alloc_handle<VulkanUniformBuffer, HwUniformBuffer>();
+    construct_handle<VulkanUniformBuffer>(handle, size);
+    handle_cast<VulkanUniformBuffer>(handle)->allocate(context);
+    return handle;
+}
 
 void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     VulkanPrimitive* prim = handle_cast<VulkanPrimitive>(handle);
@@ -161,19 +258,17 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
 
     for (uint32_t i = 0; i < bufferCount; ++i) {
         Attribute attrib = prim->vertex->attributes[i];
-        VulkanBufferObject* buffer = prim->vertex->buffer;
-
-        buffers[i] = buffer->buffer;
+        buffers[i] =  prim->vertex->buffers[attrib.index]->buffer;
         offsets[i] = attrib.offset;
         attributes[i] = {
             .location = i,
             .binding = i,
-            .format = VK_FORMAT_R32G32_SFLOAT
+            .format = getVkFormat(attrib.type, attrib.flags & Attribute::FLAG_NORMALIZED, false)
         };
         bindings[i] = {
             .binding = i,
             .stride = attrib.stride,
-            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+           
         };
     }
 
@@ -192,11 +287,11 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         .viewport = vp
     };
     
-    VkPipeline pl = pipelineCache.createPipeline(context, key);
+    VkPipeline pl = pipelineCache.getOrCreatePipeline(context, key);
     vkCmdBindPipeline(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pl);
     vkCmdBindVertexBuffers(cmdbuffer, 0, bufferCount, buffers, offsets);
     vkCmdBindIndexBuffer(cmdbuffer, prim->index->buffer->buffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdDraw(cmdbuffer, prim->vertex->vertexCount, 1, 0, 0);
+    vkCmdDraw(cmdbuffer, prim->index->count, 1, 0, 0);
 }
 
 void VulkanDriver::endRenderPass(int dummy) {
@@ -215,26 +310,26 @@ void VulkanDriver::commit(int dummy) {
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-       VkImageMemoryBarrier barrier {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = 0,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-           .image = context.currentSwapContext->attachment.image,
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .levelCount = 1,
-                .layerCount = 1,
-            },
-        };
-        vkCmdPipelineBarrier(cmdbuffer,
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-        vkEndCommandBuffer(cmdbuffer);
-    
+    VkImageMemoryBarrier barrier {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = 0,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+       .image = context.currentSwapContext->attachment.image,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1,
+        },
+    };
+    vkCmdPipelineBarrier(cmdbuffer,
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    vkEndCommandBuffer(cmdbuffer);
+
     VkSemaphore waitSemaphores[] = { context.commands.imageAvailableSemaphore()};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;

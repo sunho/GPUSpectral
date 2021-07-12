@@ -3,7 +3,7 @@
 
 using namespace sunho3d;
 
-Window::Window(size_t width, size_t height) : width(width), height(height) {
+Window::Window(uint32_t id, size_t width, size_t height) : IdResource(id), width(width), height(height) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);

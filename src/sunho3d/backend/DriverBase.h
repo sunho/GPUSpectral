@@ -34,17 +34,21 @@ struct HwRenderTarget : public HwBase {
     explicit HwRenderTarget(uint32_t w, uint32_t h) : width(w), height(h) { }
 };
 
-struct HwBufferObject {
+struct HwBufferObject : public HwBase {
     uint32_t size{};
     HwBufferObject() = default;
     explicit HwBufferObject(uint32_t size) : size(size) { }
 };
 
+struct HwUniformBuffer : public HwBase  {
+    uint32_t size{};
+    HwUniformBuffer() = default;
+    explicit HwUniformBuffer(uint32_t size) : size(size) { }
+};
+
 struct HwPrimitive {
-//    uint32_t offset{};
-//    uint32_t minIndex{};
-//    uint32_t maxIndex{};
-//    uint32_t count{};
-//    uint32_t maxVertexCount{};
+    PrimitiveMode mode{};
+    HwPrimitive() = default;
+    explicit HwPrimitive(PrimitiveMode mode) : mode(mode) { }
 };
 

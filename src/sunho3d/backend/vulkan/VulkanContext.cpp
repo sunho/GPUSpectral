@@ -291,8 +291,6 @@ void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface, sunh
     surface.format = surfaceFormat;
     surface.extent = extent;
     surface.size = imageCount;
-
-
 }
 
 void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {

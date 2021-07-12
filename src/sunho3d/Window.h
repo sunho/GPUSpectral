@@ -5,15 +5,16 @@
 
 #include <stdlib.h>
 #include <functional>
+#include "ResourceList.h"
 
 namespace sunho3d {
 
 class Engine;
 
-class Window {
+class Window : public IdResource {
 public:
     Window() = delete;
-    explicit Window(size_t width, size_t height);
+    explicit Window(uint32_t id, size_t width, size_t height);
     ~Window();
     
     size_t getWindowWidth() const;

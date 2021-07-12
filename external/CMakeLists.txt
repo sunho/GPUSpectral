@@ -10,3 +10,6 @@ find_package(Vulkan)
 add_library(Vulkan INTERFACE)
 target_compile_definitions(Vulkan INTERFACE -DHAVE_VULKAN)
 target_link_libraries(Vulkan INTERFACE Vulkan::Vulkan)
+
+add_library(tinygltf INTERFACE)
+target_include_directories(tinygltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinygltf)

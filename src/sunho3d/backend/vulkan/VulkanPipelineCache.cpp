@@ -1,6 +1,66 @@
 #include "VulkanPipelineCache.h"
 
-VkPipeline VulkanPipelineCache::createPipeline(VulkanContext& context, const VulkanPipelineKey& key) {
+void VulkanPipelineCache::init(VulkanContext& context) {
+      VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+      pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
+      pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+      pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+    
+    VkDescriptorSetLayoutBinding binding = {};
+       binding.descriptorCount = 1; // NOTE: We never use arrays-of-blocks.
+       binding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS; // NOTE: This is potentially non-optimal.
+
+    VkDescriptorSetLayoutBinding ubindings[1];
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    for (uint32_t i = 0; i < 1; i++) {
+        binding.binding = i;
+        ubindings[i] = binding;
+    }
+     VkDescriptorSetLayoutCreateInfo dlinfo = {};
+    dlinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    dlinfo.bindingCount = 1;
+    dlinfo.pBindings = ubindings;
+    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout);
+    pipelineLayoutInfo.setLayoutCount = 1; // Optional
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout; // Optional
+
+      if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+          throw std::runtime_error("failed to create pipeline layout!");
+      }
+    
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1280;
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1280;
+    if (vkCreateDescriptorPool(context.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor pool!");
+    }
+}
+
+VkDescriptorSet VulkanPipelineCache::getOrCreateDescriptorSet(VulkanContext& context, const std::vector<VkDescriptorSetLayoutBinding>& bindings) {
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &descriptorSetLayout;
+    VkDescriptorSet descriptorSet;
+    if (vkAllocateDescriptorSets(context.device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+    return descriptorSet;
+}
+
+VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context, const VulkanPipelineKey& key) {
+    auto it = pipelines.find(key);
+    if (it != pipelines.end()) {
+        return it->second;
+    }
+    
       VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
       vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
       vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -106,17 +166,6 @@ VkPipeline VulkanPipelineCache::createPipeline(VulkanContext& context, const Vul
       dynamicState.dynamicStateCount = 2;
       dynamicState.pDynamicStates = dynamicStates;
       
-      VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-      pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-      pipelineLayoutInfo.setLayoutCount = 0; // Optional
-      pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
-      pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-      pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
-
-    VkPipelineLayout pipelineLayout;
-      if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-          throw std::runtime_error("failed to create pipeline layout!");
-      }
       
       VkGraphicsPipelineCreateInfo pipelineInfo{};
       pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -140,11 +189,16 @@ VkPipeline VulkanPipelineCache::createPipeline(VulkanContext& context, const Vul
           throw std::runtime_error("failed to create graphics pipeline!");
       }
     
-    return out;
+    pipelines.emplace(key, out);
+        return out;
 }
 
 
-VkRenderPass VulkanPipelineCache::createRenderPass(VulkanContext& context, VulkanRenderTarget* renderTarget) {
+VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext& context, VulkanRenderTarget* renderTarget) {
+    auto it = renderpasses.find(renderTarget);
+    if (it != renderpasses.end()) {
+        return it->second;
+    }
     VkRenderPass out;
     VkAttachmentDescription colorAttachment{
         .format = context.surface->format.format,
@@ -179,10 +233,15 @@ VkRenderPass VulkanPipelineCache::createRenderPass(VulkanContext& context, Vulka
         throw std::runtime_error("failed to create render pass!");
     }
 
+    renderpasses.emplace(renderTarget, out);
     return out;
 }
 
-VkFramebuffer VulkanPipelineCache::createFrameBuffer(VulkanContext& context, VkRenderPass renderPass, VulkanRenderTarget* renderTarget) {
+VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext& context, VkRenderPass renderPass, VulkanRenderTarget* renderTarget) {
+    auto it = framebuffers.find(std::make_pair(renderTarget, context.currentSwapContext->attachment.view));
+    if (it != framebuffers.end()) {
+        return it->second;
+    }
     VkImageView attachments[] = {
         context.currentSwapContext->attachment.view
     };
@@ -201,5 +260,8 @@ VkFramebuffer VulkanPipelineCache::createFrameBuffer(VulkanContext& context, VkR
     if (vkCreateFramebuffer(context.device, &framebufferInfo, nullptr, &framebuffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to create framebuffer!");
     }
+    
+    
+    framebuffers.emplace(std::make_pair(renderTarget, context.currentSwapContext->attachment.view), framebuffer);
     return framebuffer;
 }

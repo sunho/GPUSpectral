@@ -1,0 +1,1061 @@
+{
+	"asset": {
+		"generator": "Unity 5.6.3p1",
+		"extras": {
+			"exporterVersion" : "2.2.1"
+		},
+		"version": "2.0"
+	},
+	"accessors": [
+		{
+			"bufferView": 2,
+			"byteOffset": 0,
+			"componentType": 5126,
+			"count": 10690,
+			"max": [ 25.40032, 7.490946, -0.04393895 ],
+			"min": [ -25.40031, -8.245514, -57.43032 ],
+			"type": "VEC3"
+		},
+		{
+			"bufferView": 2,
+			"byteOffset": 128280,
+			"componentType": 5126,
+			"count": 10690,
+			"max": [ 1, 1, 1 ],
+			"min": [ -1, -1, -0.9999806 ],
+			"type": "VEC3"
+		},
+		{
+			"bufferView": 1,
+			"byteOffset": 0,
+			"componentType": 5126,
+			"count": 10690,
+			"max": [ 1.99609, 1 ],
+			"min": [ 0.00537872, 0.001465976 ],
+			"type": "VEC2"
+		},
+		{
+			"bufferView": 4,
+			"byteOffset": 0,
+			"componentType": 5123,
+			"count": 10690,
+			"max": [ 96, 96, 96, 96 ],
+			"min": [ 0, 0, 0, 0 ],
+			"type": "VEC4"
+		},
+		{
+			"bufferView": 3,
+			"byteOffset": 0,
+			"componentType": 5126,
+			"count": 10690,
+			"max": [ 1, 0.497188, 0.294598, 0.190747 ],
+			"min": [ 0.328946, 0, 0, 0 ],
+			"type": "VEC4"
+		},
+		{
+			"bufferView": 3,
+			"byteOffset": 171040,
+			"componentType": 5126,
+			"count": 10690,
+			"max": [ 1, 1, 1, 1 ],
+			"min": [ -1, -1, -1, -1 ],
+			"type": "VEC4"
+		},
+		{
+			"bufferView": 0,
+			"byteOffset": 0,
+			"componentType": 5123,
+			"count": 30024,
+			"max": [ 7339 ],
+			"min": [ 0 ],
+			"type": "SCALAR"
+		},
+		{
+			"bufferView": 0,
+			"byteOffset": 60048,
+			"componentType": 5123,
+			"count": 3036,
+			"max": [ 7915 ],
+			"min": [ 7340 ],
+			"type": "SCALAR"
+		},
+		{
+			"bufferView": 0,
+			"byteOffset": 66120,
+			"componentType": 5123,
+			"count": 11073,
+			"max": [ 10393 ],
+			"min": [ 7916 ],
+			"type": "SCALAR"
+		},
+		{
+			"bufferView": 0,
+			"byteOffset": 88266,
+			"componentType": 5123,
+			"count": 840,
+			"max": [ 10689 ],
+			"min": [ 10394 ],
+			"type": "SCALAR"
+		},
+		{
+			"bufferView": 5,
+			"byteOffset": 0,
+			"componentType": 5126,
+			"count": 97,
+			"max": [ 1, 0, 0.000351, 0, 0, 0.004845262, 0.9999999, 0, 0, 0, 0.004845262, 0, 25.82338, 0, 5.661144, 1 ],
+			"min": [ 0, 0, 0, 0, -0.000351, 0, 0, 0, -1.164153E-10, -1, 0, 0, -25.82339, -57.37374, -3.213314, 0 ],
+			"type": "MAT4"
+		}
+	],
+	"buffers": [
+		{
+			"byteLength": 865834,
+			"uri": "Unity2Skfb.bin"
+		}
+	],
+	"bufferViews": [
+		{
+			"buffer": 0,
+			"byteLength": 89946,
+			"target": 34963,
+			"byteOffset": 775888
+		},
+		{
+			"buffer": 0,
+			"byteLength": 85520,
+			"target": 34962,
+			"byteStride": 8,
+			"byteOffset": 0
+		},
+		{
+			"buffer": 0,
+			"byteLength": 256560,
+			"target": 34962,
+			"byteStride": 12,
+			"byteOffset": 85520
+		},
+		{
+			"buffer": 0,
+			"byteLength": 342080,
+			"target": 34962,
+			"byteStride": 16,
+			"byteOffset": 342080
+		},
+		{
+			"buffer": 0,
+			"byteLength": 85520,
+			"byteStride": 8,
+			"byteOffset": 684160
+		},
+		{
+			"buffer": 0,
+			"byteLength": 6208,
+			"byteStride": 64,
+			"byteOffset": 769680
+		}
+	],
+	"images": [
+		{
+			"uri": "Assets/NeptuneVictory/images/body_v.jpg"
+		},
+		{
+			"uri": "Assets/NeptuneVictory/images/face_c.jpg"
+		},
+		{
+			"uri": "Assets/NeptuneVictory/images/hair_c.jpg"
+		},
+		{
+			"uri": "Assets/NeptuneVictory/images/acce_c.jpg"
+		}
+	],
+	"materials": [
+		{
+			"extensions": {
+				"KHR_materials_pbrSpecularGlossiness": {
+					"baseColorTexture" : {
+						"index" : 0,
+						"texCoord" : 0
+					},
+					"baseColorFactor": [0.8, 0.8, 0.8, 1]				}
+
+			},
+			"emissiveFactor": [0, 0, 0],
+			"doubleSided": false,
+			"name": "body_v"
+		},
+		{
+			"extensions": {
+				"KHR_materials_pbrSpecularGlossiness": {
+					"baseColorTexture" : {
+						"index" : 1,
+						"texCoord" : 0
+					},
+					"baseColorFactor": [0.8, 0.8, 0.8, 1]				}
+
+			},
+			"emissiveFactor": [0, 0, 0],
+			"doubleSided": false,
+			"name": "face_c"
+		},
+		{
+			"extensions": {
+				"KHR_materials_pbrSpecularGlossiness": {
+					"baseColorTexture" : {
+						"index" : 2,
+						"texCoord" : 0
+					},
+					"baseColorFactor": [0.8, 0.8, 0.8, 1]				}
+
+			},
+			"emissiveFactor": [0, 0, 0],
+			"doubleSided": false,
+			"name": "hair_c"
+		},
+		{
+			"extensions": {
+				"KHR_materials_pbrSpecularGlossiness": {
+					"baseColorTexture" : {
+						"index" : 3,
+						"texCoord" : 0
+					},
+					"baseColorFactor": [0.8, 0.8, 0.8, 1]				}
+
+			},
+			"emissiveFactor": [0, 0, 0],
+			"doubleSided": false,
+			"name": "acce_c"
+		}
+	],
+	"meshes": [
+		{
+			"name": "mesh_NeptuneV_13442NeptuneV",
+			"primitives": [
+				{
+					"attributes": {
+						"POSITION": 0,
+						"NORMAL": 1,
+						"TEXCOORD_0": 2,
+						"JOINTS_0": 3,
+						"WEIGHTS_0": 4,
+						"TANGENT": 5
+					},
+					"indices": 6,
+					"material": 0,
+					"mode": 4
+				},
+				{
+					"attributes": {
+						"POSITION": 0,
+						"NORMAL": 1,
+						"TEXCOORD_0": 2,
+						"JOINTS_0": 3,
+						"WEIGHTS_0": 4,
+						"TANGENT": 5
+					},
+					"indices": 7,
+					"material": 1,
+					"mode": 4
+				},
+				{
+					"attributes": {
+						"POSITION": 0,
+						"NORMAL": 1,
+						"TEXCOORD_0": 2,
+						"JOINTS_0": 3,
+						"WEIGHTS_0": 4,
+						"TANGENT": 5
+					},
+					"indices": 8,
+					"material": 2,
+					"mode": 4
+				},
+				{
+					"attributes": {
+						"POSITION": 0,
+						"NORMAL": 1,
+						"TEXCOORD_0": 2,
+						"JOINTS_0": 3,
+						"WEIGHTS_0": 4,
+						"TANGENT": 5
+					},
+					"indices": 9,
+					"material": 3,
+					"mode": 4
+				}
+			]
+		}
+	],
+	"nodes": [
+		{
+			"name": "UnityGlTF_root",
+			"children": [
+				65
+			]
+		},
+		{
+			"name": "node_neck_15012",
+			"children": [
+				74
+			],
+			"translation": [ 0, 6.402458, 1.505905]
+		},
+		{
+			"name": "node_R_B_skirt_01_15024",
+			"children": [
+				93
+			],
+			"translation": [ 2.100835, 4.343597, 1.504127]
+		},
+		{
+			"name": "node_R_F_hair_15028",
+			"translation": [ 3.565508, 4.063267, -2.356028]
+		},
+		{
+			"name": "node_L_B_skirt_01_15032",
+			"children": [
+				5
+			],
+			"translation": [ -2.100834, 4.343605, 1.504125]
+		},
+		{
+			"name": "node_L_B_skirt_02_15188",
+			"children": [
+				51
+			],
+			"translation": [ -0.970319, -3.133289, 1.167499]
+		},
+		{
+			"name": "node_L_leg_02_15036",
+			"children": [
+				77
+			],
+			"translation": [ 0.309962, -13.1519, 0.778947]
+		},
+		{
+			"name": "node_L_leg_01_15084",
+			"children": [
+				6
+			],
+			"translation": [ -3.380861, -0.725893, 0.12419]
+		},
+		{
+			"name": "node_R_middle_02_15040",
+			"children": [
+				9
+			],
+			"translation": [ 1.553469, -0.03540039, 5.96046E-08]
+		},
+		{
+			"name": "node_R_middle_03_15076",
+			"translation": [ 0.7821026, -0.005901337, 0]
+		},
+		{
+			"name": "node_R_middle_01_15164",
+			"children": [
+				8
+			],
+			"translation": [ 2.599703, 0.07950974, -0.01538402]
+		},
+		{
+			"name": "node_L_pinkey_02_15044",
+			"children": [
+				12
+			],
+			"translation": [ -1.151768, -0.03540039, 0]
+		},
+		{
+			"name": "node_L_pinkey_03_15184",
+			"translation": [ -0.5879993, -0.005901337, 0]
+		},
+		{
+			"name": "node_L_pinkey_01_15116",
+			"children": [
+				11
+			],
+			"translation": [ -2.219353, -0.1846886, 1.281348]
+		},
+		{
+			"name": "node_L_F_hair_15048",
+			"translation": [ -3.565506, 4.063381, -2.356027]
+		},
+		{
+			"name": "node_L_himo_02_15052",
+			"translation": [ -0.618848, -3.358303, -1.025025]
+		},
+		{
+			"name": "node_L_himo_01_15196",
+			"children": [
+				15
+			],
+			"translation": [ -1.946114, 1.884628, -2.376704]
+		},
+		{
+			"name": "node_L_F_skirt_01_15056",
+			"children": [
+				18
+			],
+			"translation": [ -1.613108, 4.369961, -2.7126]
+		},
+		{
+			"name": "node_L_F_skirt_02_15080",
+			"children": [
+				32
+			],
+			"translation": [ -1.093057, -3.293274, -0.9287145]
+		},
+		{
+			"name": "node_R_pinkey_02_15060",
+			"children": [
+				20
+			],
+			"translation": [ 1.151768, -0.03540039, 0]
+		},
+		{
+			"name": "node_R_pinkey_03_15262",
+			"translation": [ 0.5879993, -0.005901337, 0]
+		},
+		{
+			"name": "node_R_pinkey_01_15104",
+			"children": [
+				19
+			],
+			"translation": [ 2.219353, -0.1846886, 1.281348]
+		},
+		{
+			"name": "node_R_arm_15064",
+			"children": [
+				23,
+				24,
+				25
+			],
+			"translation": [ 2.8248, -0.8447914, 0]
+		},
+		{
+			"name": "node_R_elbow_15148",
+			"children": [
+				83,
+				38
+			],
+			"translation": [ 7.768061, 0, 0.002584994]
+		},
+		{
+			"name": "node_R_elbow_hojo_02_15310",
+			"translation": [ 7.107996, 0, 0.002584994]
+		},
+		{
+			"name": "node_R_sub_shoulder_15326"
+		},
+		{
+			"name": "node_R_shoulder_15172",
+			"children": [
+				22
+			],
+			"translation": [ 1.094879, 4.641155, 1.625546]
+		},
+		{
+			"name": "node_R_toe_15068",
+			"children": [
+				28
+			],
+			"translation": [ -0.08681488, -5.537141, -3.802839]
+		},
+		{
+			"name": "node_R_toe_02_15286",
+			"translation": [ -0.06795311, -0.145335, -2.094693]
+		},
+		{
+			"name": "node_L_middle_02_15072",
+			"children": [
+				30
+			],
+			"translation": [ -1.553469, -0.03540039, 5.96046E-08]
+		},
+		{
+			"name": "node_L_middle_03_15200",
+			"translation": [ -0.7821026, -0.005901337, 0]
+		},
+		{
+			"name": "node_L_middle_01_15234",
+			"children": [
+				29
+			],
+			"translation": [ -2.599703, 0.07950974, -0.01538402]
+		},
+		{
+			"name": "node_L_F_skirt_03_15092",
+			"translation": [ -1.247227, -3.605476, -0.9986691]
+		},
+		{
+			"name": "node_L_thumb_01_15246",
+			"children": [
+				85
+			],
+			"translation": [ -0.78619, -0.1992989, -0.648982]
+		},
+		{
+			"name": "node_Head_Collision_15096",
+			"translation": [ 0, 8.859455, -0.606444]
+		},
+		{
+			"name": "node_L_skirt_03_15100",
+			"translation": [ -1.926798, -3.672968, 0.246489]
+		},
+		{
+			"name": "node_L_skirt_02_15108",
+			"children": [
+				35
+			],
+			"translation": [ -1.938174, -3.223858, 0.09756088]
+		},
+		{
+			"name": "node_L_skirt_01_15180",
+			"children": [
+				36
+			],
+			"translation": [ -3.416885, 4.369011, -0.5716499]
+		},
+		{
+			"name": "node_R_sub_elbow_15112",
+			"translation": [ 5.70225, 0, -0.00109899]
+		},
+		{
+			"name": "node_L_ring_03_15270",
+			"translation": [ -0.7611065, -0.005901337, 0]
+		},
+		{
+			"name": "node_R_weapon_15128",
+			"translation": [ 6.272331, -3.546684, -0.00087294]
+		},
+		{
+			"name": "node_L_hair_03_15140",
+			"translation": [ 0.10028, -2.306438, -0.554132]
+		},
+		{
+			"name": "node_R_index_03_15144",
+			"translation": [ 0.6898537, -0.005901337, 0]
+		},
+		{
+			"name": "node_R_index_02_15230",
+			"children": [
+				42
+			],
+			"translation": [ 1.391233, -0.03540039, 5.96046E-08]
+		},
+		{
+			"name": "node_L_index_01_15238",
+			"children": [
+				53
+			],
+			"translation": [ -2.574677, 0.07239532, -0.697633]
+		},
+		{
+			"name": "node_L_weapon_15176",
+			"translation": [ -6.272318, -3.546829, -0.000871956]
+		},
+		{
+			"name": "node_L_shoulder_15156",
+			"children": [
+				98
+			],
+			"translation": [ -1.094879, 4.641155, 1.625546]
+		},
+		{
+			"name": "node_L_bust_up_15346",
+			"translation": [ -1.542178, 1.683071, -1.775094]
+		},
+		{
+			"name": "node_R_bust_up_15212",
+			"translation": [ 1.542177, 1.683151, -1.775093]
+		},
+		{
+			"name": "node_R_himo_01_15220",
+			"children": [
+				54
+			],
+			"translation": [ 1.946114, 1.884727, -2.376704]
+		},
+		{
+			"name": "node_R_hair_01_15216",
+			"children": [
+				64
+			],
+			"translation": [ 3.369484, 3.782162, -1.184017]
+		},
+		{
+			"name": "node_L_B_skirt_03_15254",
+			"translation": [ -1.167671, -3.706427, 1.562838]
+		},
+		{
+			"name": "node_L_index_03_15208",
+			"translation": [ -0.6898537, -0.005901337, 0]
+		},
+		{
+			"name": "node_L_index_02_15322",
+			"children": [
+				52
+			],
+			"translation": [ -1.391233, -0.03540039, 5.96046E-08]
+		},
+		{
+			"name": "node_R_himo_02_15350",
+			"translation": [ 0.6188461, -3.358387, -1.025012]
+		},
+		{
+			"name": "node_R_index_01_15290",
+			"children": [
+				43
+			],
+			"translation": [ 2.574677, 0.07239532, -0.697633]
+		},
+		{
+			"name": "node_R_ring_03_15258",
+			"translation": [ 0.7611065, -0.005901337, 0]
+		},
+		{
+			"name": "node_R_ring_02_15338",
+			"children": [
+				56
+			],
+			"translation": [ 1.413849, -0.03540039, 0]
+		},
+		{
+			"name": "node_L_sub_shoulder_15266",
+			"rotation": [-0.002422569, 0, 0, -0.9999971]
+		},
+		{
+			"name": "node_L_elbow_hojo_02_15314",
+			"translation": [ -7.107996, 0, 0.002584994]
+		},
+		{
+			"name": "node_R_skirt_01_15298",
+			"children": [
+				61
+			],
+			"translation": [ 3.416886, 4.368992, -0.571649]
+		},
+		{
+			"name": "node_R_skirt_02_15318",
+			"children": [
+				63
+			],
+			"translation": [ 1.938154, -3.223858, 0.09755898]
+		},
+		{
+			"name": "node_R_ring_01_15306",
+			"children": [
+				57
+			],
+			"translation": [ 2.463039, 0.02746582, 0.709958]
+		},
+		{
+			"name": "node_R_skirt_03_15334",
+			"translation": [ 1.926811, -3.672953, 0.246492]
+		},
+		{
+			"name": "node_R_hair_02_15168",
+			"children": [
+				100
+			],
+			"translation": [ -0.140393, -2.62756, -0.09838605]
+		},
+		{
+			"name": "node_NeptuneV_OpenCollada_14944",
+			"children": [
+				66,
+				67,
+				68
+			],
+			"matrix": [0.03, 0, 0, 0, 0, 0.03, 0, 0, 0, 0, 0.03, 0, 0, 0, 0, 1]
+		},
+		{
+			"name": "node_EnvironmentAmbientLight_15020",
+			"rotation": [-0.7071068, 0, 0, -0.7071068]
+		},
+		{
+			"name": "node_NeptuneV_15224",
+			"mesh": 0,
+			"rotation": [-0.7071068, 0, 0, -0.7071068]
+,
+			"skin": 0
+		},
+		{
+			"name": "node_root_15294",
+			"children": [
+				4,
+				17,
+				7,
+				37,
+				2,
+				88,
+				80,
+				60,
+				71
+			],
+			"translation": [ 0, 32.26691, -1.021137]
+		},
+		{
+			"name": "node_spine_01_14948",
+			"children": [
+				70
+			],
+			"translation": [ 0, 1.849674, 0.01341903]
+		},
+		{
+			"name": "node_spine_02_15160",
+			"children": [
+				47,
+				16,
+				46,
+				1,
+				48,
+				49,
+				26
+			],
+			"translation": [ 0, 2.046761, 0.1389568]
+		},
+		{
+			"name": "node_spine_00_15136",
+			"children": [
+				69
+			],
+			"translation": [ 0, 4.358616, -0.3598298]
+		},
+		{
+			"name": "node_L_hair_01_14952",
+			"children": [
+				73
+			],
+			"translation": [ -3.369482, 3.782112, -1.184018]
+		},
+		{
+			"name": "node_L_hair_02_15282",
+			"children": [
+				41
+			],
+			"translation": [ 0.1403921, -2.627331, -0.09838295]
+		},
+		{
+			"name": "node_head_15274",
+			"children": [
+				94,
+				34,
+				14,
+				72,
+				3,
+				50
+			],
+			"translation": [ 0, 1.589867, -0.218092]
+		},
+		{
+			"name": "node_L_toe_14956",
+			"children": [
+				76
+			],
+			"translation": [ 0.08681297, -5.537153, -3.802841]
+		},
+		{
+			"name": "node_L_toe_02_15124",
+			"translation": [ 0.06795406, -0.145334, -2.094687]
+		},
+		{
+			"name": "node_L_foot_01_15330",
+			"children": [
+				75
+			],
+			"translation": [ 0.287365, -12.66269, 1.189007]
+		},
+		{
+			"name": "node_R_leg_02_14960",
+			"children": [
+				79
+			],
+			"translation": [ -0.3099649, -13.15189, 0.778948]
+		},
+		{
+			"name": "node_R_foot_01_15242",
+			"children": [
+				27
+			],
+			"translation": [ -0.2873621, -12.66272, 1.189005]
+		},
+		{
+			"name": "node_R_leg_01_14984",
+			"children": [
+				78
+			],
+			"translation": [ 3.380862, -0.7258892, 0.124189]
+		},
+		{
+			"name": "node_R_thumb_01_14964",
+			"children": [
+				82
+			],
+			"translation": [ 0.78619, -0.1992989, -0.648982]
+		},
+		{
+			"name": "node_R_thumb_02_15302",
+			"children": [
+				99
+			],
+			"translation": [ 0.7169342, -0.1830559, -0.529156]
+		},
+		{
+			"name": "node_R_hand_15342",
+			"children": [
+				55,
+				10,
+				21,
+				62,
+				81,
+				40
+			],
+			"translation": [ 7.863319, 0, -0.002618998]
+		},
+		{
+			"name": "node_L_thumb_03_14968",
+			"translation": [ -1.249008, -0.1749802, -0.2540631]
+		},
+		{
+			"name": "node_L_thumb_02_15088",
+			"children": [
+				84
+			],
+			"translation": [ -0.7169342, -0.1830559, -0.529156]
+		},
+		{
+			"name": "node_R_F_skirt_02_14988",
+			"children": [
+				87
+			],
+			"translation": [ 1.093059, -3.293308, -0.9286935]
+		},
+		{
+			"name": "node_R_F_skirt_03_15250",
+			"translation": [ 1.247221, -3.605476, -0.9987011]
+		},
+		{
+			"name": "node_R_F_skirt_01_15192",
+			"children": [
+				86
+			],
+			"translation": [ 1.613106, 4.36998, -2.712602]
+		},
+		{
+			"name": "node_L_ring_01_14992",
+			"children": [
+				90
+			],
+			"translation": [ -2.463039, 0.02746582, 0.709958]
+		},
+		{
+			"name": "node_L_ring_02_15120",
+			"children": [
+				39
+			],
+			"translation": [ -1.413849, -0.03540039, 0]
+		},
+		{
+			"name": "node_L_hand_15152",
+			"children": [
+				44,
+				31,
+				13,
+				89,
+				33,
+				45
+			],
+			"translation": [ -7.863319, 0, -0.002618998]
+		},
+		{
+			"name": "node_R_B_skirt_03_14996",
+			"translation": [ 1.167665, -3.706451, 1.562838]
+		},
+		{
+			"name": "node_R_B_skirt_02_15132",
+			"children": [
+				92
+			],
+			"translation": [ 0.970319, -3.13327, 1.167496]
+		},
+		{
+			"name": "node_F_hair_01_15000",
+			"children": [
+				95
+			],
+			"translation": [ 0.74292, 5.613174, -3.894353]
+		},
+		{
+			"name": "node_F_hair_02_15204",
+			"translation": [ -0.666411, -1.441307, 0]
+		},
+		{
+			"name": "node_L_elbow_15004",
+			"children": [
+				91,
+				97
+			],
+			"translation": [ -7.768061, 0, 0.002584994]
+		},
+		{
+			"name": "node_L_sub_elbow_15016",
+			"translation": [ -5.70224, 0, -0.001100987]
+		},
+		{
+			"name": "node_L_arm_15278",
+			"children": [
+				96,
+				59,
+				58
+			],
+			"translation": [ -2.8248, -0.8447914, 0]
+		},
+		{
+			"name": "node_R_thumb_03_15008",
+			"translation": [ 1.249008, -0.1749802, -0.2540631]
+		},
+		{
+			"name": "node_R_hair_03_14932",
+			"translation": [ -0.10028, -2.306301, -0.5541301]
+		}
+	],
+	"samplers": [
+		{
+			"magFilter": 9729,
+			"minFilter": 9985,
+			"wrapS": 10497,
+			"wrapT": 10497
+		}
+	],
+	"scenes": [
+		{
+			"name":"defaultScene",
+			"nodes": [
+				0
+			]
+		}
+	],
+	"scene": 0,
+	"skins": [
+		{
+			"inverseBindMatrices": 10,
+			"joints": [
+				68,
+				71,
+				69,
+				70,
+				1,
+				74,
+				34,
+				72,
+				73,
+				41,
+				14,
+				94,
+				95,
+				50,
+				64,
+				100,
+				3,
+				47,
+				46,
+				98,
+				96,
+				91,
+				33,
+				85,
+				84,
+				44,
+				53,
+				52,
+				31,
+				29,
+				30,
+				89,
+				90,
+				39,
+				13,
+				11,
+				12,
+				45,
+				97,
+				58,
+				59,
+				26,
+				22,
+				23,
+				83,
+				81,
+				82,
+				99,
+				55,
+				43,
+				42,
+				10,
+				8,
+				9,
+				62,
+				57,
+				56,
+				21,
+				19,
+				20,
+				40,
+				38,
+				25,
+				24,
+				48,
+				16,
+				15,
+				49,
+				54,
+				7,
+				6,
+				77,
+				75,
+				76,
+				17,
+				18,
+				32,
+				37,
+				36,
+				35,
+				4,
+				5,
+				51,
+				80,
+				78,
+				79,
+				27,
+				28,
+				88,
+				86,
+				87,
+				60,
+				61,
+				63,
+				2,
+				93,
+				92
+			],
+			"name": "root_skeleton_NeptuneV15224"
+		}
+	],
+	"textures": [
+		{
+			"sampler": 0,
+			"source": 0
+		},
+		{
+			"sampler": 0,
+			"source": 1
+		},
+		{
+			"sampler": 0,
+			"source": 2
+		},
+		{
+			"sampler": 0,
+			"source": 3
+		}
+	]
+}

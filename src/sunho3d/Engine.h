@@ -3,8 +3,11 @@
 #include <memory>
 #include <list>
 #include <stdlib.h>
+#include "ResourceList.h"
 #include "Window.h"
+#include "Entity.h"
 #include "Renderer.h"
+#include "Scene.h"
 
 namespace sunho3d {
 
@@ -14,10 +17,14 @@ public:
     ~Engine();
     
     Window* createWindow(size_t width, size_t height);
-    Renderer* createRenderer(Window* window);
+    Entity* createEntity();
+    Renderer* createRenderer(Window* window, Scene* scene);
+    Scene* createScene();
 private:
-    std::list<std::unique_ptr<Window>> windows;
-    std::list<std::unique_ptr<Renderer>> renderers;
+    ResourceList<Window> windows;
+    ResourceList<Renderer> renderers;
+    ResourceList<Entity> entities;
+    ResourceList<Scene> scenes;
 };
 
 }
