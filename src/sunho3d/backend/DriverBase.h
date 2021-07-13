@@ -46,9 +46,19 @@ struct HwUniformBuffer : public HwBase  {
     explicit HwUniformBuffer(uint32_t size) : size(size) { }
 };
 
-struct HwPrimitive {
+struct HwPrimitive : public HwBase {
     PrimitiveMode mode{};
     HwPrimitive() = default;
     explicit HwPrimitive(PrimitiveMode mode) : mode(mode) { }
 };
 
+struct HwTexture : public HwBase {
+    SamplerType type{};
+    uint8_t levels{};
+    TextureFormat format{};
+    uint32_t width{};
+    uint32_t height{};
+    HwTexture() = default;
+    HwTexture(SamplerType type, uint8_t levels, TextureFormat format, uint32_t width, uint32_t height) :
+        type(type), levels(levels), format(format), width(width), height(height) { }
+};

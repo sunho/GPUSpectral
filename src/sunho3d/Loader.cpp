@@ -8,6 +8,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <tiny_gltf.h>
 #include <stdexcept>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
 using namespace sunho3d;
 
@@ -36,6 +38,96 @@ Scene* Loader::loadGLTF(const std::string &path) {
         loadGLTFNode(scene, model, model.nodes[node]);
     }
     return scene;
+}
+
+Entity* Loader::loadObj(const std::string &path) {
+    Entity* out = engine.createEntity();
+    std::string warn;
+     std::string err;
+    std::vector<tinyobj::shape_t> shapes;
+tinyobj::attrib_t attrib;
+    std::vector<tinyobj::material_t> materials;
+    
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), "");
+     if (!warn.empty()) {
+       std::cout << "WARN: " << warn << std::endl;
+     }
+     if (!err.empty()) {
+       std::cerr << err << std::endl;
+     }
+
+    
+    for (size_t m = 0; m < materials.size(); m++) {
+        tinyobj::material_t* mp = &materials[m];
+        
+    }
+    for (size_t s = 0; s < shapes.size(); s++) {
+        Material material;
+        auto mat = shapes[s].mesh.material_ids[0];
+        int width,height,comp;
+        unsigned char *data = stbi_load(materials[mat].diffuse_texname.c_str(), &width, &height, &comp, 0);
+        if (!data) {
+            throw std::runtime_error("FUCK");
+        }
+        for (int j = height-1; j >=0 ; --j) {
+            for (int i = 0; i < width; ++i) {
+                material.diffuseImage.push_back(data[(j*width+i)*comp]);
+                material.diffuseImage.push_back(data[(j*width+i)*comp+1]);
+                material.diffuseImage.push_back(data[(j*width+i)*comp+2]);
+                material.diffuseImage.push_back(0xFF);
+            }
+        }
+        material.width = width;
+        material.height = height;
+        stbi_image_free(data);
+        Primitive primitve;
+        std::vector<float> v;
+        std::vector<float> vn;
+        std::vector<float> vt;
+        primitve.material = material;
+        for (size_t f = 0; f < shapes[s].mesh.indices.size(); ++f) {
+            primitve.indexBuffer.push_back(f);
+            auto i0 = shapes[s].mesh.indices[f];
+            v.push_back(attrib.vertices[3*i0.vertex_index]);
+            v.push_back(attrib.vertices[3*i0.vertex_index+1]);
+            v.push_back(attrib.vertices[3*i0.vertex_index+2]);
+            vt.push_back(attrib.texcoords[2*i0.texcoord_index]);
+            vt.push_back(attrib.texcoords[2*i0.texcoord_index+1]);
+            vn.push_back(attrib.normals[3*i0.normal_index]);
+            vn.push_back(attrib.normals[3*i0.normal_index+1]);
+            vn.push_back(attrib.normals[3*i0.normal_index+2]);
+        }
+        primitve.attibutes[0] = {
+            .name="position",
+            .offset=0,
+            .index=0,
+            .type=ElementType::FLOAT3,
+            .stride=12
+        };
+        primitve.attibutes[1] = {
+                .name="normal",
+                .offset=0,
+                .index=1,
+                .type=ElementType::FLOAT3,
+                .stride=12
+            };
+        primitve.attibutes[2] = {
+                .name="texcoord",
+                .offset=0,
+                .index=2,
+                .type=ElementType::FLOAT2,
+                .stride=8
+            };
+        
+        primitve.vertexBuffers.push_back(std::vector<char>((char*)v.data(), (char*)v.data() + 4*v.size()));
+        primitve.vertexBuffers.push_back(std::vector<char>((char*)vn.data(), (char*)vn.data() + 4*v.size()));
+        primitve.vertexBuffers.push_back(std::vector<char>((char*)vt.data(), (char*)vt.data() + 4*vt.size()));
+        primitve.mode = PrimitiveMode::TRIANGLES;
+        primitve.attributeCount = 3;
+        primitve.elementCount =  primitve.indexBuffer.size();
+        out->addPrimitive(std::move(primitve));
+    }
+    return out;
 }
 
 void Loader::loadGLTFNode(Scene* scene, tinygltf::Model &model, tinygltf::Node &node, Entity* parent) {

@@ -18,6 +18,8 @@ set(SOURCE_LIST
     backend/vulkan/VulkanPipelineCache.cpp
     backend/vulkan/VulkanCommands.h
     backend/vulkan/VulkanCommands.cpp
+    backend/vulkan/VulkanTexture.h
+    backend/vulkan/VulkanTexture.cpp
     shaders/triangle.frag
     shaders/triangle.vert
     Engine.h
@@ -32,12 +34,14 @@ set(SOURCE_LIST
     Scene.cpp
     Loader.h
     Loader.cpp
+    Material.h
+    Material.cpp
     ResourceList.h
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
 add_library(sunho3d ${SOURCE_LIST})
-target_link_libraries(sunho3d PUBLIC glfw glm Vulkan tinygltf)
+target_link_libraries(sunho3d PUBLIC glfw glm Vulkan tinygltf tinyobjloader)
 target_include_directories(sunho3d PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 add_executable(embedfile EmbedFile.c)

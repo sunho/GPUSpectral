@@ -18,6 +18,7 @@ private:
     Window* window;
     Scene* scene;
     std::vector<Handle<HwPrimitive>> primitives;
+    std::vector<Handle<HwTexture>> textures;
 };
 
 }

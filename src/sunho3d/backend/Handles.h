@@ -45,3 +45,4 @@ using ProgramHandle = Handle<HwProgram>;
 using RenderTargetHandle = Handle<HwRenderTarget>;
 using BufferObjectHandle = Handle<HwBufferObject>;
 using PrimitiveHandle = Handle<HwPrimitive>;
+using TextureHandle = Handle<HwTexture>;

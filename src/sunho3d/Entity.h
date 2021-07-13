@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "ResourceList.h"
+#include "Material.h"
 #include <sunho3d/backend/DriverTypes.h>
 
 namespace sunho3d {
@@ -13,6 +14,7 @@ struct Primitive {
     AttributeArray attibutes;
     uint32_t elementCount;
     uint32_t attributeCount;
+    Material material;
     PrimitiveMode mode;
 };
 

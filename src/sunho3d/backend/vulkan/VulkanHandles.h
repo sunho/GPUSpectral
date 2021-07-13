@@ -53,7 +53,10 @@ struct VulkanProgram : public HwProgram {
 
 struct VulkanRenderTarget : public HwRenderTarget {
     VulkanRenderTarget() = default;
-    explicit VulkanRenderTarget(uint32_t w, uint32_t h) : HwRenderTarget(w, h), surface(true) { }
+    explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachment depth) : HwRenderTarget(w, h), surface(true), depth(depth) {
+      
+        
+    }
     explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachment color, VulkanAttachment depth) : HwRenderTarget(w, h), color(color), depth(depth), surface(false) { }
     bool surface;
     VulkanAttachment color;

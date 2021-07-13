@@ -47,8 +47,13 @@ VulkanDriver::~VulkanDriver() {
 }
 
 RenderTargetHandle VulkanDriver::createDefaultRenderTarget(int dummy) {
+    VulkanAttachment depth;
+    auto tex = VulkanTexture(context, SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, 1, TextureFormat::DEPTH32F, surface.extent.width, surface.extent.height);
+    depth.image = tex.image;
+    depth.format = tex.vkFormat;
+    depth.view = tex.view;
     Handle<HwRenderTarget> handle = alloc_handle<VulkanRenderTarget, HwRenderTarget>();
-    construct_handle<VulkanRenderTarget>(handle, surface.extent.width, surface.extent.height);
+    construct_handle<VulkanRenderTarget>(handle, surface.extent.width, surface.extent.height, depth);
     return handle;
 }
 
@@ -118,9 +123,11 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     renderPassInfo.framebuffer = frameBuffer;
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = surface.extent;
-    VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    std::array<VkClearValue, 2> clearValues{};
+    clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+    clearValues[1].depthStencil = {1.0f, 0};
+    renderPassInfo.clearValueCount = 2;
+    renderPassInfo.pClearValues = clearValues.data();
     vkCmdBeginRenderPass(cmdbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     
     VkViewport viewport = {
@@ -141,6 +148,16 @@ PrimitiveHandle VulkanDriver::createPrimitive(PrimitiveMode mode) {
     return handle;
 }
 
+TextureHandle VulkanDriver::createTexture(SamplerType type, TextureUsage usage, TextureFormat format, uint32_t width, uint32_t height) {
+    Handle<HwTexture> handle = alloc_handle<VulkanTexture, HwTexture>();
+    construct_handle<VulkanTexture>(handle, context, type, usage, 1, format, width, height);
+    return handle;
+}
+
+void VulkanDriver::updateTexture(TextureHandle handle, BufferDescriptor data) {
+    handle_cast<VulkanTexture>(handle)->update2DImage(context, data);
+}
+
 void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle vertexBuffer, IndexBufferHandle indexBuffer) {
     VulkanVertexBuffer* vertex = handle_cast<VulkanVertexBuffer>(vertexBuffer);
     VulkanIndexBuffer* index = handle_cast<VulkanIndexBuffer>(indexBuffer);
@@ -155,32 +172,25 @@ void VulkanDriver::updateUniformBuffer(UniformBufferHandle handle, BufferDescrip
 void VulkanDriver::bindUniformBuffer(uint32_t binding, UniformBufferHandle handle) {
     const VkCommandBuffer cmdbuffer = context.commands.get();
     
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    bindings.push_back(VkDescriptorSetLayoutBinding{
-        .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .binding = 0,
-        .descriptorCount = 1,
-        .stageFlags = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-    });
+    VulkanUniformBuffer* ubo = handle_cast<VulkanUniformBuffer>(handle);
+    currentBinding.uniformBuffers[binding] = ubo->buffer->buffer;
+    currentBinding.uniformBufferOffsets[binding] = 0;
+    currentBinding.uniformBufferSizes[binding] = ubo->size;
     
-    VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = handle_cast<VulkanUniformBuffer>(handle)->buffer->buffer;
-    bufferInfo.offset = 0;
-    bufferInfo.range = handle_cast<VulkanUniformBuffer>(handle)->size;
-    VkDescriptorSet descriptorSet = pipelineCache.getOrCreateDescriptorSet(context, bindings);
-    VkWriteDescriptorSet descriptorWrite{};
-    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrite.dstSet = descriptorSet;
-    descriptorWrite.dstBinding = 0;
-    descriptorWrite.dstArrayElement = 0;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.pBufferInfo = &bufferInfo;
-    descriptorWrite.pImageInfo = nullptr; // Optional
-    descriptorWrite.pTexelBufferView = nullptr; // Optional
-    vkUpdateDescriptorSets(context.device, 1, &descriptorWrite, 0, nullptr);
-    vkCmdBindDescriptorSets(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineCache.pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-   
+    pipelineCache.bindDescriptors(context, currentBinding);
+}
+
+void VulkanDriver::bindTexture(uint32_t binding, TextureHandle handle) {
+    const VkCommandBuffer cmdbuffer = context.commands.get();
+       
+    VulkanTexture* tex = handle_cast<VulkanTexture>(handle);
+    VkDescriptorImageInfo info;
+    info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    info.imageView = tex->view;
+    info.sampler = tex->sampler;
+    currentBinding.samplers[binding] = info;
+
+    pipelineCache.bindDescriptors(context, currentBinding);
 }
 
 inline VkFormat getVkFormat(ElementType type, bool normalized, bool integer) {
@@ -309,25 +319,24 @@ void VulkanDriver::commit(int dummy) {
     
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkImageMemoryBarrier barrier {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = 0,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    VkImageMemoryBarrier  barrier = {
+       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+       .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+       .dstAccessMask = 0,
+       .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+       .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
        .image = context.currentSwapContext->attachment.image,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .levelCount = 1,
-            .layerCount = 1,
-        },
+       .subresourceRange = {
+           .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+           .levelCount = 1,
+           .layerCount = 1,
+       },
     };
-    vkCmdPipelineBarrier(cmdbuffer,
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    vkCmdPipelineBarrier( context.commands.get(),
+            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
     vkEndCommandBuffer(cmdbuffer);
 
     VkSemaphore waitSemaphores[] = { context.commands.imageAvailableSemaphore()};

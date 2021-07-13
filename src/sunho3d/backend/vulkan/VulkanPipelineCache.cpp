@@ -1,58 +1,223 @@
 #include "VulkanPipelineCache.h"
 
 void VulkanPipelineCache::init(VulkanContext& context) {
-      VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-      pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+     dummyBufferWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+     dummyBufferWriteInfo.pNext = nullptr;
+     dummyBufferWriteInfo.dstArrayElement = 0;
+     dummyBufferWriteInfo.descriptorCount = 1;
+     dummyBufferWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+     dummyBufferWriteInfo.pImageInfo = nullptr;
+     dummyBufferWriteInfo.pBufferInfo = &dummyBufferInfo;
+     dummyBufferWriteInfo.pTexelBufferView = nullptr;
 
-      pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-      pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
-    
+     dummySamplerWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+     dummySamplerWriteInfo.pNext = nullptr;
+     dummySamplerWriteInfo.dstArrayElement = 0;
+     dummySamplerWriteInfo.descriptorCount = 1;
+     dummySamplerWriteInfo.pImageInfo = &dummySamplerInfo;
+     dummySamplerWriteInfo.pBufferInfo = nullptr;
+     dummySamplerWriteInfo.pTexelBufferView = nullptr;
+     dummySamplerWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+     dummyTargetInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+     dummyTargetWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+     dummyTargetWriteInfo.pNext = nullptr;
+     dummyTargetWriteInfo.dstArrayElement = 0;
+     dummyTargetWriteInfo.descriptorCount = 1;
+     dummyTargetWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+     dummyTargetWriteInfo.pImageInfo = &dummyTargetInfo;
+     dummyTargetWriteInfo.pBufferInfo = nullptr;
+     dummyTargetWriteInfo.pTexelBufferView = nullptr;
+    setupDescriptorLayout(context);
+}
+
+void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+
+    pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+    pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+       
     VkDescriptorSetLayoutBinding binding = {};
-       binding.descriptorCount = 1; // NOTE: We never use arrays-of-blocks.
-       binding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS; // NOTE: This is potentially non-optimal.
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
 
-    VkDescriptorSetLayoutBinding ubindings[1];
+    std::array<VkDescriptorSetLayoutBinding, UBUFFER_BINDING_COUNT> ubindings;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    for (uint32_t i = 0; i < 1; i++) {
-        binding.binding = i;
-        ubindings[i] = binding;
+    for (uint32_t i = 0; i < UBUFFER_BINDING_COUNT; i++) {
+       binding.binding = i;
+       ubindings[i] = binding;
     }
-     VkDescriptorSetLayoutCreateInfo dlinfo = {};
+    VkDescriptorSetLayoutCreateInfo dlinfo = {};
     dlinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    dlinfo.bindingCount = 1;
-    dlinfo.pBindings = ubindings;
-    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout);
-    pipelineLayoutInfo.setLayoutCount = 1; // Optional
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout; // Optional
-
-      if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
-          throw std::runtime_error("failed to create pipeline layout!");
-      }
+    dlinfo.bindingCount = ubindings.size();
+    dlinfo.pBindings = ubindings.data();
+    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[0]);
     
-    VkDescriptorPoolSize poolSize{};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = 1280;
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = 1280;
+    std::array<VkDescriptorSetLayoutBinding, SAMPLER_BINDING_COUNT> sbindings;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    for (uint32_t i = 0; i < SAMPLER_BINDING_COUNT; i++) {
+      binding.binding = i;
+      sbindings[i] = binding;
+    }
+    dlinfo.bindingCount = sbindings.size();
+    dlinfo.pBindings = sbindings.data();
+    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[1]);
+
+    std::array<VkDescriptorSetLayoutBinding, TARGET_BINDING_COUNT> bindings;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+      binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    for (uint32_t i = 0; i < TARGET_BINDING_COUNT; i++) {
+      binding.binding = i;
+      bindings[i] = binding;
+    }
+    dlinfo.bindingCount = bindings.size();
+    dlinfo.pBindings = bindings.data();
+    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[2]);
+    
+    pipelineLayoutInfo.setLayoutCount = 3;
+    pipelineLayoutInfo.pSetLayouts = descriptorSetLayout.data();
+
+    if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create pipeline layout!");
+    }
+    VkDescriptorPoolSize poolSizes[3] = {};
+    VkDescriptorPoolCreateInfo poolInfo {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+        .maxSets = 1024 * 3,
+        .poolSizeCount = 3,
+        .pPoolSizes = poolSizes
+    };
+    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSizes[0].descriptorCount = poolInfo.maxSets * UBUFFER_BINDING_COUNT;
+    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSizes[1].descriptorCount = poolInfo.maxSets * SAMPLER_BINDING_COUNT;
+    poolSizes[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    poolSizes[2].descriptorCount = poolInfo.maxSets * TARGET_BINDING_COUNT;
     if (vkCreateDescriptorPool(context.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
 }
 
-VkDescriptorSet VulkanPipelineCache::getOrCreateDescriptorSet(VulkanContext& context, const std::vector<VkDescriptorSetLayoutBinding>& bindings) {
+
+void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext& context, const VulkanDescriptorKey& key, std::array<VkDescriptorSet, 3>& descriptors) {
+    auto it = descriptorSets.find(key);
+    if (it != descriptorSets.end()) {
+        descriptors = it->second;
+        return;
+    }
+    
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &descriptorSetLayout;
-    VkDescriptorSet descriptorSet;
-    if (vkAllocateDescriptorSets(context.device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
+    allocInfo.descriptorSetCount = 3;
+    allocInfo.pSetLayouts = descriptorSetLayout.data();
+    if (vkAllocateDescriptorSets(context.device, &allocInfo, descriptors.data()) !=VK_SUCCESS) {
+         throw std::runtime_error("failed to allocate descriptor sets!");
     }
-    return descriptorSet;
+    descriptorSets.emplace(key, descriptors);
+}
+
+void VulkanPipelineCache::bindDescriptors(VulkanContext& context, const VulkanDescriptorKey& key) {
+    std::array<VkDescriptorSet, 3> descriptors;
+    getOrCreateDescriptors(context, key, descriptors);
+    
+    dummySamplerInfo.imageLayout = dummyTargetInfo.imageLayout;
+    dummySamplerInfo.imageView = dummyImageView;
+    dummySamplerInfo.imageView = dummyImageView;
+
+    if (dummySamplerInfo.sampler == VK_NULL_HANDLE) {
+       VkSamplerCreateInfo samplerInfo {
+           .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+           .magFilter = VK_FILTER_NEAREST,
+           .minFilter = VK_FILTER_NEAREST,
+           .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+           .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+           .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+           .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+           .anisotropyEnable = VK_FALSE,
+           .maxAnisotropy = 1,
+           .compareEnable = VK_FALSE,
+           .compareOp = VK_COMPARE_OP_ALWAYS,
+           .minLod = 0.0f,
+           .maxLod = 1.0f,
+           .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+           .unnormalizedCoordinates = VK_FALSE
+       };
+       vkCreateSampler(context.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
+    }
+
+       VkDescriptorBufferInfo descriptorBuffers[UBUFFER_BINDING_COUNT];
+       VkDescriptorImageInfo descriptorSamplers[SAMPLER_BINDING_COUNT];
+       VkDescriptorImageInfo descriptorInputAttachments[TARGET_BINDING_COUNT];
+       VkWriteDescriptorSet descriptorWrites[UBUFFER_BINDING_COUNT + SAMPLER_BINDING_COUNT +
+               TARGET_BINDING_COUNT];
+       uint32_t nwrites = 0;
+       VkWriteDescriptorSet* writes = descriptorWrites;
+       nwrites = 0;
+       for (uint32_t binding = 0; binding < UBUFFER_BINDING_COUNT; binding++) {
+           VkWriteDescriptorSet& writeInfo = writes[nwrites++];
+           if (key.uniformBuffers[binding]) {
+               VkDescriptorBufferInfo& bufferInfo = descriptorBuffers[binding];
+               bufferInfo.buffer = key.uniformBuffers[binding];
+               bufferInfo.offset = key.uniformBufferOffsets[binding];
+               bufferInfo.range = key.uniformBufferSizes[binding];
+               writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+               writeInfo.pNext = nullptr;
+               writeInfo.dstArrayElement = 0;
+               writeInfo.descriptorCount = 1;
+               writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+               writeInfo.pImageInfo = nullptr;
+               writeInfo.pBufferInfo = &bufferInfo;
+               writeInfo.pTexelBufferView = nullptr;
+           } else {
+               writeInfo = dummyBufferWriteInfo;
+           }
+           writeInfo.dstSet = descriptors[0];
+           writeInfo.dstBinding = binding;
+       }
+       for (uint32_t binding = 0; binding < SAMPLER_BINDING_COUNT; binding++) {
+           VkWriteDescriptorSet& writeInfo = writes[nwrites++];
+           if (key.samplers[binding].sampler) {
+               VkDescriptorImageInfo& imageInfo = descriptorSamplers[binding];
+               imageInfo = key.samplers[binding];
+               writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+               writeInfo.pNext = nullptr;
+               writeInfo.dstArrayElement = 0;
+               writeInfo.descriptorCount = 1;
+               writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+               writeInfo.pImageInfo = &imageInfo;
+               writeInfo.pBufferInfo = nullptr;
+               writeInfo.pTexelBufferView = nullptr;
+           } else {
+               writeInfo = dummySamplerWriteInfo;
+           }
+           writeInfo.dstSet = descriptors[1];
+           writeInfo.dstBinding = binding;
+       }
+       for (uint32_t binding = 0; binding < TARGET_BINDING_COUNT; binding++) {
+           VkWriteDescriptorSet& writeInfo = writes[nwrites++];
+           if (key.inputAttachments[binding].imageView) {
+               VkDescriptorImageInfo& imageInfo = descriptorInputAttachments[binding];
+               imageInfo = key.inputAttachments[binding];
+               writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+               writeInfo.pNext = nullptr;
+               writeInfo.dstArrayElement = 0;
+               writeInfo.descriptorCount = 1;
+               writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+               writeInfo.pImageInfo = &imageInfo;
+               writeInfo.pBufferInfo = nullptr;
+               writeInfo.pTexelBufferView = nullptr;
+           } else {
+               writeInfo = dummyTargetWriteInfo;
+           }
+           writeInfo.dstSet = descriptors[2];
+           writeInfo.dstBinding = binding;
+       }
+    vkUpdateDescriptorSets(context.device, nwrites, writes, 0, nullptr);
+    vkCmdBindDescriptorSets(context.commands.get(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 3, descriptors.data(), 0, nullptr);
 }
 
 VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context, const VulkanPipelineKey& key) {
@@ -105,6 +270,18 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context, cons
       viewportState.scissorCount = 1;
       viewportState.pScissors = &scissor;
       
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.minDepthBounds = 0.0f; // Optional
+    depthStencil.maxDepthBounds = 1.0f; // Optional
+    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.front = {}; // Optional
+    depthStencil.back = {}; // Optional
+
       VkPipelineRasterizationStateCreateInfo rasterizer{};
       rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
       rasterizer.depthClampEnable = VK_FALSE;
@@ -137,7 +314,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context, cons
       colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
       colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
       
-      colorBlendAttachment.blendEnable = VK_TRUE;
+      colorBlendAttachment.blendEnable = VK_FALSE;
       colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
       colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
       colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
@@ -176,7 +353,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context, cons
       pipelineInfo.pViewportState = &viewportState;
       pipelineInfo.pRasterizationState = &rasterizer;
       pipelineInfo.pMultisampleState = &multisampling;
-      pipelineInfo.pDepthStencilState = nullptr; // Optional
+      pipelineInfo.pDepthStencilState = &depthStencil; // Optional
       pipelineInfo.pColorBlendState = &colorBlending;
       pipelineInfo.pDynamicState = nullptr; // Optional
       pipelineInfo.layout = pipelineLayout;
@@ -214,17 +391,32 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext& context, 
         .attachment = 0,
         .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
     };
-
+    VkAttachmentDescription depthAttachment{};
+    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    VkAttachmentReference depthAttachmentRef{};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
     VkSubpassDescription subpass{
         .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount = 1,
-        .pColorAttachments = &colorAttachmentRef
+        .pColorAttachments = &colorAttachmentRef,
+        .pDepthStencilAttachment = &depthAttachmentRef
     };
+
+    std::array<VkAttachmentDescription, 2> attachments = {colorAttachment, depthAttachment};
 
     VkRenderPassCreateInfo renderPassInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &colorAttachment,
+        .attachmentCount = attachments.size(),
+        .pAttachments = attachments.data(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
     };
@@ -243,14 +435,15 @@ VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext& context
         return it->second;
     }
     VkImageView attachments[] = {
-        context.currentSwapContext->attachment.view
+        context.currentSwapContext->attachment.view,
+        renderTarget->depth.view
     };
 
     VkFramebuffer framebuffer;
     VkFramebufferCreateInfo framebufferInfo{
         .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
         .renderPass = renderPass,
-        .attachmentCount = 1,
+        .attachmentCount = 2,
         .pAttachments = attachments,
         .width = renderTarget->width,
         .height = renderTarget->height,

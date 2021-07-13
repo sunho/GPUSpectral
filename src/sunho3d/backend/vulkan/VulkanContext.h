@@ -22,12 +22,17 @@ struct VulkanContext {
     VulkanSurfaceContext* surface;
     VulkanSwapContext* currentSwapContext;
     VkRenderPass currentRenderPass;
+    
+    VkCommandBuffer beginSingleCommands();
+    void endSingleCommands(VkCommandBuffer cmd);
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 };
 
 struct VulkanAttachment {
     VkFormat format;
     VkImage image;
     VkImageView view;
+    VkDeviceMemory memory;
 };
 
 struct VulkanSwapContext {

@@ -17,6 +17,7 @@ class Loader {
 public:
     explicit Loader(Engine& engine);
     Scene* loadGLTF(const std::string& path);
+    Entity* loadObj(const std::string &path);
     
 private:
     void loadGLTFNode(Scene* scene, tinygltf::Model &model, tinygltf::Node &node, Entity* parent=nullptr);

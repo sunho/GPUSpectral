@@ -7,6 +7,9 @@
 #include <map>
 #include <unordered_map>
 
+
+
+
 struct VulkanPipelineKey {
     std::vector<VkVertexInputAttributeDescription> attributes;
     std::vector<VkVertexInputBindingDescription> bindings;
@@ -30,7 +33,7 @@ struct VulkanPipelineKey {
 };
 
 // FIXME: hash more robustly
-struct KeyHasher
+struct VulkanPipelineKeyHasher
 {
   std::size_t operator()(const VulkanPipelineKey& k) const
   {
@@ -38,19 +41,62 @@ struct KeyHasher
   }
 };
 
+static constexpr uint32_t UBUFFER_BINDING_COUNT = 8;
+static constexpr uint32_t SAMPLER_BINDING_COUNT = 8;
+static constexpr uint32_t TARGET_BINDING_COUNT = 8;
+
+#pragma pack(push, 1)
+struct VulkanDescriptorKey {
+    std::array<VkBuffer,UBUFFER_BINDING_COUNT> uniformBuffers;
+    std::array<VkDescriptorImageInfo, SAMPLER_BINDING_COUNT> samplers;
+    std::array<VkDescriptorImageInfo, TARGET_BINDING_COUNT> inputAttachments;
+    std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
+    std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
+    
+     bool operator==(const VulkanDescriptorKey& other) const {
+         return memcmp(this, &other, sizeof(VulkanDescriptorKey)) == 0;
+     }
+};
+#pragma pack(pop)
+
+template<class A>
+class PodHash {
+public:
+    size_t operator()(const A &a) const
+    {
+        // it is possible to write hash func here char by char without using std::string
+        const std::string str =
+            std::string( reinterpret_cast<const std::string::value_type*>( &a ), sizeof(A) );
+        return std::hash<std::string>()( str );
+    }
+};
 
 class VulkanPipelineCache {
 public:
+
     void init(VulkanContext& contex);
     VkPipeline getOrCreatePipeline(VulkanContext& context, const VulkanPipelineKey& key);
     VkFramebuffer getOrCreateFrameBuffer(VulkanContext& context, VkRenderPass renderPass, VulkanRenderTarget* renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanContext& context, VulkanRenderTarget* renderTarget);
-    VkDescriptorSet getOrCreateDescriptorSet(VulkanContext& context, const std::vector<VkDescriptorSetLayoutBinding>& bindings);
+    void bindDescriptors(VulkanContext& context, const VulkanDescriptorKey& key);
     VkPipelineLayout pipelineLayout;
 private:
+    void setupDescriptorLayout(VulkanContext& context);
+    void getOrCreateDescriptors(VulkanContext& context,  const VulkanDescriptorKey& key, std::array<VkDescriptorSet, 3>& descripotrs);
+    
+    
     VkDescriptorPool descriptorPool;
-        VkDescriptorSetLayout descriptorSetLayout;
-    std::unordered_map<VulkanPipelineKey, VkPipeline, KeyHasher> pipelines;
+    std::array<VkDescriptorSetLayout,3> descriptorSetLayout;
+    std::unordered_map<VulkanPipelineKey, VkPipeline, VulkanPipelineKeyHasher> pipelines;
     std::map<std::pair<VulkanRenderTarget*, VkImageView>, VkFramebuffer> framebuffers;
     std::unordered_map<VulkanRenderTarget*, VkRenderPass> renderpasses;
+    std::unordered_map<VulkanDescriptorKey, std::array<VkDescriptorSet, 3>, PodHash<VulkanDescriptorKey>> descriptorSets;
+    
+    VkImageView dummyImageView = VK_NULL_HANDLE;
+    VkDescriptorBufferInfo dummyBufferInfo = {};
+    VkWriteDescriptorSet dummyBufferWriteInfo = {};
+    VkDescriptorImageInfo dummySamplerInfo = {};
+    VkWriteDescriptorSet dummySamplerWriteInfo = {};
+    VkDescriptorImageInfo dummyTargetInfo = {};
+    VkWriteDescriptorSet dummyTargetWriteInfo = {};
 };

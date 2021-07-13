@@ -5,6 +5,7 @@
 #include "../DriverBase.h"
 #include "../PipelineState.h"
 #include "VulkanPipelineCache.h"
+#include "VulkanTexture.h"
 #include "VulkanHandles.h"
 #include "VulkanContext.h"
 #include "VulkanBuffer.h"
@@ -87,6 +88,7 @@ private:
 
     VulkanPipelineCache pipelineCache;
     VulkanContext context;
+    VulkanDescriptorKey currentBinding{};
     VulkanSurfaceContext surface;
 };
 
