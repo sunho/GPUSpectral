@@ -7,6 +7,7 @@ layout(location = 2) in vec2 inTex;
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 uv;
 layout(location = 2) out vec3 normal;
+layout(location = 3) out vec3 pos;
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
@@ -28,9 +29,11 @@ vec3 colors[3] = vec3[](
 
 
 void main() {
-    vec4 k = ubo.proj*ubo.view*ubo.model*vec4(inPosition, 1.0);
+    mat4 M = ubo.proj*ubo.view*ubo.model;
+    vec4 k = M*vec4(inPosition, 1.0);
     gl_Position = k;
     fragColor = inNormal;
     uv = inTex;
-    normal = inNormal;
+    pos = vec3(ubo.model*vec4(inPosition,1.0));
+    normal = vec3(transpose(inverse(ubo.model))*vec4(inNormal, 0.0));
 }

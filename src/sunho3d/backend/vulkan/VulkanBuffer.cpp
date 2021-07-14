@@ -8,7 +8,7 @@ void VulkanBufferObject::allocate(VulkanContext& ctx, VkBufferUsageFlags usage) 
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     if (vkCreateBuffer(ctx.device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-       throw std::runtime_error("failed to create buffer!");
+        throw std::runtime_error("failed to create buffer!");
     }
 
     VkMemoryRequirements memRequirements;
@@ -18,10 +18,12 @@ void VulkanBufferObject::allocate(VulkanContext& ctx, VkBufferUsageFlags usage) 
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
 
-    allocInfo.memoryTypeIndex = ctx.findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex = ctx.findMemoryType(memRequirements.memoryTypeBits,
+                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     if (vkAllocateMemory(ctx.device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-       throw std::runtime_error("failed to allocate buffer memory!");
+        throw std::runtime_error("failed to allocate buffer memory!");
     }
 
     vkBindBufferMemory(ctx.device, buffer, memory, 0);

@@ -1,15 +1,20 @@
 #include "VulkanContext.h"
+
 #include <sunho3d/Window.h>
 
-#include <optional>
 #include <map>
-#include <string>
+#include <optional>
 #include <set>
+#include <string>
 
-static const std::vector<const char*> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    "VK_KHR_portability_subset"
-};
+#include "VulkanTexture.h"
+
+static const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_"
+                                                                                            "KHR_"
+                                                                                            "portab"
+                                                                                            "ility_"
+                                                                                            "subse"
+                                                                                            "t" };
 
 static const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation",
@@ -34,7 +39,8 @@ inline bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
+    vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
+                                         availableExtensions.data());
 
     std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
@@ -45,7 +51,8 @@ inline bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
     return requiredExtensions.empty();
 }
 
-inline SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
+inline SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device,
+                                                     VkSurfaceKHR surface) {
     SwapChainSupportDetails details;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
     uint32_t formatCount;
@@ -60,9 +67,10 @@ inline SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device, Vk
 
     if (presentModeCount != 0) {
         details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, details.presentModes.data());
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount,
+                                                  details.presentModes.data());
     }
-    
+
     return details;
 }
 
@@ -85,7 +93,7 @@ inline QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKH
         }
         i++;
     }
-    
+
     return indices;
 }
 
@@ -95,21 +103,21 @@ inline bool isDeviceSuitable(VkPhysicalDevice device, VkSurfaceKHR surface) {
     bool swapChainAdequate = false;
     if (extensionsSupported) {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, surface);
-        swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+        swapChainAdequate =
+            !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
     return indices.isComplete() && swapChainAdequate && extensionsSupported;
 }
-
 
 inline int rateDeviceSuitability(VkPhysicalDevice device) {
     VkPhysicalDeviceProperties deviceProperties;
     VkPhysicalDeviceFeatures deviceFeatures;
     vkGetPhysicalDeviceProperties(device, &deviceProperties);
     vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
-    
+
     int score = 0;
     if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-       score += 1000;
+        score += 1000;
     }
     score += deviceProperties.limits.maxImageDimension2D;
     return score;
@@ -121,7 +129,7 @@ inline bool checkValidationLayerSupport() {
 
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-    
+
     for (const char* layerName : validationLayers) {
         bool layerFound = false;
 
@@ -139,7 +147,7 @@ inline bool checkValidationLayerSupport() {
     return true;
 }
 
-inline std::vector<const char *> getRequiredExtensions() {
+inline std::vector<const char*> getRequiredExtensions() {
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions;
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -157,7 +165,7 @@ void initContext(VulkanContext& context) {
     appInfo.pEngineName = "sunho3d";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
-    
+
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
@@ -166,13 +174,13 @@ void initContext(VulkanContext& context) {
     createInfo.enabledExtensionCount = extensions.size();
     createInfo.ppEnabledExtensionNames = extensions.data();
 
-    if(!checkValidationLayerSupport()) {
+    if (!checkValidationLayerSupport()) {
         throw std::runtime_error("validation layer not available!");
     }
-    
+
     createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
     createInfo.ppEnabledLayerNames = validationLayers.data();
-    
+
     if (vkCreateInstance(&createInfo, nullptr, &context.instance) != VK_SUCCESS) {
         throw std::runtime_error("failed to create instance!");
     }
@@ -186,7 +194,7 @@ void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
     }
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(context.instance, &deviceCount, devices.data());
-    
+
     std::multimap<int, VkPhysicalDevice> candidates;
     for (const auto& device : devices) {
         if (isDeviceSuitable(device, surface.surface)) {
@@ -198,18 +206,21 @@ void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
     if (candidates.rbegin()->first > 0) {
         context.physicalDevice = candidates.rbegin()->second;
     } else {
-       throw std::runtime_error("failed to find a suitable GPU!");
+        throw std::runtime_error("failed to find a suitable GPU!");
     }
 }
 
-void initSurfaceContext(VulkanContext& context, VulkanSurfaceContext& surface, sunho3d::Window *window) {
+void initSurfaceContext(VulkanContext& context, VulkanSurfaceContext& surface,
+                        sunho3d::Window* window) {
     surface.surface = window->createSurface(context.instance);
     context.surface = &surface;
 }
 
-VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
+VkSurfaceFormatKHR
+chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+            availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }
     }
@@ -233,27 +244,29 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, sunho3
         int width = window->getWindowWidth();
         int height = window->getWindowHeight();
 
-        VkExtent2D actualExtent = {
-            static_cast<uint32_t>(width),
-            static_cast<uint32_t>(height)
-        };
+        VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 
-        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width,
+                                        capabilities.maxImageExtent.width);
+        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height,
+                                         capabilities.maxImageExtent.height);
 
         return actualExtent;
     }
 }
 
-void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface, sunho3d::Window *window) {
-    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(context.physicalDevice, surface.surface);
+void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface,
+                     sunho3d::Window* window) {
+    SwapChainSupportDetails swapChainSupport =
+        querySwapChainSupport(context.physicalDevice, surface.surface);
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
     VkExtent2D extent = chooseSwapExtent(swapChainSupport.capabilities, window);
-    
+
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
+    if (swapChainSupport.capabilities.maxImageCount > 0 &&
+        imageCount > swapChainSupport.capabilities.maxImageCount) {
         imageCount = swapChainSupport.capabilities.maxImageCount;
     }
     VkSwapchainCreateInfoKHR createInfo{};
@@ -266,7 +279,8 @@ void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface, sunh
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     QueueFamilyIndices indices = findQueueFamilies(context.physicalDevice, surface.surface);
-    uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+    uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(),
+                                      indices.presentFamily.value() };
 
     if (indices.graphicsFamily != indices.presentFamily) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -274,20 +288,21 @@ void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface, sunh
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        createInfo.queueFamilyIndexCount = 0; // Optional
-        createInfo.pQueueFamilyIndices = nullptr; // Optional
+        createInfo.queueFamilyIndexCount = 0;      // Optional
+        createInfo.pQueueFamilyIndices = nullptr;  // Optional
     }
     createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
-    if (vkCreateSwapchainKHR(context.device, &createInfo, nullptr, &surface.swapChain) != VK_SUCCESS) {
+    if (vkCreateSwapchainKHR(context.device, &createInfo, nullptr, &surface.swapChain) !=
+        VK_SUCCESS) {
         throw std::runtime_error("failed to create swap chain!");
     }
-    
+
     vkGetSwapchainImagesKHR(context.device, surface.swapChain, &imageCount, nullptr);
-    
+
     surface.format = surfaceFormat;
     surface.extent = extent;
     surface.size = imageCount;
@@ -300,7 +315,8 @@ void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) 
 
     VkPhysicalDeviceFeatures deviceFeatures{};
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+    std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(),
+                                               indices.presentFamily.value() };
     for (uint32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo{};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -309,33 +325,36 @@ void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) 
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
-    
+
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.queueCreateInfoCount = queueCreateInfos.size();
     createInfo.pEnabledFeatures = &deviceFeatures;
-    
+
     createInfo.enabledExtensionCount = deviceExtensions.size();
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
-    
-    if (vkCreateDevice(context.physicalDevice, &createInfo, nullptr, &context.device) != VK_SUCCESS) {
+
+    if (vkCreateDevice(context.physicalDevice, &createInfo, nullptr, &context.device) !=
+        VK_SUCCESS) {
         throw std::runtime_error("failed to create logical device!");
     }
     vkGetDeviceQueue(context.device, indices.graphicsFamily.value(), 0, &context.graphicsQueue);
     vkGetDeviceQueue(context.device, indices.presentFamily.value(), 0, &surface.presentQueue);
-    
-    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(context.physicalDevice, surface.surface);
+
+    QueueFamilyIndices queueFamilyIndices =
+        findQueueFamilies(context.physicalDevice, surface.surface);
 
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    
-    if (vkCreateCommandPool(context.device, &poolInfo, nullptr, &context.commandPool) != VK_SUCCESS) {
+
+    if (vkCreateCommandPool(context.device, &poolInfo, nullptr, &context.commandPool) !=
+        VK_SUCCESS) {
         throw std::runtime_error("failed to create command pool!");
     }
-    
+
     context.commands = VulkanCommands(context);
 }
 
@@ -345,7 +364,7 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
     std::vector<VkImage> swapChainImages;
     swapChainImages.resize(imageCount);
     vkGetSwapchainImagesKHR(context.device, surface.swapChain, &imageCount, swapChainImages.data());
-    
+
     for (size_t i = 0; i < surface.size; ++i) {
         surface.swapContexts[i].attachment.image = swapChainImages[i];
     }
@@ -365,13 +384,20 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
         createInfo.subresourceRange.levelCount = 1;
         createInfo.subresourceRange.baseArrayLayer = 0;
         createInfo.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(context.device, &createInfo, nullptr, &surface.swapContexts[i].attachment.view) != VK_SUCCESS) {
+        if (vkCreateImageView(context.device, &createInfo, nullptr,
+                              &surface.swapContexts[i].attachment.view) != VK_SUCCESS) {
             throw std::runtime_error("failed to create image views!");
         }
     }
-    
+
     context.currentSwapContext = &surface.swapContexts[0];
     surface.swapContextIndex = 0;
+
+    context.emptyTexture =
+        new VulkanTexture(context, SamplerType::SAMPLER2D,
+                          TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE |
+                              TextureUsage::COLOR_ATTACHMENT | TextureUsage::INPUT_ATTACHMENT,
+                          1, TextureFormat::RGBA8, 1, 1);
 }
 
 void destroyContext(VulkanContext& context, VulkanSurfaceContext& surface) {
@@ -422,7 +448,8 @@ uint32_t VulkanContext::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlag
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
     for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
             return i;
         }
     }

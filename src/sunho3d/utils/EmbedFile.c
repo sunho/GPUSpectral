@@ -43,7 +43,7 @@ int main(int argc, char** argv)
   } while (nread > 0);
   if (linecount > 0) fprintf(out, "\n");
   fprintf(out, "};\n");
-  fprintf(out, "const size_t %s_len = sizeof(%s);\n\n",sym,sym);
+  fprintf(out, "const size_t %sSize = sizeof(%s);\n\n",sym,sym);
 
   fclose(in);
   fclose(out);

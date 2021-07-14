@@ -1,13 +1,10 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
-#include <array>
 
-enum class ProgramType : uint8_t {
-    VERTEX = 0,
-    FRAGMENT = 1
-};
+enum class ProgramType : uint8_t { VERTEX = 0, FRAGMENT = 1 };
 
 using ProgramCode = std::vector<char>;
 

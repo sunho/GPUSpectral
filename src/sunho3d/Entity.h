@@ -1,10 +1,12 @@
 #pragma once
 
+#include <sunho3d/backend/DriverTypes.h>
+
 #include <string>
 #include <vector>
-#include "ResourceList.h"
+
 #include "Material.h"
-#include <sunho3d/backend/DriverTypes.h>
+#include "utils/ResourceList.h"
 
 namespace sunho3d {
 
@@ -19,15 +21,15 @@ struct Primitive {
 };
 
 class Entity : public IdResource {
-public:
-    explicit Entity(uint32_t id);
+  public:
+    explicit Entity();
     void addNode(Entity* entity);
     void addPrimitive(Primitive&& primitive);
     const std::vector<Entity*>& getNodes();
-    
-//private:
+
+    // private:
     std::vector<Entity*> nodes;
     std::vector<Primitive> primitives;
 };
 
-}
+}  // namespace sunho3d

@@ -7,4 +7,4 @@ struct Material {
     int width;
     int height;
 };
-}
+}  // namespace sunho3d

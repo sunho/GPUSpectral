@@ -1,9 +1,8 @@
 #include "Scene.h"
 
-
 using namespace sunho3d;
 
-Scene::Scene(uint32_t id) : IdResource(id) {
+Scene::Scene() {
 }
 
 void Scene::addEntity(Entity *entity) {

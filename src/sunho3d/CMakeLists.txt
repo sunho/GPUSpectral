@@ -20,8 +20,17 @@ set(SOURCE_LIST
     backend/vulkan/VulkanCommands.cpp
     backend/vulkan/VulkanTexture.h
     backend/vulkan/VulkanTexture.cpp
-    shaders/triangle.frag
-    shaders/triangle.vert
+    framegraph/shaders/ForwardPhong.frag
+    framegraph/shaders/ForwardPhong.vert
+    framegraph/FrameGraph.h
+    framegraph/FrameGraph.cpp
+    framegraph/RenderPass.h
+    framegraph/RenderPass.cpp
+    framegraph/Resource.h
+    framegraph/Resource.cpp
+    framegraph/renderpasses/ForwardRenderPass.h
+    utils/ResourceList.h
+    utils/FixedVector.h
     Engine.h
     Engine.cpp
     Window.h
@@ -30,13 +39,16 @@ set(SOURCE_LIST
     Entity.cpp
     Renderer.h
     Renderer.cpp
+    Light.h
+    Light.cpp
+    Camera.h
+    Camera.cpp
     Scene.h
     Scene.cpp
     Loader.h
     Loader.cpp
     Material.h
     Material.cpp
-    ResourceList.h
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
@@ -44,13 +56,13 @@ add_library(sunho3d ${SOURCE_LIST})
 target_link_libraries(sunho3d PUBLIC glfw glm Vulkan tinygltf tinyobjloader)
 target_include_directories(sunho3d PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
-add_executable(embedfile EmbedFile.c)
+add_executable(embedfile utils/EmbedFile.c)
 
 function(add_shader TARGET SHADENAME SHADER)
     find_program(GLSLC glslc)
 
-	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/shaders/${SHADER})
-    set(current-output-path ${CMAKE_BINARY_DIR}/shaders/${SHADER}.spv)
+	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/framegraph/shaders/${SHADER})
+    set(current-output-path ${CMAKE_BINARY_DIR}/framegraph/shaders/${SHADER}.spv)
 
 	# Add a custom command to compile GLSL to SPIR-V.
 	get_filename_component(current-output-dir ${current-output-path} DIRECTORY)
@@ -66,17 +78,17 @@ function(add_shader TARGET SHADENAME SHADER)
 	set_source_files_properties(${current-output-path} PROPERTIES GENERATED TRUE)
 
     set(COUT ${CMAKE_CURRENT_BINARY_DIR}/${SHADENAME}.c)
-    set(CHEAD ${CMAKE_CURRENT_BINARY_DIR}/shaders/${SHADENAME}.h)
+    set(CHEAD ${CMAKE_CURRENT_BINARY_DIR}/framegraph/shaders/${SHADENAME}.h)
     add_custom_command(
         OUTPUT ${COUT}
         COMMAND embedfile ${SHADENAME} ${current-output-path}
         DEPENDS ${current-output-path})
     target_sources(${TARGET} PRIVATE ${COUT})
 
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/shaders)
-    file(WRITE ${CHEAD} "#pragma once\nextern \"C\" const char ${SHADENAME}[]; extern \"C\" const size_t ${SHADENAME}_len;")
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/framegraph/shaders)
+    file(WRITE ${CHEAD} "#pragma once\nextern \"C\" const char ${SHADENAME}[]; extern \"C\" const size_t ${SHADENAME}Size;")
 
 endfunction(add_shader)
 
-add_shader(sunho3d triangle_vert triangle.vert)
-add_shader(sunho3d triangle_frag triangle.frag)
+add_shader(sunho3d ForwardPhongVert ForwardPhong.vert)
+add_shader(sunho3d ForwardPhongFrag ForwardPhong.frag)
