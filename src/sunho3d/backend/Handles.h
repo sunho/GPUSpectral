@@ -2,10 +2,14 @@
 
 #include <numeric>
 
+struct HwUniformBuffer;
 struct HwVertexBuffer;
 struct HwIndexBuffer;
 struct HwProgram;
 struct HwRenderTarget;
+struct HwBufferObject;
+struct HwPrimitive;
+struct HwTexture;
 
 class HandleBase {
   public:

@@ -19,14 +19,16 @@ class Engine {
 
     Window *createWindow(size_t width, size_t height);
     Entity *createEntity();
-    Renderer *createRenderer(Window *window, Scene *scene);
-    Scene *createScene();
+    Renderer *createRenderer(Window *window);
+    Scene *createScene(Renderer *renderer);
+    Material *createMaterial();
 
   private:
     ResourceList<Window> windows;
     ResourceList<Renderer> renderers;
     ResourceList<Entity> entities;
     ResourceList<Scene> scenes;
+    ResourceList<Material> materials;
 };
 
 }  // namespace sunho3d

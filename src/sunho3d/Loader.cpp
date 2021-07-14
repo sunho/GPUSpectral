@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "Engine.h"
+#include "Renderer.h"
 #include "Scene.h"
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -15,8 +16,8 @@
 
 using namespace sunho3d;
 
-Loader::Loader(Engine &engine)
-    : engine(engine) {
+Loader::Loader(Engine &engine, Renderer &renderer)
+    : engine(engine), renderer(renderer) {
 }
 
 Scene *Loader::loadGLTF(const std::string &path) {
@@ -35,7 +36,7 @@ Scene *Loader::loadGLTF(const std::string &path) {
         throw std::runtime_error("couldn't load model");
     }
 
-    Scene *scene = engine.createScene();
+    Scene *scene = engine.createScene(&renderer);
     tinygltf::Scene &s = model.scenes[model.defaultScene];
     for (auto node : s.nodes) {
         loadGLTFNode(scene, model, model.nodes[node]);
@@ -50,6 +51,7 @@ Entity *Loader::loadObj(const std::string &path) {
     std::vector<tinyobj::shape_t> shapes;
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::material_t> materials;
+    std::map<int, Material *> generatedMaterials;
 
     bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), "");
     if (!warn.empty()) {
@@ -63,32 +65,44 @@ Entity *Loader::loadObj(const std::string &path) {
         tinyobj::material_t *mp = &materials[m];
     }
     for (size_t s = 0; s < shapes.size(); s++) {
-        Material material;
-        auto mat = shapes[s].mesh.material_ids[0];
-        int width, height, comp;
-        unsigned char *data =
-            stbi_load(materials[mat].diffuse_texname.c_str(), &width, &height, &comp, 0);
-        if (!data) {
-            throw std::runtime_error("FUCK");
-        }
-        for (int j = height - 1; j >= 0; --j) {
-            for (int i = 0; i < width; ++i) {
-                material.diffuseImage.push_back(data[(j * width + i) * comp]);
-                material.diffuseImage.push_back(data[(j * width + i) * comp + 1]);
-                material.diffuseImage.push_back(data[(j * width + i) * comp + 2]);
-                material.diffuseImage.push_back(0xFF);
+        auto &driver = renderer.getDriver();
+        Material *material = nullptr;
+        const int matId = shapes[s].mesh.material_ids[0];
+        auto it = generatedMaterials.find(matId);
+        if (it == generatedMaterials.end()) {
+            int width, height, comp;
+            unsigned char *data =
+                stbi_load(materials[matId].diffuse_texname.c_str(), &width, &height, &comp, 0);
+            if (!data) {
+                throw std::runtime_error("FUCK");
             }
+            std::vector<char> textureData;
+            for (int j = height - 1; j >= 0; --j) {
+                for (int i = 0; i < width; ++i) {
+                    textureData.push_back(data[(j * width + i) * comp]);
+                    textureData.push_back(data[(j * width + i) * comp + 1]);
+                    textureData.push_back(data[(j * width + i) * comp + 2]);
+                    textureData.push_back(0xFF);
+                }
+            }
+            auto tex = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, width, height);
+            driver.updateTexture(tex, { .data = (uint32_t *)textureData.data() });
+            material = engine.createMaterial();
+            material->diffuseMap = tex;
+            stbi_image_free(data);
+            generatedMaterials.emplace(matId, material);
+        } else {
+            material = it->second;
         }
-        material.width = width;
-        material.height = height;
-        stbi_image_free(data);
-        Primitive primitve;
+
+        Primitive primitive;
         std::vector<float> v;
         std::vector<float> vn;
         std::vector<float> vt;
-        primitve.material = material;
+        std::vector<uint16_t> indices;
+        primitive.material = material;
         for (size_t f = 0; f < shapes[s].mesh.indices.size(); ++f) {
-            primitve.indexBuffer.push_back(f);
+            indices.push_back(f);
             auto i0 = shapes[s].mesh.indices[f];
             v.push_back(attrib.vertices[3 * i0.vertex_index]);
             v.push_back(attrib.vertices[3 * i0.vertex_index + 1]);
@@ -99,26 +113,34 @@ Entity *Loader::loadObj(const std::string &path) {
             vn.push_back(attrib.normals[3 * i0.normal_index + 1]);
             vn.push_back(attrib.normals[3 * i0.normal_index + 2]);
         }
-        primitve.attibutes[0] = {
+        primitive.attibutes[0] = {
             .name = "position", .offset = 0, .index = 0, .type = ElementType::FLOAT3, .stride = 12
         };
-        primitve.attibutes[1] = {
+        primitive.attibutes[1] = {
             .name = "normal", .offset = 0, .index = 1, .type = ElementType::FLOAT3, .stride = 12
         };
-        primitve.attibutes[2] = {
+        primitive.attibutes[2] = {
             .name = "texcoord", .offset = 0, .index = 2, .type = ElementType::FLOAT2, .stride = 8
         };
+        auto buffer0 = driver.createBufferObject(4 * v.size());
+        driver.updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);
+        auto buffer1 = driver.createBufferObject(4 * v.size());
+        driver.updateBufferObject(buffer1, { .data = (uint32_t *)vn.data() }, 0);
+        auto buffer2 = driver.createBufferObject(4 * vt.size());
+        driver.updateBufferObject(buffer2, { .data = (uint32_t *)vt.data() }, 0);
 
-        primitve.vertexBuffers.push_back(
-            std::vector<char>((char *)v.data(), (char *)v.data() + 4 * v.size()));
-        primitve.vertexBuffers.push_back(
-            std::vector<char>((char *)vn.data(), (char *)vn.data() + 4 * v.size()));
-        primitve.vertexBuffers.push_back(
-            std::vector<char>((char *)vt.data(), (char *)vt.data() + 4 * vt.size()));
-        primitve.mode = PrimitiveMode::TRIANGLES;
-        primitve.attributeCount = 3;
-        primitve.elementCount = primitve.indexBuffer.size();
-        out->addPrimitive(std::move(primitve));
+        auto vbo = driver.createVertexBuffer(3, v.size() / 3, 3, primitive.attibutes);
+        driver.setVertexBuffer(vbo, 0, buffer0);
+        driver.setVertexBuffer(vbo, 1, buffer1);
+        driver.setVertexBuffer(vbo, 2, buffer2);
+
+        auto ibo = driver.createIndexBuffer(indices.size());
+        driver.updateIndexBuffer(ibo, { .data = (uint32_t *)indices.data() }, 0);
+        primitive.indexBuffer = ibo;
+        primitive.vertexBuffer = vbo;
+        primitive.hwInstance = driver.createPrimitive(PrimitiveMode::TRIANGLES);
+        driver.setPrimitiveBuffer(primitive.hwInstance, vbo, ibo);
+        out->addPrimitive(primitive);
     }
     return out;
 }
@@ -219,11 +241,12 @@ PrimitiveMode translatePrimitiveMode(int mode) {
 }
 
 void Loader::loadGLTFMesh(Entity *entity, tinygltf::Model &model, tinygltf::Mesh &mesh) {
-    for (size_t i = 0; i < mesh.primitives.size(); ++i) {
+    /*for (size_t i = 0; i < mesh.primitives.size(); ++i) {
         Primitive out;
         std::map<int, size_t> offsetMap;
+        std::vector<Handle<HwBufferObject>> vertexBuffers;
+        
         tinygltf::Primitive primitive = mesh.primitives[i];
-
         tinygltf::Accessor indexAccessor = model.accessors[primitive.indices];
 
         int j = 0;
@@ -232,10 +255,12 @@ void Loader::loadGLTFMesh(Entity *entity, tinygltf::Model &model, tinygltf::Mesh
             if (offsetMap.find(accessor.bufferView) == offsetMap.end()) {
                 auto &bufferView = model.bufferViews[accessor.bufferView];
                 auto &data = model.buffers[bufferView.buffer].data;
-                offsetMap.emplace(accessor.bufferView, out.vertexBuffers.size());
+                offsetMap.emplace(accessor.bufferView, vertexBuffers.size());
+                renderer.getDriver().createBufferObject(bufferView.byteLength);
+                
                 out.vertexBuffers.push_back(std::vector<char>(data.begin() + bufferView.byteOffset,
                                                               data.begin() + bufferView.byteOffset +
-                                                                  bufferView.byteLength));
+                                                                 ));
             }
             size_t index = offsetMap.at(accessor.bufferView);
             int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
@@ -267,5 +292,5 @@ void Loader::loadGLTFMesh(Entity *entity, tinygltf::Model &model, tinygltf::Mesh
             }
         }
         entity->addPrimitive(std::move(out));
-    }
+    }*/
 }

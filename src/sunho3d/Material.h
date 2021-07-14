@@ -1,9 +1,9 @@
 #pragma once
 
+#include "utils/ResourceList.h"
+
 namespace sunho3d {
-struct Material {
-    std::vector<char> diffuseImage;
-    int width;
-    int height;
+struct Material : public IdResource {
+    Handle<HwTexture> diffuseMap;
 };
 }  // namespace sunho3d

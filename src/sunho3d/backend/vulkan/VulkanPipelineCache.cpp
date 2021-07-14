@@ -264,9 +264,9 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
 
     VkViewport viewport{};
     viewport.x = 0.0f;
-    viewport.y = 0.0f;
+    viewport.y = (float)key.viewport.height;
     viewport.width = (float)key.viewport.width;
-    viewport.height = (float)key.viewport.height;
+    viewport.height = -(float)key.viewport.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -300,7 +300,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;  // Optional
     rasterizer.depthBiasClamp = 0.0f;           // Optional

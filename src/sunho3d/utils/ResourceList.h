@@ -27,7 +27,8 @@ class ResourceList {
 
     ResourceList() = default;
     ~ResourceList() {
-        for (auto [_, resource] : data) {
+        while (!data.empty()) {
+            auto &resource = data.begin()->second;
             T *addr = reinterpret_cast<T *>(resource.data());
             destruct(addr);
         }

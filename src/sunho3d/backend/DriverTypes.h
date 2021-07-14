@@ -72,7 +72,7 @@ enum class TextureUsage : uint8_t {
     DEPTH_ATTACHMENT = 0x2,
     SAMPLEABLE = 0x4,
     UPLOADABLE = 0x8,
-    INPUT_ATTACHMENT = 0x16
+    INPUT_ATTACHMENT = 0x10
 };
 
 static TextureUsage operator|(TextureUsage lhs, TextureUsage rhs) {

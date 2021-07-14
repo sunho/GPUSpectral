@@ -27,7 +27,6 @@ set(SOURCE_LIST
     framegraph/RenderPass.h
     framegraph/RenderPass.cpp
     framegraph/Resource.h
-    framegraph/Resource.cpp
     framegraph/renderpasses/ForwardRenderPass.h
     utils/ResourceList.h
     utils/FixedVector.h
@@ -37,6 +36,7 @@ set(SOURCE_LIST
     Window.cpp
     Entity.h
     Entity.cpp
+    Transform.h
     Renderer.h
     Renderer.cpp
     Light.h

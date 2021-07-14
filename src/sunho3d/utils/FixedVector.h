@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <cstdlib>
+
 template <typename T>
 struct FixedVector {
     FixedVector() = default;
