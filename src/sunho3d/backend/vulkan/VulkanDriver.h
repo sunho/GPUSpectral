@@ -16,18 +16,17 @@
 #include "VulkanTexture.h"
 
 namespace sunho3d {
-
 using HandleData = std::vector<char>;
 
 class VulkanDriver {
   public:
-    VulkanDriver(Window* window);
+    VulkanDriver(Window *window);
     ~VulkanDriver();
 
-    VulkanDriver(const VulkanDriver&) = delete;
-    VulkanDriver& operator=(const VulkanDriver&) = delete;
-    VulkanDriver(VulkanDriver&&) = delete;
-    VulkanDriver& operator=(VulkanDriver&&) = delete;
+    VulkanDriver(const VulkanDriver &) = delete;
+    VulkanDriver &operator=(const VulkanDriver &) = delete;
+    VulkanDriver(VulkanDriver &&) = delete;
+    VulkanDriver &operator=(VulkanDriver &&) = delete;
 
 #define DECL_COMMAND(R, N, ARGS, PARAMS) R N(ARGS);
 #define DECL_VOIDCOMMAND(N, ARGS, PARAMS) void N(ARGS);
@@ -42,7 +41,7 @@ class VulkanDriver {
     static VKAPI_ATTR VkBool32 VKAPI_CALL
     debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                   VkDebugUtilsMessageTypeFlagsEXT messageType,
-                  const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
+                  const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData);
 
     VkDebugUtilsMessengerEXT debugMessenger;
 
@@ -53,40 +52,40 @@ class VulkanDriver {
     }
 
     template <typename Dp, typename B>
-    Dp* handle_cast(Handle<B> handle) noexcept {
+    Dp *handle_cast(Handle<B> handle) noexcept {
         if (!handle)
             return nullptr;
         auto iter = handles.find(handle.getId());
         assert(iter != handles.end());
-        HandleData& data = iter->second;
-        return reinterpret_cast<Dp*>(data.data());
+        HandleData &data = iter->second;
+        return reinterpret_cast<Dp *>(data.data());
     }
 
     template <typename Dp, typename B>
-    const Dp* handle_const_cast(const Handle<B>& handle) noexcept {
+    const Dp *handle_const_cast(const Handle<B> &handle) noexcept {
         if (!handle)
             return nullptr;
         auto iter = handles.find(handle.getId());
-        HandleData& data = iter->second;
-        return reinterpret_cast<const Dp*>(data.data());
+        HandleData &data = iter->second;
+        return reinterpret_cast<const Dp *>(data.data());
     }
 
     template <typename Dp, typename B, typename... ARGS>
-    Dp* construct_handle(Handle<B>& handle, ARGS&&... args) noexcept {
+    Dp *construct_handle(Handle<B> &handle, ARGS &&... args) noexcept {
         if (!handle)
             return nullptr;
         auto iter = handles.find(handle.getId());
-        HandleData& data = iter->second;
-        Dp* addr = reinterpret_cast<Dp*>(data.data());
+        HandleData &data = iter->second;
+        Dp *addr = reinterpret_cast<Dp *>(data.data());
         new (addr) Dp(std::forward<ARGS>(args)...);
         return addr;
     }
 
     template <typename Dp, typename B>
-    void destruct_handle(const Handle<B>& handle) noexcept {
+    void destruct_handle(const Handle<B> &handle) noexcept {
         auto iter = handles.find(handle.getId());
-        HandleData& data = iter->second;
-        reinterpret_cast<Dp*>(data.data())->~Dp();
+        HandleData &data = iter->second;
+        reinterpret_cast<Dp *>(data.data())->~Dp();
         handles.erase(handle.getId());
     }
 

@@ -11,7 +11,7 @@ struct VulkanContext;
 class VulkanCommands {
   public:
     VulkanCommands() = default;
-    explicit VulkanCommands(VulkanContext& context);
+    explicit VulkanCommands(VulkanContext &context);
 
     VkCommandBuffer get();
     void next();

@@ -15,10 +15,11 @@
 
 using namespace sunho3d;
 
-Loader::Loader(Engine& engine) : engine(engine) {
+Loader::Loader(Engine &engine)
+    : engine(engine) {
 }
 
-Scene* Loader::loadGLTF(const std::string& path) {
+Scene *Loader::loadGLTF(const std::string &path) {
     tinygltf::TinyGLTF loader;
     std::string err;
     std::string warn;
@@ -34,16 +35,16 @@ Scene* Loader::loadGLTF(const std::string& path) {
         throw std::runtime_error("couldn't load model");
     }
 
-    Scene* scene = engine.createScene();
-    tinygltf::Scene& s = model.scenes[model.defaultScene];
+    Scene *scene = engine.createScene();
+    tinygltf::Scene &s = model.scenes[model.defaultScene];
     for (auto node : s.nodes) {
         loadGLTFNode(scene, model, model.nodes[node]);
     }
     return scene;
 }
 
-Entity* Loader::loadObj(const std::string& path) {
-    Entity* out = engine.createEntity();
+Entity *Loader::loadObj(const std::string &path) {
+    Entity *out = engine.createEntity();
     std::string warn;
     std::string err;
     std::vector<tinyobj::shape_t> shapes;
@@ -59,13 +60,13 @@ Entity* Loader::loadObj(const std::string& path) {
     }
 
     for (size_t m = 0; m < materials.size(); m++) {
-        tinyobj::material_t* mp = &materials[m];
+        tinyobj::material_t *mp = &materials[m];
     }
     for (size_t s = 0; s < shapes.size(); s++) {
         Material material;
         auto mat = shapes[s].mesh.material_ids[0];
         int width, height, comp;
-        unsigned char* data =
+        unsigned char *data =
             stbi_load(materials[mat].diffuse_texname.c_str(), &width, &height, &comp, 0);
         if (!data) {
             throw std::runtime_error("FUCK");
@@ -109,11 +110,11 @@ Entity* Loader::loadObj(const std::string& path) {
         };
 
         primitve.vertexBuffers.push_back(
-            std::vector<char>((char*)v.data(), (char*)v.data() + 4 * v.size()));
+            std::vector<char>((char *)v.data(), (char *)v.data() + 4 * v.size()));
         primitve.vertexBuffers.push_back(
-            std::vector<char>((char*)vn.data(), (char*)vn.data() + 4 * v.size()));
+            std::vector<char>((char *)vn.data(), (char *)vn.data() + 4 * v.size()));
         primitve.vertexBuffers.push_back(
-            std::vector<char>((char*)vt.data(), (char*)vt.data() + 4 * vt.size()));
+            std::vector<char>((char *)vt.data(), (char *)vt.data() + 4 * vt.size()));
         primitve.mode = PrimitiveMode::TRIANGLES;
         primitve.attributeCount = 3;
         primitve.elementCount = primitve.indexBuffer.size();
@@ -122,10 +123,10 @@ Entity* Loader::loadObj(const std::string& path) {
     return out;
 }
 
-void Loader::loadGLTFNode(Scene* scene, tinygltf::Model& model, tinygltf::Node& node,
-                          Entity* parent) {
+void Loader::loadGLTFNode(Scene *scene, tinygltf::Model &model, tinygltf::Node &node,
+                          Entity *parent) {
     if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
-        Entity* entity = engine.createEntity();
+        Entity *entity = engine.createEntity();
         loadGLTFMesh(entity, model, model.meshes[node.mesh]);
         if (parent) {
             parent->addNode(entity);
@@ -217,7 +218,7 @@ PrimitiveMode translatePrimitiveMode(int mode) {
     }
 }
 
-void Loader::loadGLTFMesh(Entity* entity, tinygltf::Model& model, tinygltf::Mesh& mesh) {
+void Loader::loadGLTFMesh(Entity *entity, tinygltf::Model &model, tinygltf::Mesh &mesh) {
     for (size_t i = 0; i < mesh.primitives.size(); ++i) {
         Primitive out;
         std::map<int, size_t> offsetMap;
@@ -226,11 +227,11 @@ void Loader::loadGLTFMesh(Entity* entity, tinygltf::Model& model, tinygltf::Mesh
         tinygltf::Accessor indexAccessor = model.accessors[primitive.indices];
 
         int j = 0;
-        for (auto& attrib : primitive.attributes) {
+        for (auto &attrib : primitive.attributes) {
             tinygltf::Accessor accessor = model.accessors[attrib.second];
             if (offsetMap.find(accessor.bufferView) == offsetMap.end()) {
-                auto& bufferView = model.bufferViews[accessor.bufferView];
-                auto& data = model.buffers[bufferView.buffer].data;
+                auto &bufferView = model.bufferViews[accessor.bufferView];
+                auto &data = model.buffers[bufferView.buffer].data;
                 offsetMap.emplace(accessor.bufferView, out.vertexBuffers.size());
                 out.vertexBuffers.push_back(std::vector<char>(data.begin() + bufferView.byteOffset,
                                                               data.begin() + bufferView.byteOffset +
@@ -255,14 +256,14 @@ void Loader::loadGLTFMesh(Entity* entity, tinygltf::Model& model, tinygltf::Mesh
         out.attributeCount = primitive.attributes.size();
         out.elementCount = indexAccessor.count;
         out.mode = translatePrimitiveMode(primitive.mode);
-        auto& bufferView = model.bufferViews[indexAccessor.bufferView];
+        auto &bufferView = model.bufferViews[indexAccessor.bufferView];
         auto data = model.buffers[bufferView.buffer].data.data() + bufferView.byteOffset +
                     indexAccessor.byteOffset;
         for (int j = 0; j < indexAccessor.count; ++j) {
             if (tinygltf::GetComponentSizeInBytes(indexAccessor.componentType) == 2) {
-                out.indexBuffer.push_back(*(uint16_t*)(data + j * 2));
+                out.indexBuffer.push_back(*(uint16_t *)(data + j * 2));
             } else {
-                out.indexBuffer.push_back(*(uint32_t*)(data + j * 4));
+                out.indexBuffer.push_back(*(uint32_t *)(data + j * 4));
             }
         }
         entity->addPrimitive(std::move(out));

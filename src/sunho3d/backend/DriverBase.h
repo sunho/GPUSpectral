@@ -11,7 +11,7 @@ struct HwVertexBuffer : public HwBase {
     uint8_t attributeCount{};
     HwVertexBuffer() = default;
     explicit HwVertexBuffer(uint32_t vertexCount, uint8_t attributeCount,
-                            const AttributeArray& attributes)
+                            const AttributeArray &attributes)
         : vertexCount(vertexCount), attributeCount(attributeCount), attributes(attributes) {
     }
 };
@@ -19,14 +19,16 @@ struct HwVertexBuffer : public HwBase {
 struct HwIndexBuffer : public HwBase {
     uint32_t count{};
     HwIndexBuffer() = default;
-    explicit HwIndexBuffer(uint32_t count) : count(count) {
+    explicit HwIndexBuffer(uint32_t count)
+        : count(count) {
     }
 };
 
 struct HwProgram : public HwBase {
     Program program;
     HwProgram() = default;
-    explicit HwProgram(const Program& program) : program(program) {
+    explicit HwProgram(const Program &program)
+        : program(program) {
     }
 };
 
@@ -34,28 +36,32 @@ struct HwRenderTarget : public HwBase {
     uint32_t width{};
     uint32_t height{};
     HwRenderTarget() = default;
-    explicit HwRenderTarget(uint32_t w, uint32_t h) : width(w), height(h) {
+    explicit HwRenderTarget(uint32_t w, uint32_t h)
+        : width(w), height(h) {
     }
 };
 
 struct HwBufferObject : public HwBase {
     uint32_t size{};
     HwBufferObject() = default;
-    explicit HwBufferObject(uint32_t size) : size(size) {
+    explicit HwBufferObject(uint32_t size)
+        : size(size) {
     }
 };
 
 struct HwUniformBuffer : public HwBase {
     uint32_t size{};
     HwUniformBuffer() = default;
-    explicit HwUniformBuffer(uint32_t size) : size(size) {
+    explicit HwUniformBuffer(uint32_t size)
+        : size(size) {
     }
 };
 
 struct HwPrimitive : public HwBase {
     PrimitiveMode mode{};
     HwPrimitive() = default;
-    explicit HwPrimitive(PrimitiveMode mode) : mode(mode) {
+    explicit HwPrimitive(PrimitiveMode mode)
+        : mode(mode) {
     }
 };
 

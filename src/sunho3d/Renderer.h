@@ -18,15 +18,15 @@ struct UniformBufferObject {
 class Scene;
 class Renderer : public IdResource {
   public:
-    Renderer(Window* window, Scene* scene);
+    Renderer(Window *window, Scene *scene);
     ~Renderer();
 
     void run();
 
   private:
     VulkanDriver driver;
-    Window* window;
-    Scene* scene;
+    Window *window;
+    Scene *scene;
     std::vector<Handle<HwPrimitive>> primitives;
     std::vector<Handle<HwTexture>> textures;
     UniformBufferObject bb;

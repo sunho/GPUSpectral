@@ -9,14 +9,9 @@
 
 #include "VulkanTexture.h"
 
-static const std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_"
-                                                                                            "KHR_"
-                                                                                            "portab"
-                                                                                            "ility_"
-                                                                                            "subse"
-                                                                                            "t" };
+static const std::vector<const char *> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset" };
 
-static const std::vector<const char*> validationLayers = {
+static const std::vector<const char *> validationLayers = {
     "VK_LAYER_KHRONOS_validation",
 };
 
@@ -44,7 +39,7 @@ inline bool checkDeviceExtensionSupport(VkPhysicalDevice device) {
 
     std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
 
-    for (const auto& extension : availableExtensions) {
+    for (const auto &extension : availableExtensions) {
         requiredExtensions.erase(extension.extensionName);
     }
 
@@ -82,7 +77,7 @@ inline QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkSurfaceKH
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
     int i = 0;
-    for (const auto& queueFamily : queueFamilies) {
+    for (const auto &queueFamily : queueFamilies) {
         if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
             indices.graphicsFamily = i;
         }
@@ -130,10 +125,10 @@ inline bool checkValidationLayerSupport() {
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-    for (const char* layerName : validationLayers) {
+    for (const char *layerName : validationLayers) {
         bool layerFound = false;
 
-        for (const auto& layerProperties : availableLayers) {
+        for (const auto &layerProperties : availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
@@ -147,17 +142,17 @@ inline bool checkValidationLayerSupport() {
     return true;
 }
 
-inline std::vector<const char*> getRequiredExtensions() {
+inline std::vector<const char *> getRequiredExtensions() {
     uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
+    const char **glfwExtensions;
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     return extensions;
 }
 
-void initContext(VulkanContext& context) {
+void initContext(VulkanContext &context) {
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "secret";
@@ -186,7 +181,7 @@ void initContext(VulkanContext& context) {
     }
 }
 
-void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
+void pickPhysicalDevice(VulkanContext &context, VulkanSurfaceContext &surface) {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(context.instance, &deviceCount, nullptr);
     if (deviceCount == 0) {
@@ -196,7 +191,7 @@ void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
     vkEnumeratePhysicalDevices(context.instance, &deviceCount, devices.data());
 
     std::multimap<int, VkPhysicalDevice> candidates;
-    for (const auto& device : devices) {
+    for (const auto &device : devices) {
         if (isDeviceSuitable(device, surface.surface)) {
             int score = rateDeviceSuitability(device);
             candidates.insert(std::make_pair(score, device));
@@ -210,15 +205,15 @@ void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
     }
 }
 
-void initSurfaceContext(VulkanContext& context, VulkanSurfaceContext& surface,
-                        sunho3d::Window* window) {
+void initSurfaceContext(VulkanContext &context, VulkanSurfaceContext &surface,
+                        sunho3d::Window *window) {
     surface.surface = window->createSurface(context.instance);
     context.surface = &surface;
 }
 
 VkSurfaceFormatKHR
-chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
-    for (const auto& availableFormat : availableFormats) {
+chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats) {
+    for (const auto &availableFormat : availableFormats) {
         if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
             availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
@@ -227,8 +222,8 @@ chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
     return availableFormats[0];
 }
 
-VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
-    for (const auto& availablePresentMode : availablePresentModes) {
+VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes) {
+    for (const auto &availablePresentMode : availablePresentModes) {
         if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
             return availablePresentMode;
         }
@@ -237,7 +232,7 @@ VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& avai
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, sunho3d::Window* window) {
+VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, sunho3d::Window *window) {
     if (capabilities.currentExtent.width != UINT32_MAX) {
         return capabilities.currentExtent;
     } else {
@@ -255,8 +250,7 @@ VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, sunho3
     }
 }
 
-void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface,
-                     sunho3d::Window* window) {
+void createSwapChain(VulkanContext &context, VulkanSurfaceContext &surface, sunho3d::Window *window) {
     SwapChainSupportDetails swapChainSupport =
         querySwapChainSupport(context.physicalDevice, surface.surface);
 
@@ -308,7 +302,7 @@ void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface,
     surface.size = imageCount;
 }
 
-void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) {
+void createLogicalDevice(VulkanContext &context, VulkanSurfaceContext &surface) {
     QueueFamilyIndices indices = findQueueFamilies(context.physicalDevice, surface.surface);
 
     float queuePriority = 1.0f;
@@ -358,7 +352,7 @@ void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface) 
     context.commands = VulkanCommands(context);
 }
 
-void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface) {
+void populateSwapContexts(VulkanContext &context, VulkanSurfaceContext &surface) {
     uint32_t imageCount = surface.size;
     surface.swapContexts.resize(imageCount);
     std::vector<VkImage> swapChainImages;
@@ -400,10 +394,10 @@ void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface)
                           1, TextureFormat::RGBA8, 1, 1);
 }
 
-void destroyContext(VulkanContext& context, VulkanSurfaceContext& surface) {
+void destroyContext(VulkanContext &context, VulkanSurfaceContext &surface) {
     vkDestroyCommandPool(context.device, context.commandPool, nullptr);
 
-    for (auto& ctx : surface.swapContexts) {
+    for (auto &ctx : surface.swapContexts) {
         vkDestroyImageView(context.device, ctx.attachment.view, nullptr);
     }
     vkDestroySwapchainKHR(context.device, surface.swapChain, nullptr);

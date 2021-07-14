@@ -11,29 +11,30 @@ static constexpr const size_t VULKAN_VERTEX_BUFFERS_MAX = 12;
 struct VulkanVertexBuffer : public HwVertexBuffer {
     VulkanVertexBuffer() = default;
     explicit VulkanVertexBuffer(uint32_t vertexCount, uint8_t attributeCount,
-                                const AttributeArray& attributes)
+                                const AttributeArray &attributes)
         : HwVertexBuffer(vertexCount, attributeCount, attributes) {
     }
-    std::array<VulkanBufferObject*, VULKAN_VERTEX_BUFFERS_MAX> buffers;
+    std::array<VulkanBufferObject *, VULKAN_VERTEX_BUFFERS_MAX> buffers;
 };
 
 struct VulkanIndexBuffer : public HwIndexBuffer {
     VulkanIndexBuffer() = default;
-    explicit VulkanIndexBuffer(uint32_t count) : HwIndexBuffer(count) {
+    explicit VulkanIndexBuffer(uint32_t count)
+        : HwIndexBuffer(count) {
     }
-    void allocate(VulkanContext& ctx) {
+    void allocate(VulkanContext &ctx) {
         buffer = new VulkanBufferObject(count * 2);
         buffer->allocate(ctx, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     }
-    VulkanBufferObject* buffer;
+    VulkanBufferObject *buffer;
 };
 
-static VkShaderModule createShaderModule(VulkanContext& context, const char* code,
+static VkShaderModule createShaderModule(VulkanContext &context, const char *code,
                                          uint32_t codeSize) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = codeSize;
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code);
+    createInfo.pCode = reinterpret_cast<const uint32_t *>(code);
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(context.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
@@ -43,11 +44,12 @@ static VkShaderModule createShaderModule(VulkanContext& context, const char* cod
 
 struct VulkanProgram : public HwProgram {
     VulkanProgram() = default;
-    explicit VulkanProgram(const Program& program) : HwProgram(program) {
+    explicit VulkanProgram(const Program &program)
+        : HwProgram(program) {
     }
-    void compile(VulkanContext& ctx) {
-        auto& vertexCode = program.codes[0];
-        auto& fragCode = program.codes[1];
+    void compile(VulkanContext &ctx) {
+        auto &vertexCode = program.codes[0];
+        auto &fragCode = program.codes[1];
         vertex = createShaderModule(ctx, vertexCode.data(), vertexCode.size());
         fragment = createShaderModule(ctx, fragCode.data(), fragCode.size());
     }
@@ -70,19 +72,21 @@ struct VulkanRenderTarget : public HwRenderTarget {
 };
 
 struct VulkanPrimitive : public HwPrimitive {
-    explicit VulkanPrimitive(PrimitiveMode mode) : HwPrimitive(mode) {
+    explicit VulkanPrimitive(PrimitiveMode mode)
+        : HwPrimitive(mode) {
     }
-    VulkanVertexBuffer* vertex{};
-    VulkanIndexBuffer* index{};
+    VulkanVertexBuffer *vertex{};
+    VulkanIndexBuffer *index{};
 };
 
 struct VulkanUniformBuffer : public HwUniformBuffer {
     VulkanUniformBuffer() = default;
-    explicit VulkanUniformBuffer(uint32_t size) : HwUniformBuffer(size) {
+    explicit VulkanUniformBuffer(uint32_t size)
+        : HwUniformBuffer(size) {
     }
-    void allocate(VulkanContext& ctx) {
+    void allocate(VulkanContext &ctx) {
         buffer = new VulkanBufferObject(size);
         buffer->allocate(ctx, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     }
-    VulkanBufferObject* buffer;
+    VulkanBufferObject *buffer;
 };

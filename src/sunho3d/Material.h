@@ -1,7 +1,6 @@
 #pragma once
 
 namespace sunho3d {
-
 struct Material {
     std::vector<char> diffuseImage;
     int width;

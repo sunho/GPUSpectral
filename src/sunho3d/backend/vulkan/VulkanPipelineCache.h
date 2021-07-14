@@ -12,9 +12,9 @@
 struct VulkanPipelineKey {
     std::vector<VkVertexInputAttributeDescription> attributes;
     std::vector<VkVertexInputBindingDescription> bindings;
-    VulkanProgram* program;
+    VulkanProgram *program;
     Viewport viewport;
-    bool operator==(const VulkanPipelineKey& other) const {
+    bool operator==(const VulkanPipelineKey &other) const {
         if (bindings.size() != other.bindings.size())
             return false;
         if (attributes.size() != other.attributes.size())
@@ -35,8 +35,8 @@ struct VulkanPipelineKey {
 
 // FIXME: hash more robustly
 struct VulkanPipelineKeyHasher {
-    std::size_t operator()(const VulkanPipelineKey& k) const {
-        return std::hash<VulkanProgram*>()(k.program);
+    std::size_t operator()(const VulkanPipelineKey &k) const {
+        return std::hash<VulkanProgram *>()(k.program);
     }
 };
 
@@ -52,7 +52,7 @@ struct VulkanDescriptorKey {
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
 
-    bool operator==(const VulkanDescriptorKey& other) const {
+    bool operator==(const VulkanDescriptorKey &other) const {
         return memcmp(this, &other, sizeof(VulkanDescriptorKey)) == 0;
     }
 };
@@ -61,37 +61,37 @@ struct VulkanDescriptorKey {
 template <class A>
 class PodHash {
   public:
-    size_t operator()(const A& a) const {
+    size_t operator()(const A &a) const {
         // it is possible to write hash func here char by char without using std::string
         const std::string str =
-            std::string(reinterpret_cast<const std::string::value_type*>(&a), sizeof(A));
+            std::string(reinterpret_cast<const std::string::value_type *>(&a), sizeof(A));
         return std::hash<std::string>()(str);
     }
 };
 
 class VulkanPipelineCache {
   public:
-    void init(VulkanContext& contex);
-    VkPipeline getOrCreatePipeline(VulkanContext& context, const VulkanPipelineKey& key);
-    VkFramebuffer getOrCreateFrameBuffer(VulkanContext& context, VkRenderPass renderPass,
-                                         VulkanRenderTarget* renderTarget);
-    VkRenderPass getOrCreateRenderPass(VulkanContext& context, VulkanRenderTarget* renderTarget);
-    void bindDescriptors(VulkanContext& context, const VulkanDescriptorKey& key);
+    void init(VulkanContext &contex);
+    VkPipeline getOrCreatePipeline(VulkanContext &context, const VulkanPipelineKey &key);
+    VkFramebuffer getOrCreateFrameBuffer(VulkanContext &context, VkRenderPass renderPass,
+                                         VulkanRenderTarget *renderTarget);
+    VkRenderPass getOrCreateRenderPass(VulkanContext &context, VulkanRenderTarget *renderTarget);
+    void bindDescriptors(VulkanContext &context, const VulkanDescriptorKey &key);
     void setDummyTexture(VkImageView imageView) {
         dummyImageView = imageView;
     }
     VkPipelineLayout pipelineLayout;
 
   private:
-    void setupDescriptorLayout(VulkanContext& context);
-    void getOrCreateDescriptors(VulkanContext& context, const VulkanDescriptorKey& key,
-                                std::array<VkDescriptorSet, 3>& descripotrs);
+    void setupDescriptorLayout(VulkanContext &context);
+    void getOrCreateDescriptors(VulkanContext &context, const VulkanDescriptorKey &key,
+                                std::array<VkDescriptorSet, 3> &descripotrs);
 
     VkDescriptorPool descriptorPool;
     std::array<VkDescriptorSetLayout, 3> descriptorSetLayout;
     std::unordered_map<VulkanPipelineKey, VkPipeline, VulkanPipelineKeyHasher> pipelines;
-    std::map<std::pair<VulkanRenderTarget*, VkImageView>, VkFramebuffer> framebuffers;
-    std::unordered_map<VulkanRenderTarget*, VkRenderPass> renderpasses;
+    std::map<std::pair<VulkanRenderTarget *, VkImageView>, VkFramebuffer> framebuffers;
+    std::unordered_map<VulkanRenderTarget *, VkRenderPass> renderpasses;
     std::unordered_map<VulkanDescriptorKey, std::array<VkDescriptorSet, 3>,
                        PodHash<VulkanDescriptorKey>>
         descriptorSets;
@@ -104,5 +104,5 @@ class VulkanPipelineCache {
     VkDescriptorImageInfo dummyTargetInfo = {};
     VkWriteDescriptorSet dummyTargetWriteInfo = {};
 
-    VulkanBufferObject* dummyBuffer;
+    VulkanBufferObject *dummyBuffer;
 };

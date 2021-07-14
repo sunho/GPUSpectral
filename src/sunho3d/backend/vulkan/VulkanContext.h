@@ -20,9 +20,9 @@ struct VulkanContext {
     VkQueue graphicsQueue;
     VkCommandPool commandPool;
     VulkanCommands commands;
-    VulkanSurfaceContext* surface;
-    VulkanSwapContext* currentSwapContext;
-    VulkanTexture* emptyTexture;
+    VulkanSurfaceContext *surface;
+    VulkanSwapContext *currentSwapContext;
+    VulkanTexture *emptyTexture;
     VkRenderPass currentRenderPass;
 
     VkCommandBuffer beginSingleCommands();
@@ -54,14 +54,14 @@ struct VulkanSurfaceContext {
     uint32_t swapContextIndex{ 0 };
 };
 
-void initContext(VulkanContext& context);
+void initContext(VulkanContext &context);
 
-void initSurfaceContext(VulkanContext& context, VulkanSurfaceContext& surface,
-                        sunho3d::Window* window);
-void pickPhysicalDevice(VulkanContext& context, VulkanSurfaceContext& surface);
-void createLogicalDevice(VulkanContext& context, VulkanSurfaceContext& surface);
-void createSwapChain(VulkanContext& context, VulkanSurfaceContext& surface,
-                     sunho3d::Window* window);
-void populateSwapContexts(VulkanContext& context, VulkanSurfaceContext& surface);
+void initSurfaceContext(VulkanContext &context, VulkanSurfaceContext &surface,
+                        sunho3d::Window *window);
+void pickPhysicalDevice(VulkanContext &context, VulkanSurfaceContext &surface);
+void createLogicalDevice(VulkanContext &context, VulkanSurfaceContext &surface);
+void createSwapChain(VulkanContext &context, VulkanSurfaceContext &surface,
+                     sunho3d::Window *window);
+void populateSwapContexts(VulkanContext &context, VulkanSurfaceContext &surface);
 
-void destroyContext(VulkanContext& context, VulkanSurfaceContext& surface);
+void destroyContext(VulkanContext &context, VulkanSurfaceContext &surface);

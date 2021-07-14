@@ -32,7 +32,11 @@ enum class ElementType : uint8_t {
     HALF4,
 };
 
-enum class SamplerType { SAMPLER2D, SAMPLER3D, SAMPLERCUBE };
+enum class SamplerType {
+    SAMPLER2D,
+    SAMPLER3D,
+    SAMPLERCUBE
+};
 
 enum class TextureFormat : uint16_t {
     R8,
@@ -79,7 +83,11 @@ static uint8_t operator&(TextureUsage lhs, TextureUsage rhs) {
     return static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs);
 }
 
-enum class PrimitiveMode { TRIANGLES, TRIANGLE_FANS, TRIANGLE_STRIPS };
+enum class PrimitiveMode {
+    TRIANGLES,
+    TRIANGLE_FANS,
+    TRIANGLE_STRIPS
+};
 
 struct Attribute {
     static constexpr uint8_t FLAG_NORMALIZED = 0x1;
@@ -96,7 +104,7 @@ static constexpr const size_t MAX_VERTEX_ATTRIBUTE_COUNT = 16;
 using AttributeArray = std::array<Attribute, MAX_VERTEX_ATTRIBUTE_COUNT>;
 
 struct BufferDescriptor {
-    uint32_t* data;
+    uint32_t *data;
 };
 
 struct Viewport {
@@ -110,7 +118,7 @@ struct Viewport {
     int32_t top() const {
         return bottom + height;
     }
-    bool operator==(const Viewport& other) const {
+    bool operator==(const Viewport &other) const {
         return left == other.left && bottom == other.bottom && width == other.width &&
                height == other.height;
     }

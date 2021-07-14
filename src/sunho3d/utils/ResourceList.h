@@ -6,7 +6,6 @@
 #include "FixedVector.h"
 
 namespace sunho3d {
-
 class IdResource {
   public:
     explicit IdResource() = default;
@@ -29,29 +28,29 @@ class ResourceList {
     ResourceList() = default;
     ~ResourceList() {
         for (auto [_, resource] : data) {
-            T* addr = reinterpret_cast<T*>(resource.data());
+            T *addr = reinterpret_cast<T *>(resource.data());
             destruct(addr);
         }
     }
 
     template <typename... ARGS>
-    T* construct(ARGS&&... args) noexcept {
+    T *construct(ARGS &&... args) noexcept {
         ResourceData resource(sizeof(T));
-        T* addr = reinterpret_cast<T*>(resource.data());
+        T *addr = reinterpret_cast<T *>(resource.data());
         new (addr) T(std::forward<ARGS>(args)...);
         addr->setId(nextId);
         data.emplace(nextId++, std::move(resource));
         return addr;
     }
 
-    void destruct(T* resource) noexcept {
+    void destruct(T *resource) noexcept {
         resource->~T();
         data.erase(resource->id());
     }
 
-    T* get(uint32_t id) {
-        ResourceData& resource = data.find(id)->second;
-        T* addr = reinterpret_cast<T*>(resource.data());
+    T *get(uint32_t id) {
+        ResourceData &resource = data.find(id)->second;
+        T *addr = reinterpret_cast<T *>(resource.data());
         return addr;
     }
 

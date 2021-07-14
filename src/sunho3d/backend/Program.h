@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
-enum class ProgramType : uint8_t { VERTEX = 0, FRAGMENT = 1 };
+enum class ProgramType : uint8_t {
+    VERTEX = 0,
+    FRAGMENT = 1
+};
 
 using ProgramCode = std::vector<char>;
 

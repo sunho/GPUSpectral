@@ -1,6 +1,6 @@
 #include "VulkanPipelineCache.h"
 
-void VulkanPipelineCache::init(VulkanContext& context) {
+void VulkanPipelineCache::init(VulkanContext &context) {
     dummyBufferWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     dummyBufferWriteInfo.pNext = nullptr;
     dummyBufferWriteInfo.dstArrayElement = 0;
@@ -42,7 +42,7 @@ void VulkanPipelineCache::init(VulkanContext& context) {
     dummyBufferInfo.range = bufferInfo.size;
 }
 
-void VulkanPipelineCache::setupDescriptorLayout(VulkanContext& context) {
+void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
@@ -111,9 +111,9 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext& context) {
     }
 }
 
-void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext& context,
-                                                 const VulkanDescriptorKey& key,
-                                                 std::array<VkDescriptorSet, 3>& descriptors) {
+void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
+                                                 const VulkanDescriptorKey &key,
+                                                 std::array<VkDescriptorSet, 3> &descriptors) {
     auto it = descriptorSets.find(key);
     if (it != descriptorSets.end()) {
         descriptors = it->second;
@@ -131,7 +131,7 @@ void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext& context,
     descriptorSets.emplace(key, descriptors);
 }
 
-void VulkanPipelineCache::bindDescriptors(VulkanContext& context, const VulkanDescriptorKey& key) {
+void VulkanPipelineCache::bindDescriptors(VulkanContext &context, const VulkanDescriptorKey &key) {
     std::array<VkDescriptorSet, 3> descriptors;
     getOrCreateDescriptors(context, key, descriptors);
 
@@ -164,12 +164,12 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext& context, const VulkanDe
     VkWriteDescriptorSet
         descriptorWrites[UBUFFER_BINDING_COUNT + SAMPLER_BINDING_COUNT + TARGET_BINDING_COUNT];
     uint32_t nwrites = 0;
-    VkWriteDescriptorSet* writes = descriptorWrites;
+    VkWriteDescriptorSet *writes = descriptorWrites;
     nwrites = 0;
     for (uint32_t binding = 0; binding < UBUFFER_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet& writeInfo = writes[nwrites++];
+        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
         if (key.uniformBuffers[binding]) {
-            VkDescriptorBufferInfo& bufferInfo = descriptorBuffers[binding];
+            VkDescriptorBufferInfo &bufferInfo = descriptorBuffers[binding];
             bufferInfo.buffer = key.uniformBuffers[binding];
             bufferInfo.offset = key.uniformBufferOffsets[binding];
             bufferInfo.range = key.uniformBufferSizes[binding];
@@ -188,9 +188,9 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext& context, const VulkanDe
         writeInfo.dstBinding = binding;
     }
     for (uint32_t binding = 0; binding < SAMPLER_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet& writeInfo = writes[nwrites++];
+        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
         if (key.samplers[binding].sampler) {
-            VkDescriptorImageInfo& imageInfo = descriptorSamplers[binding];
+            VkDescriptorImageInfo &imageInfo = descriptorSamplers[binding];
             imageInfo = key.samplers[binding];
             writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writeInfo.pNext = nullptr;
@@ -207,9 +207,9 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext& context, const VulkanDe
         writeInfo.dstBinding = binding;
     }
     for (uint32_t binding = 0; binding < TARGET_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet& writeInfo = writes[nwrites++];
+        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
         if (key.inputAttachments[binding].imageView) {
-            VkDescriptorImageInfo& imageInfo = descriptorInputAttachments[binding];
+            VkDescriptorImageInfo &imageInfo = descriptorInputAttachments[binding];
             imageInfo = key.inputAttachments[binding];
             writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writeInfo.pNext = nullptr;
@@ -230,8 +230,8 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext& context, const VulkanDe
                             0, 3, descriptors.data(), 0, nullptr);
 }
 
-VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context,
-                                                    const VulkanPipelineKey& key) {
+VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
+                                                    const VulkanPipelineKey &key) {
     auto it = pipelines.find(key);
     if (it != pipelines.end()) {
         return it->second;
@@ -379,8 +379,8 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext& context,
     return out;
 }
 
-VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext& context,
-                                                        VulkanRenderTarget* renderTarget) {
+VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
+                                                        VulkanRenderTarget *renderTarget) {
     auto it = renderpasses.find(renderTarget);
     if (it != renderpasses.end()) {
         return it->second;
@@ -432,9 +432,9 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext& context,
     return out;
 }
 
-VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext& context,
+VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext &context,
                                                           VkRenderPass renderPass,
-                                                          VulkanRenderTarget* renderTarget) {
+                                                          VulkanRenderTarget *renderTarget) {
     auto it = framebuffers.find(
         std::make_pair(renderTarget, context.currentSwapContext->attachment.view));
     if (it != framebuffers.end()) {

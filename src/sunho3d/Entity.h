@@ -9,7 +9,6 @@
 #include "utils/ResourceList.h"
 
 namespace sunho3d {
-
 struct Primitive {
     std::vector<uint16_t> indexBuffer;
     std::vector<std::vector<char>> vertexBuffers;
@@ -23,12 +22,12 @@ struct Primitive {
 class Entity : public IdResource {
   public:
     explicit Entity();
-    void addNode(Entity* entity);
-    void addPrimitive(Primitive&& primitive);
-    const std::vector<Entity*>& getNodes();
+    void addNode(Entity *entity);
+    void addPrimitive(Primitive &&primitive);
+    const std::vector<Entity *> &getNodes();
 
     // private:
-    std::vector<Entity*> nodes;
+    std::vector<Entity *> nodes;
     std::vector<Primitive> primitives;
 };
 

@@ -9,7 +9,8 @@
 
 using namespace sunho3d;
 
-Renderer::Renderer(Window* window, Scene* scene) : scene(scene), window(window), driver(window) {
+Renderer::Renderer(Window *window, Scene *scene)
+    : scene(scene), window(window), driver(window) {
 }
 
 Renderer::~Renderer() {
@@ -17,12 +18,12 @@ Renderer::~Renderer() {
 
 void Renderer::run() {
     for (auto entry : scene->entities) {
-        for (auto& prim : entry->primitives) {
+        for (auto &prim : entry->primitives) {
             auto tex = driver.createTexture(
                 SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE,
                 TextureFormat::RGBA8, prim.material.width, prim.material.height);
             BufferDescriptor td;
-            td.data = (uint32_t*)prim.material.diffuseImage.data();
+            td.data = (uint32_t *)prim.material.diffuseImage.data();
             driver.updateTexture(tex, td);
             textures.push_back(tex);
             auto p = driver.createPrimitive(prim.mode);
@@ -30,12 +31,12 @@ void Renderer::run() {
                 prim.vertexBuffers.size(), prim.elementCount, prim.attributeCount, prim.attibutes);
             for (int i = 0; i < prim.vertexBuffers.size(); ++i) {
                 auto buffer = driver.createBufferObject(prim.vertexBuffers[i].size());
-                BufferDescriptor vb = { .data = (uint32_t*)prim.vertexBuffers[i].data() };
+                BufferDescriptor vb = { .data = (uint32_t *)prim.vertexBuffers[i].data() };
                 driver.updateBufferObject(buffer, vb, 0);
                 driver.setVertexBuffer(vertexBuffer, i, buffer);
             }
             auto indexBuffer = driver.createIndexBuffer(prim.elementCount);
-            BufferDescriptor ib = { .data = (uint32_t*)prim.indexBuffer.data() };
+            BufferDescriptor ib = { .data = (uint32_t *)prim.indexBuffer.data() };
             driver.updateIndexBuffer(indexBuffer, ib, 0);
             driver.setPrimitiveBuffer(p, vertexBuffer, indexBuffer);
             primitives.push_back(p);
@@ -47,7 +48,7 @@ void Renderer::run() {
                           glm::vec3(0.0f, -1.0f, 0.0f));
     bb.proj = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 100.0f);
     auto ubo = driver.createUniformBuffer(sizeof(UniformBufferObject));
-    BufferDescriptor ub = { .data = (uint32_t*)&bb };
+    BufferDescriptor ub = { .data = (uint32_t *)&bb };
     driver.updateUniformBuffer(ubo, ub, 0);
     auto renderTarget = driver.createDefaultRenderTarget();
     RenderPassParams params;
@@ -60,7 +61,7 @@ void Renderer::run() {
         bb.model =
             glm::rotate(glm::identity<glm::mat4>(), glm::radians(10.f), glm::vec3(0.0, 1.0, 0.0)) *
             bb.model;
-        BufferDescriptor ub = { .data = (uint32_t*)&bb };
+        BufferDescriptor ub = { .data = (uint32_t *)&bb };
         driver.updateUniformBuffer(ubo, ub, 0);
         driver.bindUniformBuffer(0, ubo);
         PipelineState pipe;

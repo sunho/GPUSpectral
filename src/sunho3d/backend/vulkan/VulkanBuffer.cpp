@@ -1,6 +1,6 @@
 #include "VulkanBuffer.h"
 
-void VulkanBufferObject::allocate(VulkanContext& ctx, VkBufferUsageFlags usage) {
+void VulkanBufferObject::allocate(VulkanContext &ctx, VkBufferUsageFlags usage) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
@@ -29,8 +29,8 @@ void VulkanBufferObject::allocate(VulkanContext& ctx, VkBufferUsageFlags usage) 
     vkBindBufferMemory(ctx.device, buffer, memory, 0);
 }
 
-void VulkanBufferObject::upload(VulkanContext& ctx, const BufferDescriptor& descriptor) {
-    void* data;
+void VulkanBufferObject::upload(VulkanContext &ctx, const BufferDescriptor &descriptor) {
+    void *data;
     vkMapMemory(ctx.device, memory, 0, size, 0, &data);
     memcpy(data, descriptor.data, (size_t)size);
     vkUnmapMemory(ctx.device, memory);

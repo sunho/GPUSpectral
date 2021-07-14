@@ -50,9 +50,9 @@ static void transitionImageLayout(VkCommandBuffer cmd, VkImage image, VkImageLay
 inline
 
     static void
-    createImage(VulkanContext& context, uint32_t width, uint32_t height, VkFormat format,
+    createImage(VulkanContext &context, uint32_t width, uint32_t height, VkFormat format,
                 VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-                VkImage& image, VkDeviceMemory& imageMemory) {
+                VkImage &image, VkDeviceMemory &imageMemory) {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -143,7 +143,7 @@ static VkFormat translateTextureFormat(TextureFormat format) {
     }
 }
 
-static VkImageView createImageView(VulkanContext& context, VkImage image, VkFormat format,
+static VkImageView createImageView(VulkanContext &context, VkImage image, VkFormat format,
                                    VkImageAspectFlags aspectFlags) {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -164,7 +164,7 @@ static VkImageView createImageView(VulkanContext& context, VkImage image, VkForm
     return imageView;
 }
 
-VulkanTexture::VulkanTexture(VulkanContext& context, SamplerType type, TextureUsage usage,
+VulkanTexture::VulkanTexture(VulkanContext &context, SamplerType type, TextureUsage usage,
                              uint8_t levels, TextureFormat format, uint32_t width, uint32_t height)
     : HwTexture(type, levels, format, width, height) {
     const VkImageUsageFlags blittable =
@@ -229,7 +229,7 @@ VulkanTexture::VulkanTexture(VulkanContext& context, SamplerType type, TextureUs
     }
 }
 
-void VulkanTexture::update2DImage(VulkanContext& context, const BufferDescriptor& data) {
+void VulkanTexture::update2DImage(VulkanContext &context, const BufferDescriptor &data) {
     VulkanBufferObject buffer(width * height * 4);
     buffer.allocate(context, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
     buffer.upload(context, data);

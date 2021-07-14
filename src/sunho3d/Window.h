@@ -9,7 +9,6 @@
 #include "utils/ResourceList.h"
 
 namespace sunho3d {
-
 class Engine;
 
 class Window : public IdResource {
@@ -26,7 +25,7 @@ class Window : public IdResource {
     void run(std::function<void()> drawFrame);
 
   private:
-    GLFWwindow* window;
+    GLFWwindow *window;
 
     size_t width;
     size_t height;

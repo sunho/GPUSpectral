@@ -12,22 +12,18 @@ using namespace sunho3d;
 
 static void DestroyDebugUtilsMessengerEXT(VkInstance instance,
                                           VkDebugUtilsMessengerEXT debugMessenger,
-                                          const VkAllocationCallbacks* pAllocator) {
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebu"
-                                                                                     "gUtilsMesseng"
-                                                                                     "erEXT");
+                                          const VkAllocationCallbacks *pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
         func(instance, debugMessenger, pAllocator);
     }
 }
 
 static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
-                                             const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator,
-                                             VkDebugUtilsMessengerEXT* pDebugMessenger) {
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugU"
-                                                                                    "tilsMessengerE"
-                                                                                    "XT");
+                                             const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                             const VkAllocationCallbacks *pAllocator,
+                                             VkDebugUtilsMessengerEXT *pDebugMessenger) {
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != nullptr) {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
     } else {
@@ -35,7 +31,7 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
     }
 }
 
-VulkanDriver::VulkanDriver(Window* window) {
+VulkanDriver::VulkanDriver(Window *window) {
     initContext(context);
     initSurfaceContext(context, surface, window);
     pickPhysicalDevice(context, surface);
@@ -119,7 +115,7 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     context.currentSwapContext = &surface.swapContexts[surface.swapContextIndex];
 
     const VkCommandBuffer cmdbuffer = context.commands.get();
-    VulkanRenderTarget* rt = handle_cast<VulkanRenderTarget>(renderTarget);
+    VulkanRenderTarget *rt = handle_cast<VulkanRenderTarget>(renderTarget);
 
     VkRenderPass renderPass = pipelineCache.getOrCreateRenderPass(context, rt);
     VkFramebuffer frameBuffer = pipelineCache.getOrCreateFrameBuffer(context, renderPass, rt);
@@ -177,8 +173,8 @@ void VulkanDriver::updateTexture(TextureHandle handle, BufferDescriptor data) {
 
 void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle vertexBuffer,
                                       IndexBufferHandle indexBuffer) {
-    VulkanVertexBuffer* vertex = handle_cast<VulkanVertexBuffer>(vertexBuffer);
-    VulkanIndexBuffer* index = handle_cast<VulkanIndexBuffer>(indexBuffer);
+    VulkanVertexBuffer *vertex = handle_cast<VulkanVertexBuffer>(vertexBuffer);
+    VulkanIndexBuffer *index = handle_cast<VulkanIndexBuffer>(indexBuffer);
     handle_cast<VulkanPrimitive>(handle)->index = index;
     handle_cast<VulkanPrimitive>(handle)->vertex = vertex;
 }
@@ -191,7 +187,7 @@ void VulkanDriver::updateUniformBuffer(UniformBufferHandle handle, BufferDescrip
 void VulkanDriver::bindUniformBuffer(uint32_t binding, UniformBufferHandle handle) {
     const VkCommandBuffer cmdbuffer = context.commands.get();
 
-    VulkanUniformBuffer* ubo = handle_cast<VulkanUniformBuffer>(handle);
+    VulkanUniformBuffer *ubo = handle_cast<VulkanUniformBuffer>(handle);
     currentBinding.uniformBuffers[binding] = ubo->buffer->buffer;
     currentBinding.uniformBufferOffsets[binding] = 0;
     currentBinding.uniformBufferSizes[binding] = ubo->size;
@@ -202,7 +198,7 @@ void VulkanDriver::bindUniformBuffer(uint32_t binding, UniformBufferHandle handl
 void VulkanDriver::bindTexture(uint32_t binding, TextureHandle handle) {
     const VkCommandBuffer cmdbuffer = context.commands.get();
 
-    VulkanTexture* tex = handle_cast<VulkanTexture>(handle);
+    VulkanTexture *tex = handle_cast<VulkanTexture>(handle);
     VkDescriptorImageInfo info;
     info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     info.imageView = tex->view;
@@ -317,7 +313,7 @@ Handle<HwUniformBuffer> VulkanDriver::createUniformBuffer(uint32_t size) {
 }
 
 void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
-    VulkanPrimitive* prim = handle_cast<VulkanPrimitive>(handle);
+    VulkanPrimitive *prim = handle_cast<VulkanPrimitive>(handle);
 
     const VkCommandBuffer cmdbuffer = context.commands.get();
 
@@ -342,7 +338,7 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         };
     }
 
-    VulkanProgram* program = handle_cast<VulkanProgram>(pipeline.program);
+    VulkanProgram *program = handle_cast<VulkanProgram>(pipeline.program);
 
     Viewport vp = {
         .left = 0, .bottom = 0, .width = surface.extent.width, .height = surface.extent.height
@@ -423,8 +419,8 @@ void VulkanDriver::commit(int dummy) {
 
 VkBool32 VulkanDriver::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                      VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                                     void* pUserData) {
+                                     const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                     void *pUserData) {
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
     }

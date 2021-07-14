@@ -12,16 +12,15 @@
 #include "utils/ResourceList.h"
 
 namespace sunho3d {
-
 class Engine {
   public:
     Engine();
     ~Engine();
 
-    Window* createWindow(size_t width, size_t height);
-    Entity* createEntity();
-    Renderer* createRenderer(Window* window, Scene* scene);
-    Scene* createScene();
+    Window *createWindow(size_t width, size_t height);
+    Entity *createEntity();
+    Renderer *createRenderer(Window *window, Scene *scene);
+    Scene *createScene();
 
   private:
     ResourceList<Window> windows;
