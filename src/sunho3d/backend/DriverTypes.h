@@ -121,21 +121,21 @@ struct BufferDescriptor {
 
 struct Viewport {
     int32_t left;
-    int32_t bottom;
-    uint32_t width;
-    uint32_t height;
+    int32_t top;
+    int32_t width;
+    int32_t height;
     int32_t right() const {
         return left + width;
     }
-    int32_t top() const {
-        return bottom + height;
+    int32_t bottom() const {
+        return top + height;
     }
     bool operator==(const Viewport& other) const {
-        return left == other.left && bottom == other.bottom && width == other.width &&
+        return left == other.left && top == other.top && width == other.width &&
                height == other.height;
     }
     bool operator<(const Viewport& other) const {
-        return std::tie(left, bottom, width, height) < std::tie(other.left, other.bottom, other.width, other.height);
+        return std::tie(left, top, width, height) < std::tie(other.left, other.top, other.width, other.height);
     }
 };
 

@@ -2,6 +2,7 @@
 
 #include <sunho3d/framegraph/FrameGraph.h>
 
+#include "Camera.h"
 #include "Transform.h"
 #include "Window.h"
 #include "backend/vulkan/VulkanDriver.h"
@@ -76,6 +77,8 @@ class Renderer : public IdResource {
     void run(Scene* scene);
 
   private:
+    Handle<HwUniformBuffer> createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model);
+
     Handle<HwProgram> fowradPassProgram;
     Handle<HwProgram> quadDrawProgram;
     Handle<HwRenderTarget> surfaceRenderTarget;

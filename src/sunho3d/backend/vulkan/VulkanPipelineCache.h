@@ -15,9 +15,10 @@ struct VulkanPipelineKey {
     size_t attributeCount;
     VulkanProgram *program;
     Viewport viewport;
+    VkRenderPass renderPass;
 
     bool operator<(const VulkanPipelineKey &other) const {
-        return std::tie(attributeCount, program, viewport, attributes) < std::tie(other.attributeCount, other.program, other.viewport, other.attributes);
+        return std::tie(attributeCount, program, viewport, attributes, renderPass) < std::tie(other.attributeCount, other.program, other.viewport, other.attributes, other.renderPass);
     }
 };
 

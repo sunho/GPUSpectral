@@ -25,6 +25,7 @@ struct VulkanContext {
     VulkanSwapContext *currentSwapContext;
     VulkanTexture *emptyTexture;
     VkRenderPass currentRenderPass;
+    Viewport viewport;
     bool firstPass{ true };
 
     VkCommandBuffer beginSingleCommands();

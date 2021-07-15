@@ -23,5 +23,6 @@ struct Camera {
     // the center of the plane is paralle to the center of the camera (it "spreads" out)
     void setProjectionFov(float fovY, float aspect, float near, float far) {
         proj = glm::perspective(fovY, aspect, near, far);
+        proj[1][1] *= -1;
     }
 };

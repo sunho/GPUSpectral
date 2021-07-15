@@ -162,16 +162,11 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     renderPassInfo.clearValueCount = 2;
     renderPassInfo.pClearValues = clearValues.data();
     vkCmdBeginRenderPass(cmdbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    VkViewport viewport = {
-        .x = (float)params.viewport.left,
-        .y = (float)params.viewport.bottom,
-        .width = (float)params.viewport.width,
-        .height = (float)params.viewport.height,
-        //       .minDepth = params.depthRange.near,
-        //       .maxDepth = params.depthRange.far
-    };
-    // vkCmdSetViewport(cmdbuffer, 0, 1, &viewport);
+    if (params.viewport.width == 0 && params.viewport.height == 0) {
+        params.viewport.width = rt->width;
+        params.viewport.height = rt->height;
+    }
+    context.viewport = params.viewport;
     context.currentRenderPass = renderPass;
 }
 
@@ -251,11 +246,8 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
 
     VulkanProgram *program = handle_cast<VulkanProgram>(pipeline.program);
 
-    Viewport vp = {
-        .left = 0, .bottom = 0, .width = surface.extent.width, .height = surface.extent.height
-    };
     VulkanPipelineKey key = {
-        .attributes = prim->vertex->attributes, .attributeCount = prim->vertex->attributeCount, .program = program, .viewport = vp
+        .attributes = prim->vertex->attributes, .attributeCount = prim->vertex->attributeCount, .program = program, .viewport = context.viewport, .renderPass = context.currentRenderPass
     };
 
     VkPipeline pl = pipelineCache.getOrCreatePipeline(context, key);

@@ -299,16 +299,16 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = (float)key.viewport.height;
+    viewport.x = (float)key.viewport.left;
+    viewport.y = (float)key.viewport.top;
     viewport.width = (float)key.viewport.width;
-    viewport.height = -(float)key.viewport.height;
+    viewport.height = (float)key.viewport.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     VkRect2D scissor{};
     scissor.offset = { 0, 0 };
-    scissor.extent = { .width = key.viewport.width, .height = key.viewport.height };
+    scissor.extent = { .width = (uint32_t)std::numeric_limits<int32_t>::max(), .height = (uint32_t)std::numeric_limits<int32_t>::max() };
 
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -401,7 +401,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = nullptr;  // Optional
     pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = context.currentRenderPass;
+    pipelineInfo.renderPass = key.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;  // Optional
     pipelineInfo.basePipelineIndex = -1;               // Optional

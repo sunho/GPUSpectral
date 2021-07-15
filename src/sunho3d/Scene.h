@@ -32,6 +32,7 @@ static constexpr const size_t MAX_LIGHTS = 64;
 
 struct LightBuffer {
     std::array<LightData, MAX_LIGHTS> lights;
+    std::array<glm::mat4, MAX_LIGHTS> lightVP;
     int lightNum{};
     int pad[3];
 };
