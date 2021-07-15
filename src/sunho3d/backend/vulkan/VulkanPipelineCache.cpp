@@ -36,10 +36,31 @@ void VulkanPipelineCache::init(VulkanContext &context) {
         .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     };
 
-    dummyBuffer = new VulkanBufferObject(16);
-    dummyBuffer->allocate(context, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    dummyBuffer = new VulkanBufferObject(context, 16, BufferUsage::UNIFORM);
     dummyBufferInfo.buffer = dummyBuffer->buffer;
     dummyBufferInfo.range = bufferInfo.size;
+
+    this->context = &context;
+
+    pipelines.setDestroyer([=](VkPipeline pipeline) {
+        vkDestroyPipeline(this->context->device, pipeline, nullptr);
+    });
+    framebuffers.setDestroyer([=](VkFramebuffer framebuffer) {
+        vkDestroyFramebuffer(this->context->device, framebuffer, nullptr);
+    });
+    descriptorSets.setDestroyer([=](std::array<VkDescriptorSet, 3> descriptors) {
+        vkFreeDescriptorSets(this->context->device, descriptorPool, 3, descriptors.data());
+    });
+    renderpasses.setDestroyer([=](VkRenderPass renderPass) {
+        vkDestroyRenderPass(this->context->device, renderPass, nullptr);
+    });
+}
+
+void VulkanPipelineCache::tick() {
+    pipelines.tick();
+    framebuffers.tick();
+    descriptorSets.tick();
+    renderpasses.tick();
 }
 
 void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
@@ -53,9 +74,9 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     binding.descriptorCount = 1;
     binding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
 
-    std::array<VkDescriptorSetLayoutBinding, UBUFFER_BINDING_COUNT> ubindings;
+    std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::UBUFFER_BINDING_COUNT> ubindings;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    for (uint32_t i = 0; i < UBUFFER_BINDING_COUNT; i++) {
+    for (uint32_t i = 0; i < VulkanDescriptor::UBUFFER_BINDING_COUNT; i++) {
         binding.binding = i;
         ubindings[i] = binding;
     }
@@ -65,9 +86,9 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     dlinfo.pBindings = ubindings.data();
     vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[0]);
 
-    std::array<VkDescriptorSetLayoutBinding, SAMPLER_BINDING_COUNT> sbindings;
+    std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::SAMPLER_BINDING_COUNT> sbindings;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    for (uint32_t i = 0; i < SAMPLER_BINDING_COUNT; i++) {
+    for (uint32_t i = 0; i < VulkanDescriptor::SAMPLER_BINDING_COUNT; i++) {
         binding.binding = i;
         sbindings[i] = binding;
     }
@@ -75,10 +96,10 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     dlinfo.pBindings = sbindings.data();
     vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[1]);
 
-    std::array<VkDescriptorSetLayoutBinding, TARGET_BINDING_COUNT> bindings;
+    std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    for (uint32_t i = 0; i < TARGET_BINDING_COUNT; i++) {
+    for (uint32_t i = 0; i < VulkanDescriptor::TARGET_BINDING_COUNT; i++) {
         binding.binding = i;
         bindings[i] = binding;
     }
@@ -101,22 +122,22 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
                                          .poolSizeCount = 3,
                                          .pPoolSizes = poolSizes };
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = poolInfo.maxSets * UBUFFER_BINDING_COUNT;
+    poolSizes[0].descriptorCount = poolInfo.maxSets * VulkanDescriptor::UBUFFER_BINDING_COUNT;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = poolInfo.maxSets * SAMPLER_BINDING_COUNT;
+    poolSizes[1].descriptorCount = poolInfo.maxSets * VulkanDescriptor::SAMPLER_BINDING_COUNT;
     poolSizes[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    poolSizes[2].descriptorCount = poolInfo.maxSets * TARGET_BINDING_COUNT;
+    poolSizes[2].descriptorCount = poolInfo.maxSets * VulkanDescriptor::TARGET_BINDING_COUNT;
     if (vkCreateDescriptorPool(context.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
 }
 
 void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
-                                                 const VulkanDescriptorKey &key,
+                                                 const VulkanDescriptor &key,
                                                  std::array<VkDescriptorSet, 3> &descriptors) {
-    auto it = descriptorSets.find(key);
-    if (it != descriptorSets.end()) {
-        descriptors = it->second;
+    auto it = descriptorSets.get(key);
+    if (it) {
+        descriptors = *it;
         return;
     }
 
@@ -128,10 +149,10 @@ void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
     if (vkAllocateDescriptorSets(context.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
-    descriptorSets.emplace(key, descriptors);
+    descriptorSets.add(key, descriptors);
 }
 
-void VulkanPipelineCache::bindDescriptors(VulkanContext &context, const VulkanDescriptorKey &key) {
+void VulkanPipelineCache::bindDescriptor(VulkanContext &context, const VulkanDescriptor &key) {
     std::array<VkDescriptorSet, 3> descriptors;
     getOrCreateDescriptors(context, key, descriptors);
 
@@ -158,15 +179,15 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext &context, const VulkanDe
         vkCreateSampler(context.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
     }
 
-    VkDescriptorBufferInfo descriptorBuffers[UBUFFER_BINDING_COUNT];
-    VkDescriptorImageInfo descriptorSamplers[SAMPLER_BINDING_COUNT];
-    VkDescriptorImageInfo descriptorInputAttachments[TARGET_BINDING_COUNT];
+    VkDescriptorBufferInfo descriptorBuffers[VulkanDescriptor::UBUFFER_BINDING_COUNT];
+    VkDescriptorImageInfo descriptorSamplers[VulkanDescriptor::SAMPLER_BINDING_COUNT];
+    VkDescriptorImageInfo descriptorInputAttachments[VulkanDescriptor::TARGET_BINDING_COUNT];
     VkWriteDescriptorSet
-        descriptorWrites[UBUFFER_BINDING_COUNT + SAMPLER_BINDING_COUNT + TARGET_BINDING_COUNT];
+        descriptorWrites[VulkanDescriptor::UBUFFER_BINDING_COUNT + VulkanDescriptor::SAMPLER_BINDING_COUNT + VulkanDescriptor::TARGET_BINDING_COUNT];
     uint32_t nwrites = 0;
     VkWriteDescriptorSet *writes = descriptorWrites;
     nwrites = 0;
-    for (uint32_t binding = 0; binding < UBUFFER_BINDING_COUNT; binding++) {
+    for (uint32_t binding = 0; binding < VulkanDescriptor::UBUFFER_BINDING_COUNT; binding++) {
         VkWriteDescriptorSet &writeInfo = writes[nwrites++];
         if (key.uniformBuffers[binding]) {
             VkDescriptorBufferInfo &bufferInfo = descriptorBuffers[binding];
@@ -187,7 +208,7 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext &context, const VulkanDe
         writeInfo.dstSet = descriptors[0];
         writeInfo.dstBinding = binding;
     }
-    for (uint32_t binding = 0; binding < SAMPLER_BINDING_COUNT; binding++) {
+    for (uint32_t binding = 0; binding < VulkanDescriptor::SAMPLER_BINDING_COUNT; binding++) {
         VkWriteDescriptorSet &writeInfo = writes[nwrites++];
         if (key.samplers[binding].sampler) {
             VkDescriptorImageInfo &imageInfo = descriptorSamplers[binding];
@@ -206,7 +227,7 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext &context, const VulkanDe
         writeInfo.dstSet = descriptors[1];
         writeInfo.dstBinding = binding;
     }
-    for (uint32_t binding = 0; binding < TARGET_BINDING_COUNT; binding++) {
+    for (uint32_t binding = 0; binding < VulkanDescriptor::TARGET_BINDING_COUNT; binding++) {
         VkWriteDescriptorSet &writeInfo = writes[nwrites++];
         if (key.inputAttachments[binding].imageView) {
             VkDescriptorImageInfo &imageInfo = descriptorInputAttachments[binding];
@@ -226,15 +247,15 @@ void VulkanPipelineCache::bindDescriptors(VulkanContext &context, const VulkanDe
         writeInfo.dstBinding = binding;
     }
     vkUpdateDescriptorSets(context.device, nwrites, writes, 0, nullptr);
-    vkCmdBindDescriptorSets(context.commands.get(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+    vkCmdBindDescriptorSets(context.commands->get(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
                             0, 3, descriptors.data(), 0, nullptr);
 }
 
 VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
                                                     const VulkanPipelineKey &key) {
-    auto it = pipelines.find(key);
-    if (it != pipelines.end()) {
-        return it->second;
+    auto it = pipelines.get(key);
+    if (it) {
+        return *it;
     }
 
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -252,10 +273,25 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = key.bindings.size();
-    vertexInputInfo.pVertexBindingDescriptions = key.bindings.data();
-    vertexInputInfo.vertexAttributeDescriptionCount = key.attributes.size();
-    vertexInputInfo.pVertexAttributeDescriptions = key.attributes.data();
+    vertexInputInfo.vertexBindingDescriptionCount = key.attributeCount;
+    std::vector<VkVertexInputAttributeDescription> attributes(key.attributeCount);
+    std::vector<VkVertexInputBindingDescription> bindings(key.attributeCount);
+
+    for (uint32_t i = 0; i < key.attributeCount; ++i) {
+        Attribute attrib = key.attributes[i];
+        attributes[i] = { .location = i,
+                          .binding = i,
+                          .format = context.translateElementFormat(attrib.type,
+                                                                   attrib.flags & Attribute::FLAG_NORMALIZED, false) };
+        bindings[i] = {
+            .binding = i,
+            .stride = attrib.stride,
+        };
+    }
+
+    vertexInputInfo.pVertexBindingDescriptions = bindings.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = key.attributeCount;
+    vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -375,50 +411,84 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
         throw std::runtime_error("failed to create graphics pipeline!");
     }
 
-    pipelines.emplace(key, out);
+    pipelines.add(key, out);
     return out;
 }
 
 VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
                                                         VulkanRenderTarget *renderTarget) {
-    auto it = renderpasses.find(renderTarget);
-    if (it != renderpasses.end()) {
-        return it->second;
+    auto it = renderpasses.get(renderTarget);
+    if (it) {
+        return *it;
     }
     VkRenderPass out;
-    VkAttachmentDescription colorAttachment{ .format = context.surface->format.format,
-                                             .samples = VK_SAMPLE_COUNT_1_BIT,
-                                             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                             .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-                                             .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                             .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                             .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                             .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR };
-    VkAttachmentReference colorAttachmentRef{ .attachment = 0,
-                                              .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-    VkAttachmentDescription depthAttachment{};
-    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
-    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    std::vector<VkAttachmentDescription> attachments;
     VkAttachmentReference depthAttachmentRef{};
-    depthAttachmentRef.attachment = 1;
-    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    std::vector<VkAttachmentReference> colorAttachmentRef;
+
+    if (renderTarget->surface) {
+        attachments.push_back({ .format = context.surface->format.format,
+                                .samples = VK_SAMPLE_COUNT_1_BIT,
+                                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+                                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR });
+        colorAttachmentRef.push_back({ .attachment = 0,
+                                       .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+
+        attachments.push_back({ .format = VK_FORMAT_D32_SFLOAT,
+                                .samples = VK_SAMPLE_COUNT_1_BIT,
+                                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL });
+
+        depthAttachmentRef.attachment = 1;
+        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    } else {
+        for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+            auto &texture = renderTarget->color[i].texture;
+            if (texture) {
+                attachments.push_back({ .format = texture->vkFormat,
+                                        .samples = VK_SAMPLE_COUNT_1_BIT,
+                                        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                        .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                        .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
+                                        .finalLayout = VK_IMAGE_LAYOUT_GENERAL });
+
+                colorAttachmentRef.push_back({ .attachment = (uint32_t)i,
+                                               .layout = VK_IMAGE_LAYOUT_GENERAL });
+            }
+        }
+        if (renderTarget->depth.texture) {
+            depthAttachmentRef.attachment = attachments.size();
+            attachments.push_back({ .format = renderTarget->depth.texture->vkFormat,
+                                    .samples = VK_SAMPLE_COUNT_1_BIT,
+                                    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                    .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                    .finalLayout = VK_IMAGE_LAYOUT_GENERAL });
+
+            depthAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL;
+        }
+    }
 
     VkSubpassDescription subpass{ .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                  .colorAttachmentCount = 1,
-                                  .pColorAttachments = &colorAttachmentRef,
+                                  .colorAttachmentCount = (uint32_t)colorAttachmentRef.size(),
+                                  .pColorAttachments = colorAttachmentRef.data(),
                                   .pDepthStencilAttachment = &depthAttachmentRef };
-
-    std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
 
     VkRenderPassCreateInfo renderPassInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = attachments.size(),
+        .attachmentCount = (uint32_t)attachments.size(),
         .pAttachments = attachments.data(),
         .subpassCount = 1,
         .pSubpasses = &subpass,
@@ -428,26 +498,39 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
         throw std::runtime_error("failed to create render pass!");
     }
 
-    renderpasses.emplace(renderTarget, out);
+    renderpasses.add(renderTarget, out);
     return out;
 }
 
 VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext &context,
                                                           VkRenderPass renderPass,
                                                           VulkanRenderTarget *renderTarget) {
-    auto it = framebuffers.find(
+    auto it = framebuffers.get(
         std::make_pair(renderTarget, context.currentSwapContext->attachment.view));
-    if (it != framebuffers.end()) {
-        return it->second;
+    if (it) {
+        return *it;
     }
-    VkImageView attachments[] = { context.currentSwapContext->attachment.view,
-                                  renderTarget->depth.view };
 
+    std::vector<VkImageView> attachments;
+    if (renderTarget->surface) {
+        attachments.push_back(context.currentSwapContext->attachment.view);
+        attachments.push_back(renderTarget->depth.view);
+    } else {
+        for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+            auto &texture = renderTarget->color[i].texture;
+            if (texture) {
+                attachments.push_back(texture->view);
+            }
+        }
+        if (renderTarget->depth.texture) {
+            attachments.push_back(renderTarget->depth.texture->view);
+        }
+    }
     VkFramebuffer framebuffer;
     VkFramebufferCreateInfo framebufferInfo{ .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                                              .renderPass = renderPass,
-                                             .attachmentCount = 2,
-                                             .pAttachments = attachments,
+                                             .attachmentCount = (uint32_t)attachments.size(),
+                                             .pAttachments = attachments.data(),
                                              .width = renderTarget->width,
                                              .height = renderTarget->height,
                                              .layers = 1 };
@@ -457,7 +540,7 @@ VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext &context
         throw std::runtime_error("failed to create framebuffer!");
     }
 
-    framebuffers.emplace(std::make_pair(renderTarget, context.currentSwapContext->attachment.view),
-                         framebuffer);
+    framebuffers.add(std::make_pair(renderTarget, context.currentSwapContext->attachment.view),
+                     framebuffer);
     return framebuffer;
 }

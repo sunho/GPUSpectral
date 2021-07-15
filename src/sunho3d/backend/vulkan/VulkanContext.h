@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "../DriverTypes.h"
 #include "VulkanCommands.h"
 
 struct VulkanSwapContext;
@@ -19,18 +20,24 @@ struct VulkanContext {
     uint32_t graphicsFamily;
     VkQueue graphicsQueue;
     VkCommandPool commandPool;
-    VulkanCommands commands;
+    VulkanCommands *commands;
     VulkanSurfaceContext *surface;
     VulkanSwapContext *currentSwapContext;
     VulkanTexture *emptyTexture;
     VkRenderPass currentRenderPass;
+    bool firstPass{ true };
 
     VkCommandBuffer beginSingleCommands();
     void endSingleCommands(VkCommandBuffer cmd);
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+    VkFormat translateTextureFormat(TextureFormat format);
+    VkFormat translateElementFormat(ElementType type, bool normalized, bool integer);
+    VkBufferUsageFlags translateBufferUsage(BufferUsage usage);
 };
 
 struct VulkanAttachment {
+    VulkanTexture *texture{};
     VkFormat format;
     VkImage image;
     VkImageView view;
@@ -48,6 +55,7 @@ struct VulkanSurfaceContext {
     VkSurfaceFormatKHR format;
     VkExtent2D extent;
     VkQueue presentQueue;
+    VulkanTexture *depthTexture;
     size_t size;
     std::vector<VkSurfaceFormatKHR> availabeFormats;
     std::vector<VulkanSwapContext> swapContexts;

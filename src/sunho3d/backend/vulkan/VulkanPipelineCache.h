@@ -6,66 +6,38 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../../utils/GCPool.h"
 #include "VulkanContext.h"
 #include "VulkanHandles.h"
 
 struct VulkanPipelineKey {
-    std::vector<VkVertexInputAttributeDescription> attributes;
-    std::vector<VkVertexInputBindingDescription> bindings;
+    AttributeArray attributes;
+    size_t attributeCount;
     VulkanProgram *program;
     Viewport viewport;
-    bool operator==(const VulkanPipelineKey &other) const {
-        if (bindings.size() != other.bindings.size())
-            return false;
-        if (attributes.size() != other.attributes.size())
-            return false;
-        for (size_t i = 0; i < bindings.size(); ++i) {
-            if (memcmp(&bindings[i], &other.bindings[i], sizeof(VkVertexInputBindingDescription)) !=
-                0)
-                return false;
-        }
-        for (size_t i = 0; i < attributes.size(); ++i) {
-            if (memcmp(&attributes[i], &other.attributes[i],
-                       sizeof(VkVertexInputAttributeDescription)) != 0)
-                return false;
-        }
-        return program == other.program && viewport == other.viewport;
+
+    bool operator<(const VulkanPipelineKey &other) const {
+        return std::tie(attributeCount, program, viewport, attributes) < std::tie(other.attributeCount, other.program, other.viewport, other.attributes);
     }
 };
 
-// FIXME: hash more robustly
-struct VulkanPipelineKeyHasher {
-    std::size_t operator()(const VulkanPipelineKey &k) const {
-        return std::hash<VulkanProgram *>()(k.program);
-    }
+static bool operator<(const VkDescriptorImageInfo &lhs, const VkDescriptorImageInfo &rhs) {
+    return std::tie(lhs.imageLayout, lhs.imageView, lhs.sampler) < std::tie(rhs.imageLayout, rhs.imageView, rhs.sampler);
 };
 
-static constexpr uint32_t UBUFFER_BINDING_COUNT = 8;
-static constexpr uint32_t SAMPLER_BINDING_COUNT = 8;
-static constexpr uint32_t TARGET_BINDING_COUNT = 8;
+struct VulkanDescriptor {
+    static constexpr uint32_t UBUFFER_BINDING_COUNT = 8;
+    static constexpr uint32_t SAMPLER_BINDING_COUNT = 8;
+    static constexpr uint32_t TARGET_BINDING_COUNT = 8;
 
-#pragma pack(push, 1)
-struct VulkanDescriptorKey {
     std::array<VkBuffer, UBUFFER_BINDING_COUNT> uniformBuffers;
     std::array<VkDescriptorImageInfo, SAMPLER_BINDING_COUNT> samplers;
     std::array<VkDescriptorImageInfo, TARGET_BINDING_COUNT> inputAttachments;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
 
-    bool operator==(const VulkanDescriptorKey &other) const {
-        return memcmp(this, &other, sizeof(VulkanDescriptorKey)) == 0;
-    }
-};
-#pragma pack(pop)
-
-template <class A>
-class PodHash {
-  public:
-    size_t operator()(const A &a) const {
-        // it is possible to write hash func here char by char without using std::string
-        const std::string str =
-            std::string(reinterpret_cast<const std::string::value_type *>(&a), sizeof(A));
-        return std::hash<std::string>()(str);
+    bool operator<(const VulkanDescriptor &other) const {
+        return std::tie(uniformBuffers, samplers, inputAttachments, uniformBufferOffsets, uniformBufferSizes) < std::tie(other.uniformBuffers, other.samplers, other.inputAttachments, other.uniformBufferOffsets, other.uniformBufferSizes);
     }
 };
 
@@ -76,25 +48,24 @@ class VulkanPipelineCache {
     VkFramebuffer getOrCreateFrameBuffer(VulkanContext &context, VkRenderPass renderPass,
                                          VulkanRenderTarget *renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanContext &context, VulkanRenderTarget *renderTarget);
-    void bindDescriptors(VulkanContext &context, const VulkanDescriptorKey &key);
+    void bindDescriptor(VulkanContext &context, const VulkanDescriptor &key);
     void setDummyTexture(VkImageView imageView) {
         dummyImageView = imageView;
     }
-    VkPipelineLayout pipelineLayout;
+    void tick();
 
   private:
     void setupDescriptorLayout(VulkanContext &context);
-    void getOrCreateDescriptors(VulkanContext &context, const VulkanDescriptorKey &key,
+    void getOrCreateDescriptors(VulkanContext &context, const VulkanDescriptor &key,
                                 std::array<VkDescriptorSet, 3> &descripotrs);
 
     VkDescriptorPool descriptorPool;
     std::array<VkDescriptorSetLayout, 3> descriptorSetLayout;
-    std::unordered_map<VulkanPipelineKey, VkPipeline, VulkanPipelineKeyHasher> pipelines;
-    std::map<std::pair<VulkanRenderTarget *, VkImageView>, VkFramebuffer> framebuffers;
-    std::unordered_map<VulkanRenderTarget *, VkRenderPass> renderpasses;
-    std::unordered_map<VulkanDescriptorKey, std::array<VkDescriptorSet, 3>,
-                       PodHash<VulkanDescriptorKey>>
-        descriptorSets;
+
+    GCPool<VulkanPipelineKey, VkPipeline> pipelines;
+    GCPool<std::pair<VulkanRenderTarget *, VkImageView>, VkFramebuffer> framebuffers;
+    GCPool<VulkanRenderTarget *, VkRenderPass> renderpasses;
+    GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 3>> descriptorSets;
 
     VkImageView dummyImageView = VK_NULL_HANDLE;
     VkDescriptorBufferInfo dummyBufferInfo = {};
@@ -104,5 +75,8 @@ class VulkanPipelineCache {
     VkDescriptorImageInfo dummyTargetInfo = {};
     VkWriteDescriptorSet dummyTargetWriteInfo = {};
 
+    VulkanContext *context;
     VulkanBufferObject *dummyBuffer;
+
+    VkPipelineLayout pipelineLayout;
 };

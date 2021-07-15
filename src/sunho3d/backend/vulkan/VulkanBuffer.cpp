@@ -1,37 +1,43 @@
 #include "VulkanBuffer.h"
 
-void VulkanBufferObject::allocate(VulkanContext &ctx, VkBufferUsageFlags usage) {
+VulkanBufferObject::VulkanBufferObject(VulkanContext &context, uint32_t size, BufferUsage usage)
+    : context(context), HwBufferObject(size) {
     VkBufferCreateInfo bufferInfo{};
     bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bufferInfo.size = size;
-    bufferInfo.usage = usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufferInfo.usage = context.translateBufferUsage(usage) | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(ctx.device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+    if (vkCreateBuffer(context.device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
         throw std::runtime_error("failed to create buffer!");
     }
 
     VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(ctx.device, buffer, &memRequirements);
+    vkGetBufferMemoryRequirements(context.device, buffer, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
 
-    allocInfo.memoryTypeIndex = ctx.findMemoryType(memRequirements.memoryTypeBits,
-                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    allocInfo.memoryTypeIndex = context.findMemoryType(memRequirements.memoryTypeBits,
+                                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    if (vkAllocateMemory(ctx.device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+    if (vkAllocateMemory(context.device, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate buffer memory!");
     }
 
-    vkBindBufferMemory(ctx.device, buffer, memory, 0);
+    vkBindBufferMemory(context.device, buffer, memory, 0);
 }
 
-void VulkanBufferObject::upload(VulkanContext &ctx, const BufferDescriptor &descriptor) {
+VulkanBufferObject::~VulkanBufferObject() {
+    vkDestroyBuffer(context.device, buffer, nullptr);
+    vkFreeMemory(context.device, memory, nullptr);
+}
+
+void VulkanBufferObject::upload(const BufferDescriptor &descriptor) {
     void *data;
-    vkMapMemory(ctx.device, memory, 0, size, 0, &data);
+    vkMapMemory(context.device, memory, 0, size, 0, &data);
     memcpy(data, descriptor.data, (size_t)size);
-    vkUnmapMemory(ctx.device, memory);
+    vkUnmapMemory(context.device, memory);
 }

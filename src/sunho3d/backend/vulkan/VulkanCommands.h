@@ -10,11 +10,15 @@ struct VulkanContext;
 
 class VulkanCommands {
   public:
-    VulkanCommands() = default;
     explicit VulkanCommands(VulkanContext &context);
+    ~VulkanCommands();
 
     VkCommandBuffer get();
-    void next();
+    uint32_t getIndex() const {
+        return currentIndex;
+    }
+    uint32_t next();
+
     VkFence fence();
     VkSemaphore imageAvailableSemaphore();
     VkSemaphore renderFinishedSemaphore();
@@ -24,5 +28,6 @@ class VulkanCommands {
     std::array<VkFence, VULKAN_COMMANDS_SIZE> fences;
     std::array<VkSemaphore, VULKAN_COMMANDS_SIZE> imageAvailableSemaphores;
     std::array<VkSemaphore, VULKAN_COMMANDS_SIZE> renderFinishedSemaphores;
-    size_t currentFrame{ 0 };
+    size_t currentIndex{ 0 };
+    VulkanContext &context;
 };

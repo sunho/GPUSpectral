@@ -94,7 +94,7 @@ class VulkanDriver {
 
     VulkanPipelineCache pipelineCache;
     VulkanContext context;
-    VulkanDescriptorKey currentBinding{};
+    VulkanDescriptor currentBinding{};
     VulkanSurfaceContext surface;
 };
 

@@ -349,7 +349,7 @@ void createLogicalDevice(VulkanContext &context, VulkanSurfaceContext &surface) 
         throw std::runtime_error("failed to create command pool!");
     }
 
-    context.commands = VulkanCommands(context);
+    context.commands = new VulkanCommands(context);
 }
 
 void populateSwapContexts(VulkanContext &context, VulkanSurfaceContext &surface) {
@@ -392,9 +392,13 @@ void populateSwapContexts(VulkanContext &context, VulkanSurfaceContext &surface)
                           TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE |
                               TextureUsage::COLOR_ATTACHMENT | TextureUsage::INPUT_ATTACHMENT,
                           1, TextureFormat::RGBA8, 1, 1);
+
+    surface.depthTexture = new VulkanTexture(context, SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, 1,
+                                             TextureFormat::DEPTH32F, surface.extent.width, surface.extent.height);
 }
 
 void destroyContext(VulkanContext &context, VulkanSurfaceContext &surface) {
+    delete context.commands;
     vkDestroyCommandPool(context.device, context.commandPool, nullptr);
 
     for (auto &ctx : surface.swapContexts) {
@@ -449,4 +453,170 @@ uint32_t VulkanContext::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlag
     }
 
     throw std::runtime_error("failed to find suitable memory type!");
+}
+
+VkFormat VulkanContext::translateTextureFormat(TextureFormat format) {
+    switch (format) {
+        case TextureFormat::R8:
+            return VK_FORMAT_R8_UNORM;
+        case TextureFormat::R8_SNORM:
+            return VK_FORMAT_R8_SNORM;
+        case TextureFormat::R8UI:
+            return VK_FORMAT_R8_UINT;
+        case TextureFormat::R8I:
+            return VK_FORMAT_R8_SINT;
+        case TextureFormat::R16F:
+            return VK_FORMAT_R16_SFLOAT;
+        case TextureFormat::R16UI:
+            return VK_FORMAT_R16_UINT;
+        case TextureFormat::R16I:
+            return VK_FORMAT_R16_SINT;
+        case TextureFormat::DEPTH16:
+            return VK_FORMAT_D16_UNORM;
+        case TextureFormat::R32F:
+            return VK_FORMAT_R32_SFLOAT;
+        case TextureFormat::R32UI:
+            return VK_FORMAT_R32_UINT;
+        case TextureFormat::R32I:
+            return VK_FORMAT_R32_SINT;
+        case TextureFormat::RG16F:
+            return VK_FORMAT_R16G16_SFLOAT;
+        case TextureFormat::RG16UI:
+            return VK_FORMAT_R16G16_UINT;
+        case TextureFormat::RG16I:
+            return VK_FORMAT_R16G16_SINT;
+        case TextureFormat::R11F_G11F_B10F:
+            return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+        case TextureFormat::RGBA8:
+            return VK_FORMAT_R8G8B8A8_UNORM;
+        case TextureFormat::SRGB8_A8:
+            return VK_FORMAT_R8G8B8A8_SRGB;
+        case TextureFormat::RGBA8_SNORM:
+            return VK_FORMAT_R8G8B8A8_SNORM;
+        case TextureFormat::RGB10_A2:
+            return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+        case TextureFormat::RGBA8UI:
+            return VK_FORMAT_R8G8B8A8_UINT;
+        case TextureFormat::RGBA8I:
+            return VK_FORMAT_R8G8B8A8_SINT;
+        case TextureFormat::DEPTH32F:
+            return VK_FORMAT_D32_SFLOAT;
+        case TextureFormat::DEPTH24_STENCIL8:
+            return VK_FORMAT_D24_UNORM_S8_UINT;
+        case TextureFormat::DEPTH32F_STENCIL8:
+            return VK_FORMAT_D32_SFLOAT_S8_UINT;
+        default: {
+            assert(false);
+        }
+    }
+}
+
+VkFormat VulkanContext::translateElementFormat(ElementType type, bool normalized, bool integer) {
+    using ElementType = ElementType;
+    if (normalized) {
+        switch (type) {
+            case ElementType::BYTE:
+                return VK_FORMAT_R8_SNORM;
+            case ElementType::UBYTE:
+                return VK_FORMAT_R8_UNORM;
+            case ElementType::SHORT:
+                return VK_FORMAT_R16_SNORM;
+            case ElementType::USHORT:
+                return VK_FORMAT_R16_UNORM;
+            case ElementType::BYTE2:
+                return VK_FORMAT_R8G8_SNORM;
+            case ElementType::UBYTE2:
+                return VK_FORMAT_R8G8_UNORM;
+            case ElementType::SHORT2:
+                return VK_FORMAT_R16G16_SNORM;
+            case ElementType::USHORT2:
+                return VK_FORMAT_R16G16_UNORM;
+            case ElementType::BYTE3:
+                return VK_FORMAT_R8G8B8_SNORM;
+            case ElementType::UBYTE3:
+                return VK_FORMAT_R8G8B8_UNORM;
+            case ElementType::SHORT3:
+                return VK_FORMAT_R16G16B16_SNORM;
+            case ElementType::USHORT3:
+                return VK_FORMAT_R16G16B16_UNORM;
+            case ElementType::BYTE4:
+                return VK_FORMAT_R8G8B8A8_SNORM;
+            case ElementType::UBYTE4:
+                return VK_FORMAT_R8G8B8A8_UNORM;
+            case ElementType::SHORT4:
+                return VK_FORMAT_R16G16B16A16_SNORM;
+            case ElementType::USHORT4:
+                return VK_FORMAT_R16G16B16A16_UNORM;
+            default:
+                return VK_FORMAT_UNDEFINED;
+        }
+    }
+    switch (type) {
+        case ElementType::BYTE:
+            return integer ? VK_FORMAT_R8_SINT : VK_FORMAT_R8_SSCALED;
+        case ElementType::UBYTE:
+            return integer ? VK_FORMAT_R8_UINT : VK_FORMAT_R8_USCALED;
+        case ElementType::SHORT:
+            return integer ? VK_FORMAT_R16_SINT : VK_FORMAT_R16_SSCALED;
+        case ElementType::USHORT:
+            return integer ? VK_FORMAT_R16_UINT : VK_FORMAT_R16_USCALED;
+        case ElementType::HALF:
+            return VK_FORMAT_R16_SFLOAT;
+        case ElementType::INT:
+            return VK_FORMAT_R32_SINT;
+        case ElementType::UINT:
+            return VK_FORMAT_R32_UINT;
+        case ElementType::FLOAT:
+            return VK_FORMAT_R32_SFLOAT;
+        case ElementType::BYTE2:
+            return integer ? VK_FORMAT_R8G8_SINT : VK_FORMAT_R8G8_SSCALED;
+        case ElementType::UBYTE2:
+            return integer ? VK_FORMAT_R8G8_UINT : VK_FORMAT_R8G8_USCALED;
+        case ElementType::SHORT2:
+            return integer ? VK_FORMAT_R16G16_SINT : VK_FORMAT_R16G16_SSCALED;
+        case ElementType::USHORT2:
+            return integer ? VK_FORMAT_R16G16_UINT : VK_FORMAT_R16G16_USCALED;
+        case ElementType::HALF2:
+            return VK_FORMAT_R16G16_SFLOAT;
+        case ElementType::FLOAT2:
+            return VK_FORMAT_R32G32_SFLOAT;
+        case ElementType::BYTE3:
+            return VK_FORMAT_R8G8B8_SINT;
+        case ElementType::UBYTE3:
+            return VK_FORMAT_R8G8B8_UINT;
+        case ElementType::SHORT3:
+            return VK_FORMAT_R16G16B16_SINT;
+        case ElementType::USHORT3:
+            return VK_FORMAT_R16G16B16_UINT;
+        case ElementType::HALF3:
+            return VK_FORMAT_R16G16B16_SFLOAT;
+        case ElementType::FLOAT3:
+            return VK_FORMAT_R32G32B32_SFLOAT;
+        case ElementType::BYTE4:
+            return integer ? VK_FORMAT_R8G8B8A8_SINT : VK_FORMAT_R8G8B8A8_SSCALED;
+        case ElementType::UBYTE4:
+            return integer ? VK_FORMAT_R8G8B8A8_UINT : VK_FORMAT_R8G8B8A8_USCALED;
+        case ElementType::SHORT4:
+            return integer ? VK_FORMAT_R16G16B16A16_SINT : VK_FORMAT_R16G16B16A16_SSCALED;
+        case ElementType::USHORT4:
+            return integer ? VK_FORMAT_R16G16B16A16_UINT : VK_FORMAT_R16G16B16A16_USCALED;
+        case ElementType::HALF4:
+            return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case ElementType::FLOAT4:
+            return VK_FORMAT_R32G32B32A32_SFLOAT;
+    }
+    return VK_FORMAT_UNDEFINED;
+}
+
+VkBufferUsageFlags VulkanContext::translateBufferUsage(BufferUsage usage) {
+    switch (usage) {
+        case BufferUsage::TRANSFER_SRC:
+            return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        case BufferUsage::VERTEX:
+            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        case BufferUsage::INDEX:
+            return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        case BufferUsage::UNIFORM:
+            return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    }
 }

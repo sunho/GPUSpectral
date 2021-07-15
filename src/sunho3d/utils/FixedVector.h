@@ -17,6 +17,7 @@ struct FixedVector {
         : size_(other.size_), data_(new T[other.size_]) {
         memcpy(data_, other.data_, size_ * sizeof(T));
     }
+
     FixedVector &operator=(const FixedVector &other) {
         size_ = other.size_;
         data_ = new T[size_];
@@ -28,6 +29,7 @@ struct FixedVector {
         std::swap(data_, other.data_);
         std::swap(size_, other.size_);
     }
+
     FixedVector &operator=(FixedVector &&other) {
         std::swap(data_, other.data_);
         std::swap(size_, other.size_);
@@ -37,8 +39,17 @@ struct FixedVector {
     size_t size() const {
         return size_;
     }
+
     T *data() const {
         return data_;
+    }
+
+    T &operator[](uint32_t index) {
+        return data_[index];
+    }
+
+    const T &operator[](uint32_t index) const {
+        return data_[index];
     }
 
   private:

@@ -25,6 +25,7 @@ struct TransformBuffer {
     glm::mat4 MVP;
     glm::mat4 model;
     glm::mat4 invModelT;
+    glm::vec4 cameraPos;
 };
 
 static constexpr const size_t MAX_LIGHTS = 64;

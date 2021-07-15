@@ -22,6 +22,8 @@ set(SOURCE_LIST
     backend/vulkan/VulkanTexture.cpp
     framegraph/shaders/ForwardPhong.frag
     framegraph/shaders/ForwardPhong.vert
+    framegraph/shaders/DisplayTexture.frag
+    framegraph/shaders/DisplayTexture.vert
     framegraph/FrameGraph.h
     framegraph/FrameGraph.cpp
     framegraph/RenderPass.h
@@ -30,6 +32,8 @@ set(SOURCE_LIST
     framegraph/renderpasses/ForwardRenderPass.h
     utils/ResourceList.h
     utils/FixedVector.h
+    utils/Hash.h
+    utils/GCPool.h
     Engine.h
     Engine.cpp
     Window.h
@@ -92,3 +96,6 @@ endfunction(add_shader)
 
 add_shader(sunho3d ForwardPhongVert ForwardPhong.vert)
 add_shader(sunho3d ForwardPhongFrag ForwardPhong.frag)
+
+add_shader(sunho3d DisplayTextureVert DisplayTexture.vert)
+add_shader(sunho3d DisplayTextureFrag DisplayTexture.frag)

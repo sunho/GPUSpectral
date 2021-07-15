@@ -3,26 +3,29 @@
 #include "VulkanContext.h"
 
 VkSemaphore VulkanCommands::renderFinishedSemaphore() {
-    return renderFinishedSemaphores[currentFrame];
+    return renderFinishedSemaphores[currentIndex];
 }
 
 VkSemaphore VulkanCommands::imageAvailableSemaphore() {
-    return imageAvailableSemaphores[currentFrame];
+    return imageAvailableSemaphores[currentIndex];
 }
 
 VkFence VulkanCommands::fence() {
-    return fences[currentFrame];
+    return fences[currentIndex];
 }
 
-void VulkanCommands::next() {
-    currentFrame = (currentFrame + 1) % VULKAN_COMMANDS_SIZE;
+uint32_t VulkanCommands::next() {
+    uint32_t out = currentIndex;
+    currentIndex = (currentIndex + 1) % VULKAN_COMMANDS_SIZE;
+    return out;
 }
 
 VkCommandBuffer VulkanCommands::get() {
-    return cmdBuffers[currentFrame];
+    return cmdBuffers[currentIndex];
 }
 
-VulkanCommands::VulkanCommands(VulkanContext &context) {
+VulkanCommands::VulkanCommands(VulkanContext &context)
+    : context(context) {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = context.commandPool;
@@ -47,5 +50,13 @@ VulkanCommands::VulkanCommands(VulkanContext &context) {
             vkCreateFence(context.device, &fenceInfo, nullptr, &fences[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to create semaphores!");
         }
+    }
+}
+
+VulkanCommands::~VulkanCommands() {
+    for (int i = 0; i < VULKAN_COMMANDS_SIZE; ++i) {
+        vkDestroySemaphore(context.device, imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(context.device, renderFinishedSemaphores[i], nullptr);
+        vkDestroyFence(context.device, fences[i], nullptr);
     }
 }

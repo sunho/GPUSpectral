@@ -32,6 +32,19 @@ struct HwProgram : public HwBase {
     }
 };
 
+struct HwTexture : public HwBase {
+    SamplerType type{};
+    uint8_t levels{};
+    TextureFormat format{};
+    uint32_t width{};
+    uint32_t height{};
+    HwTexture() = default;
+    HwTexture(SamplerType type, uint8_t levels, TextureFormat format, uint32_t width,
+              uint32_t height)
+        : type(type), levels(levels), format(format), width(width), height(height) {
+    }
+};
+
 struct HwRenderTarget : public HwBase {
     uint32_t width{};
     uint32_t height{};
@@ -62,18 +75,5 @@ struct HwPrimitive : public HwBase {
     HwPrimitive() = default;
     explicit HwPrimitive(PrimitiveMode mode)
         : mode(mode) {
-    }
-};
-
-struct HwTexture : public HwBase {
-    SamplerType type{};
-    uint8_t levels{};
-    TextureFormat format{};
-    uint32_t width{};
-    uint32_t height{};
-    HwTexture() = default;
-    HwTexture(SamplerType type, uint8_t levels, TextureFormat format, uint32_t width,
-              uint32_t height)
-        : type(type), levels(levels), format(format), width(width), height(height) {
     }
 };

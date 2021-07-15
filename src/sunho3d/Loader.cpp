@@ -122,11 +122,11 @@ Entity *Loader::loadObj(const std::string &path) {
         primitive.attibutes[2] = {
             .name = "texcoord", .offset = 0, .index = 2, .type = ElementType::FLOAT2, .stride = 8
         };
-        auto buffer0 = driver.createBufferObject(4 * v.size());
+        auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX);
         driver.updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);
-        auto buffer1 = driver.createBufferObject(4 * v.size());
+        auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX);
         driver.updateBufferObject(buffer1, { .data = (uint32_t *)vn.data() }, 0);
-        auto buffer2 = driver.createBufferObject(4 * vt.size());
+        auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX);
         driver.updateBufferObject(buffer2, { .data = (uint32_t *)vt.data() }, 0);
 
         auto vbo = driver.createVertexBuffer(3, v.size() / 3, 3, primitive.attibutes);

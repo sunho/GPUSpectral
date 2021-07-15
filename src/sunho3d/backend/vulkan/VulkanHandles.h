@@ -3,6 +3,7 @@
 #include "../Handles.h"
 #include "VulkanBuffer.h"
 #include "VulkanContext.h"
+#include "VulkanTexture.h"
 
 struct VulkanBufferObject;
 
@@ -18,13 +19,13 @@ struct VulkanVertexBuffer : public HwVertexBuffer {
 };
 
 struct VulkanIndexBuffer : public HwIndexBuffer {
-    VulkanIndexBuffer() = default;
-    explicit VulkanIndexBuffer(uint32_t count)
+    explicit VulkanIndexBuffer(VulkanContext &ctx, uint32_t count)
         : HwIndexBuffer(count) {
+        buffer = new VulkanBufferObject(ctx, count * 2, BufferUsage::INDEX);
     }
-    void allocate(VulkanContext &ctx) {
-        buffer = new VulkanBufferObject(count * 2);
-        buffer->allocate(ctx, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+    ~VulkanIndexBuffer() {
+        delete buffer;
     }
     VulkanBufferObject *buffer;
 };
@@ -62,12 +63,27 @@ struct VulkanRenderTarget : public HwRenderTarget {
     explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachment depth)
         : HwRenderTarget(w, h), surface(true), depth(depth) {
     }
-    explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachment color,
+    explicit VulkanRenderTarget(uint32_t w, uint32_t h, std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> color,
                                 VulkanAttachment depth)
         : HwRenderTarget(w, h), color(color), depth(depth), surface(false) {
+        for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+            const VulkanAttachment &spec = color[i];
+            VulkanTexture *texture = spec.texture;
+            if (texture == nullptr) {
+                continue;
+            }
+            color[i].format = texture->vkFormat;
+            color[i].view = texture->view;
+        }
+
+        const VulkanAttachment &depthSpec = depth;
+        VulkanTexture *depthTexture = depth.texture;
+        if (depthTexture) {
+            depth.view = depthTexture->view;
+        }
     }
     bool surface;
-    VulkanAttachment color;
+    std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> color;
     VulkanAttachment depth;
 };
 
@@ -81,12 +97,12 @@ struct VulkanPrimitive : public HwPrimitive {
 
 struct VulkanUniformBuffer : public HwUniformBuffer {
     VulkanUniformBuffer() = default;
-    explicit VulkanUniformBuffer(uint32_t size)
+    explicit VulkanUniformBuffer(VulkanContext &ctx, uint32_t size)
         : HwUniformBuffer(size) {
+        buffer = new VulkanBufferObject(ctx, size, BufferUsage::UNIFORM);
     }
-    void allocate(VulkanContext &ctx) {
-        buffer = new VulkanBufferObject(size);
-        buffer->allocate(ctx, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+    ~VulkanUniformBuffer() {
+        delete buffer;
     }
     VulkanBufferObject *buffer;
 };

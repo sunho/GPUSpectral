@@ -3,6 +3,8 @@
 #include <array>
 #include <string>
 
+#include "Handles.h"
+
 enum class ElementType : uint8_t {
     BYTE,
     BYTE2,
@@ -89,6 +91,13 @@ enum class PrimitiveMode {
     TRIANGLE_STRIPS
 };
 
+enum class BufferUsage : uint8_t {
+    VERTEX,
+    INDEX,
+    UNIFORM,
+    TRANSFER_SRC
+};
+
 struct Attribute {
     static constexpr uint8_t FLAG_NORMALIZED = 0x1;
     static constexpr uint8_t FLAG_INTEGER_TARGET = 0x2;
@@ -98,13 +107,16 @@ struct Attribute {
     uint8_t stride{};
     ElementType type{ ElementType::BYTE };
     uint8_t flags{ 0x0 };
+    bool operator<(const Attribute& other) const {
+        return std::tie(index, offset, stride, type, flags) < std::tie(other.index, other.offset, other.stride, other.type, other.flags);
+    }
 };
 
 static constexpr const size_t MAX_VERTEX_ATTRIBUTE_COUNT = 16;
 using AttributeArray = std::array<Attribute, MAX_VERTEX_ATTRIBUTE_COUNT>;
 
 struct BufferDescriptor {
-    uint32_t *data;
+    uint32_t* data;
 };
 
 struct Viewport {
@@ -118,9 +130,12 @@ struct Viewport {
     int32_t top() const {
         return bottom + height;
     }
-    bool operator==(const Viewport &other) const {
+    bool operator==(const Viewport& other) const {
         return left == other.left && bottom == other.bottom && width == other.width &&
                height == other.height;
+    }
+    bool operator<(const Viewport& other) const {
+        return std::tie(left, bottom, width, height) < std::tie(other.left, other.bottom, other.width, other.height);
     }
 };
 
@@ -128,4 +143,16 @@ struct RenderPassParams {
     // RenderPassFlags flags{};
     Viewport viewport{};
     // DepthRange depthRange{};
+};
+
+struct TextureAttachment {
+    Handle<HwTexture> handle;
+    uint32_t layer{};
+    uint32_t level{};
+};
+
+struct ColorAttachment {
+    static constexpr size_t MAX_MRT_NUM = 8;
+    std::array<TextureAttachment, MAX_MRT_NUM> colors;
+    uint32_t targetNum{};
 };
