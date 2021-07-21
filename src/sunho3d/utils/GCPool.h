@@ -1,14 +1,22 @@
-#pragma oncee
+#pragma once
 
 #include <map>
 #include <optional>
+#include <functional>
 
 template <typename K, typename V>
 class GCPool {
   public:
+    const static constexpr uint32_t INITIAL_REF_COUNT = 2;
+    template <typename G>
+    struct Holder {
+        uint32_t refCount;
+        G value;
+    };
+
     GCPool() = default;
     void add(K key, V obj) {
-        objs.emplace(key, Holder{ INITIAL_REF_COUNT, obj });
+        objs.emplace(key, Holder<V>{ INITIAL_REF_COUNT, obj });
     }
 
     std::optional<V> get(K key) {
@@ -38,15 +46,5 @@ class GCPool {
 
   private:
     std::function<void(V)> destroyer;
-
-    const static constexpr uint32_t INITIAL_REF_COUNT = 2;
-    struct Holder {
-        uint32_t refCount{};
-        V value;
-        Holder(const Holder& other) = delete;
-        Holder& operator=(const Holder& other) = delete;
-        Holder(Holder&& other) = default;
-        Holder& operator=(Holder&& other) = default;
-    };
-    std::map<K, Holder> objs;
+    std::map<K, Holder<V>> objs;
 };

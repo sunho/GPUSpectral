@@ -114,13 +114,21 @@ Entity *Loader::loadObj(const std::string &path) {
             vn.push_back(attrib.normals[3 * i0.normal_index + 2]);
         }
         primitive.attibutes[0] = {
-            .name = "position", .offset = 0, .index = 0, .type = ElementType::FLOAT3, .stride = 12
+            .name = "position",
+            .index = 0,
+            .offset = 0,
+            .stride = 12,
+            .type = ElementType::FLOAT3
         };
         primitive.attibutes[1] = {
-            .name = "normal", .offset = 0, .index = 1, .type = ElementType::FLOAT3, .stride = 12
+            .name = "normal", .index = 1, .offset = 0, .stride = 12, .type = ElementType::FLOAT3
         };
         primitive.attibutes[2] = {
-            .name = "texcoord", .offset = 0, .index = 2, .type = ElementType::FLOAT2, .stride = 8
+            .name = "texcoord",
+            .index = 2,
+            .offset = 0,
+            .stride = 8,
+            .type = ElementType::FLOAT2,
         };
         auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX);
         driver.updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);

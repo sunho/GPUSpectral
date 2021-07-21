@@ -140,9 +140,7 @@ struct Viewport {
 };
 
 struct RenderPassParams {
-    // RenderPassFlags flags{};
     Viewport viewport{};
-    // DepthRange depthRange{};
 };
 
 struct TextureAttachment {

@@ -43,16 +43,9 @@ Renderer::Renderer(Window* window)
         renderGraphs.push_back(RenderGraph(*this));
     }
 
-    Program prog;
-    prog.codes[0] = std::vector<char>(ForwardPhongVert, ForwardPhongVert + ForwardPhongVertSize);
-    prog.codes[1] = std::vector<char>(ForwardPhongFrag, ForwardPhongFrag + ForwardPhongFragSize);
+    Program prog(ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag,ForwardPhongFragSize);
     fowradPassProgram = driver.createProgram(prog);
     surfaceRenderTarget = driver.createDefaultRenderTarget();
-
-    Program prog2;
-    prog2.codes[0] = std::vector<char>(DisplayTextureVert, DisplayTextureVert + DisplayTextureVertSize);
-    prog2.codes[1] = std::vector<char>(DisplayTextureFrag, DisplayTextureFrag + DisplayTextureFragSize);
-    quadDrawProgram = driver.createProgram(prog2);
 
     Primitive primitive;
     std::vector<float> v = {
@@ -71,7 +64,11 @@ Renderer::Renderer(Window* window)
     };
     std::vector<uint16_t> indices = { 0, 1, 2, 3, 4, 5 };
     primitive.attibutes[0] = {
-        .name = "position", .offset = 0, .index = 0, .type = ElementType::FLOAT2, .stride = 8
+        .name = "position",
+        .index = 0,
+        .offset = 0,
+        .stride = 8,
+        .type = ElementType::FLOAT2
     };
     auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX);
     driver.updateBufferObject(buffer0, { .data = (uint32_t*)v.data() }, 0);

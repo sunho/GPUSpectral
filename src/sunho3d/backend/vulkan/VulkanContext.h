@@ -12,6 +12,12 @@ struct VulkanSwapContext;
 struct VulkanTexture;
 struct VulkanSurfaceContext;
 
+struct VulkanPipeline {
+    VkPipeline pipeline;
+    VkDescriptorSetLayout descriptorLayout;
+    VkPipelineLayout pipelineLayout;
+};
+
 struct VulkanContext {
     VkInstance instance;
     VkDevice device;
@@ -19,13 +25,17 @@ struct VulkanContext {
     VkPhysicalDeviceProperties physicalDeviceProperties;
     uint32_t graphicsFamily;
     VkQueue graphicsQueue;
+    VkQueue computeQueue;
     VkCommandPool commandPool;
     VulkanCommands *commands;
     VulkanSurfaceContext *surface;
     VulkanSwapContext *currentSwapContext;
     VulkanTexture *emptyTexture;
-    VkRenderPass currentRenderPass;
     Viewport viewport;
+
+    VkRenderPass currentRenderPass;
+    VulkanPipeline* currentPipeline;
+    VkDescriptorSet currentDescriptorSet;
     bool firstPass{ true };
 
     VkCommandBuffer beginSingleCommands();

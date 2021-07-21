@@ -2,6 +2,8 @@
 
 #include "VulkanContext.h"
 
+#include <stdexcept>
+
 VkSemaphore VulkanCommands::renderFinishedSemaphore() {
     return renderFinishedSemaphores[currentIndex];
 }

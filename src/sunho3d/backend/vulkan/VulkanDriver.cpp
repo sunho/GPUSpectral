@@ -107,8 +107,7 @@ IndexBufferHandle VulkanDriver::createIndexBuffer(uint32_t indexCount) {
 
 ProgramHandle VulkanDriver::createProgram(Program program) {
     Handle<HwProgram> handle = alloc_handle<VulkanProgram, HwProgram>();
-    construct_handle<VulkanProgram>(handle, program);
-    handle_cast<VulkanProgram>(handle)->compile(context);
+    construct_handle<VulkanProgram>(handle, context, program);
     return handle;
 }
 
@@ -289,6 +288,10 @@ void VulkanDriver::endRenderPass(int dummy) {
     const VkCommandBuffer cmdbuffer = context.commands->get();
     vkCmdEndRenderPass(cmdbuffer);
     currentBinding = {};
+}
+
+void VulkanDriver::dispatch(int dummy) {
+
 }
 
 uint32_t VulkanDriver::commit(int dummy) {

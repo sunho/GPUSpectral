@@ -6,10 +6,13 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <cassert>
+#include <stdexcept>
 
 #include "VulkanTexture.h"
 
-static const std::vector<const char *> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME, "VK_KHR_portability_subset" };
+static const std::vector<const char *> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+//, "VK_KHR_portability_subset"
 
 static const std::vector<const char *> validationLayers = {
     "VK_LAYER_KHRONOS_validation",

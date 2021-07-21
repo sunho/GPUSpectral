@@ -4,7 +4,7 @@
 
 int main() {
     sunho3d::Engine engine;
-    sunho3d::Window* window = engine.createWindow(600, 600);
+    sunho3d::Window* window = engine.createWindow(1200, 1200);
     sunho3d::Renderer* renderer = engine.createRenderer(window);
     sunho3d::Loader loader(engine, *renderer);
     

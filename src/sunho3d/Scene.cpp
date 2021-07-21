@@ -35,8 +35,9 @@ void Scene::prepare() {
 void Scene::visitEntity(Entity* entity, const glm::mat4& currentTransform) {
     glm::mat4 nextTransform = entity->getTransform().toMatrix() * currentTransform;
     for (auto& prim : entity->getPrimitives()) {
-        sceneData.geometries.push_back({ .primitive = prim.hwInstance,
-                                         .material = prim.material });
+        sceneData.geometries.push_back({
+            .material = prim.material, .primitive = prim.hwInstance,
+                                         });
         sceneData.worldTransforms.push_back(nextTransform);
     }
     for (auto& entity : entity->getNodes()) {

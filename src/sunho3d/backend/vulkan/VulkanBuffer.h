@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include <stdexcept>
 
 #include "../DriverBase.h"
 #include "../Handles.h"

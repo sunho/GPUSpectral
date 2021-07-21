@@ -30,10 +30,11 @@ struct VulkanDescriptor {
     static constexpr uint32_t UBUFFER_BINDING_COUNT = 8;
     static constexpr uint32_t SAMPLER_BINDING_COUNT = 8;
     static constexpr uint32_t TARGET_BINDING_COUNT = 8;
+    static constexpr uint32_t STORAGE_BINDING_COUNT = 8;
 
-    std::array<VkBuffer, UBUFFER_BINDING_COUNT> uniformBuffers;
     std::array<VkDescriptorImageInfo, SAMPLER_BINDING_COUNT> samplers;
     std::array<VkDescriptorImageInfo, TARGET_BINDING_COUNT> inputAttachments;
+    std::array<VkBuffer, UBUFFER_BINDING_COUNT> uniformBuffers;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
 
@@ -56,17 +57,21 @@ class VulkanPipelineCache {
     void tick();
 
   private:
-    void setupDescriptorLayout(VulkanContext &context);
+    struct PipelineLayout {
+		std::array<VkDescriptorSetLayout, 3> descriptorSetLayout;
+		VkPipelineLayout pipelineLayout;
+    };
+
+    void setupLayouts(VulkanContext &context, VulkanPipelineCache::PipelineLayout& layout, bool compute);
     void getOrCreateDescriptors(VulkanContext &context, const VulkanDescriptor &key,
                                 std::array<VkDescriptorSet, 3> &descripotrs);
 
-    VkDescriptorPool descriptorPool;
-    std::array<VkDescriptorSetLayout, 3> descriptorSetLayout;
 
     GCPool<VulkanPipelineKey, VkPipeline> pipelines;
     GCPool<std::pair<VulkanRenderTarget *, VkImageView>, VkFramebuffer> framebuffers;
     GCPool<VulkanRenderTarget *, VkRenderPass> renderpasses;
     GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 3>> descriptorSets;
+	VkDescriptorPool descriptorPool;
 
     VkImageView dummyImageView = VK_NULL_HANDLE;
     VkDescriptorBufferInfo dummyBufferInfo = {};
@@ -79,5 +84,6 @@ class VulkanPipelineCache {
     VulkanContext *context;
     VulkanBufferObject *dummyBuffer;
 
-    VkPipelineLayout pipelineLayout;
+    PipelineLayout graphicsLayout;
+    PipelineLayout computeLayout;
 };

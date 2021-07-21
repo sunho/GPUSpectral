@@ -35,7 +35,7 @@ layout(binding = 2) uniform MaterialBuffer {
 layout(set=1,binding = 0) uniform sampler2D diffuseMap;
 layout(set=1,binding = 1) uniform sampler2D shadowMap;
 
-#define PCF_KERNEL_SIZE 8
+#define PCF_KERNEL_SIZE 6
 #define BLOCK_SEARCH_SIZE 4
 #define LIGHT_AREA 0.005f
 
@@ -45,7 +45,7 @@ float pcf(vec2 uv, float z, float radius) {
     for (float i = -radius; i < radius; i += step) {
         for (float j = -radius; j < radius; j += step) {
             vec2 uv2 = vec2(uv.x + i, uv.y + j);
-            float tex = texture(shadowMap, uv2).z;
+            float tex = texture(shadowMap, uv2).x;
             shadow += float(z < tex);
         }
     }
@@ -58,7 +58,7 @@ float blockerSearch(vec2 uv, float z, float radius, out float numBlockers) {
     for (float i = -radius; i < radius; i += step) {
        for (float j = -radius; j < radius; j += step) {
            vec2 uv2 = vec2(uv.x + i, uv.y + j);
-           float tex = texture(shadowMap, uv2).z;
+           float tex = texture(shadowMap, uv2).x;
            if (tex < z) {
                distance += tex;
                ++numBlockers;
@@ -73,7 +73,7 @@ float blockerSearch(vec2 uv, float z, float radius, out float numBlockers) {
 
 float pcss(vec2 uv, float z, float radius) {
     // it's not blocked
-   /* if (z < texture(shadowMap, uv).z) {
+    /*if (z < texture(shadowMap, uv).x) {
         return 1.0;
     }*/
     
@@ -100,13 +100,13 @@ void main() {
     vec4 color = diffuse * 0.35;
     float bias = 0.005;
     float textureSize = float(textureSize(shadowMap,0).x);
-    float radius = 12 / textureSize;
+    float radius = 8 / textureSize;
     
     for (int i = 0; i < light.numLights; i++) {
         vec4 tmp = (light.lightVP[i] * vec4(inPos,1.0));
         tmp /= tmp.w;
         tmp.z-=bias;
-        float shadow = pcss(tmp.xy / 2.0f + 0.5f, tmp.z, radius);
+        float shadow = pcf(tmp.xy / 2.0f + 0.5f, tmp.z, radius);
         vec3 lightV = light.light[i].pos - inPos;
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);

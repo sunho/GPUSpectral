@@ -5,6 +5,8 @@
 #include "VulkanContext.h"
 #include "VulkanTexture.h"
 
+#include <stdexcept>
+
 struct VulkanBufferObject;
 
 static constexpr const size_t VULKAN_VERTEX_BUFFERS_MAX = 12;
@@ -36,6 +38,7 @@ static VkShaderModule createShaderModule(VulkanContext &context, const char *cod
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = codeSize;
     createInfo.pCode = reinterpret_cast<const uint32_t *>(code);
+    
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(context.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
@@ -45,17 +48,19 @@ static VkShaderModule createShaderModule(VulkanContext &context, const char *cod
 
 struct VulkanProgram : public HwProgram {
     VulkanProgram() = default;
-    explicit VulkanProgram(const Program &program)
+    explicit VulkanProgram(VulkanContext &ctx, const Program &program)
         : HwProgram(program) {
+        if (program.type == ProgramType::PIPELINE) {
+            vertex = createShaderModule(ctx, program.vertex().data(), program.vertex().size());
+            fragment = createShaderModule(ctx, program.frag().data(), program.frag().size());
+        } else {
+            compute = createShaderModule(ctx, program.compute().data(), program.compute().size());
+        }
     }
-    void compile(VulkanContext &ctx) {
-        auto &vertexCode = program.codes[0];
-        auto &fragCode = program.codes[1];
-        vertex = createShaderModule(ctx, vertexCode.data(), vertexCode.size());
-        fragment = createShaderModule(ctx, fragCode.data(), fragCode.size());
-    }
+
     VkShaderModule vertex;
     VkShaderModule fragment;
+    VkShaderModule compute;
 };
 
 struct VulkanRenderTarget : public HwRenderTarget {

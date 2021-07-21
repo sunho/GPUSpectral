@@ -28,7 +28,7 @@ void VulkanPipelineCache::init(VulkanContext &context) {
     dummyTargetWriteInfo.pImageInfo = &dummyTargetInfo;
     dummyTargetWriteInfo.pBufferInfo = nullptr;
     dummyTargetWriteInfo.pTexelBufferView = nullptr;
-    setupDescriptorLayout(context);
+    setupLayouts(context, graphicsLayout, false);
 
     VkBufferCreateInfo bufferInfo{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -63,7 +63,7 @@ void VulkanPipelineCache::tick() {
     renderpasses.tick();
 }
 
-void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
+void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& layout, bool compute) {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
@@ -84,7 +84,7 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     dlinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     dlinfo.bindingCount = ubindings.size();
     dlinfo.pBindings = ubindings.data();
-    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[0]);
+    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[0]);
 
     std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::SAMPLER_BINDING_COUNT> sbindings;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -94,23 +94,35 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     }
     dlinfo.bindingCount = sbindings.size();
     dlinfo.pBindings = sbindings.data();
-    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[1]);
-
-    std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    for (uint32_t i = 0; i < VulkanDescriptor::TARGET_BINDING_COUNT; i++) {
-        binding.binding = i;
-        bindings[i] = binding;
+    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[1]);
+    
+    if (compute) {
+        std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        for (uint32_t i = 0; i < VulkanDescriptor::TARGET_BINDING_COUNT; i++) {
+            binding.binding = i;
+            bindings[i] = binding;
+        }
+        dlinfo.bindingCount = bindings.size();
+        dlinfo.pBindings = bindings.data();
+        vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
+    } else {
+        std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+        for (uint32_t i = 0; i < VulkanDescriptor::TARGET_BINDING_COUNT; i++) {
+            binding.binding = i;
+            bindings[i] = binding;
+        }
+        dlinfo.bindingCount = bindings.size();
+        dlinfo.pBindings = bindings.data();
+        vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
     }
-    dlinfo.bindingCount = bindings.size();
-    dlinfo.pBindings = bindings.data();
-    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &descriptorSetLayout[2]);
 
     pipelineLayoutInfo.setLayoutCount = 3;
-    pipelineLayoutInfo.pSetLayouts = descriptorSetLayout.data();
+    pipelineLayoutInfo.pSetLayouts = layout.descriptorSetLayout.data();
 
-    if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &pipelineLayout) !=
+    if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &layout.pipelineLayout) !=
         VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
     }
@@ -125,7 +137,7 @@ void VulkanPipelineCache::setupDescriptorLayout(VulkanContext &context) {
     poolSizes[0].descriptorCount = poolInfo.maxSets * VulkanDescriptor::UBUFFER_BINDING_COUNT;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = poolInfo.maxSets * VulkanDescriptor::SAMPLER_BINDING_COUNT;
-    poolSizes[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+    poolSizes[2].type = compute ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
     poolSizes[2].descriptorCount = poolInfo.maxSets * VulkanDescriptor::TARGET_BINDING_COUNT;
     if (vkCreateDescriptorPool(context.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
@@ -140,22 +152,14 @@ void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
         descriptors = *it;
         return;
     }
-
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
     allocInfo.descriptorSetCount = 3;
-    allocInfo.pSetLayouts = descriptorSetLayout.data();
+    allocInfo.pSetLayouts = graphicsLayout.descriptorSetLayout.data();
     if (vkAllocateDescriptorSets(context.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
-    descriptorSets.add(key, descriptors);
-}
-
-void VulkanPipelineCache::bindDescriptor(VulkanContext &context, const VulkanDescriptor &key) {
-    std::array<VkDescriptorSet, 3> descriptors;
-    getOrCreateDescriptors(context, key, descriptors);
-
     dummySamplerInfo.imageLayout = dummyTargetInfo.imageLayout;
     dummySamplerInfo.imageView = dummyImageView;
     dummyTargetInfo.imageView = dummyImageView;
@@ -184,6 +188,7 @@ void VulkanPipelineCache::bindDescriptor(VulkanContext &context, const VulkanDes
     VkDescriptorImageInfo descriptorInputAttachments[VulkanDescriptor::TARGET_BINDING_COUNT];
     VkWriteDescriptorSet
         descriptorWrites[VulkanDescriptor::UBUFFER_BINDING_COUNT + VulkanDescriptor::SAMPLER_BINDING_COUNT + VulkanDescriptor::TARGET_BINDING_COUNT];
+
     uint32_t nwrites = 0;
     VkWriteDescriptorSet *writes = descriptorWrites;
     nwrites = 0;
@@ -247,7 +252,13 @@ void VulkanPipelineCache::bindDescriptor(VulkanContext &context, const VulkanDes
         writeInfo.dstBinding = binding;
     }
     vkUpdateDescriptorSets(context.device, nwrites, writes, 0, nullptr);
-    vkCmdBindDescriptorSets(context.commands->get(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+    descriptorSets.add(key, descriptors);
+}
+
+void VulkanPipelineCache::bindDescriptor(VulkanContext &context, const VulkanDescriptor &key) {
+    std::array<VkDescriptorSet, 3> descriptors;
+    getOrCreateDescriptors(context, key, descriptors);
+    vkCmdBindDescriptorSets(context.commands->get(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout.pipelineLayout,
                             0, 3, descriptors.data(), 0, nullptr);
 }
 
@@ -400,7 +411,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
     pipelineInfo.pDepthStencilState = &depthStencil;  // Optional
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = nullptr;  // Optional
-    pipelineInfo.layout = pipelineLayout;
+    pipelineInfo.layout = graphicsLayout.pipelineLayout;
     pipelineInfo.renderPass = key.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;  // Optional

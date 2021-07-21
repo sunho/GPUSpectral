@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <vector>
+#include <cassert>
 
 #include "../DriverBase.h"
 #include "../PipelineState.h"

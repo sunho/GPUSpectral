@@ -1,5 +1,8 @@
 #include "VulkanBuffer.h"
 
+#include <vulkan/vulkan.hpp>
+#include <stdexcept>
+
 VulkanBufferObject::VulkanBufferObject(VulkanContext &context, uint32_t size, BufferUsage usage)
     : context(context), HwBufferObject(size) {
     VkBufferCreateInfo bufferInfo{};
