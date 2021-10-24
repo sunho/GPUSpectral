@@ -13,3 +13,6 @@
 [submodule "external/graphviz"]
 	path = external/graphviz
 	url = https://gitlab.com/graphviz/graphviz.git
+[submodule "external/vk-bootstrap"]
+	path = external/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap.git
