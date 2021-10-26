@@ -29,7 +29,7 @@ class RenderGraph {
 
 #define SCRATCH_IMPL(RESOURCENAME, METHODNAME)                        \
     template <typename... ARGS>                                       \
-    Handle<Hw##RESOURCENAME> METHODNAME(ARGS&&... args) {             \
+    Handle<Hw##RESOURCENAME> METHODNAME ## SC(ARGS&&... args) {      \
         auto handle = driver.METHODNAME(std::forward<ARGS>(args)...); \
         destroyers.push_back([handle, this]() {                       \
             this->driver.destroy##RESOURCENAME(handle);               \
@@ -39,6 +39,7 @@ class RenderGraph {
 
     SCRATCH_IMPL(RenderTarget, createDefaultRenderTarget)
     SCRATCH_IMPL(RenderTarget, createRenderTarget)
+    SCRATCH_IMPL(BufferObject, createBufferObject)
     SCRATCH_IMPL(Texture, createTexture)
     SCRATCH_IMPL(UniformBuffer, createUniformBuffer)
 
@@ -70,6 +71,7 @@ struct InflightData {
     Handle<HwFence> fence;
     Handle<HwInflight> handle{};
     std::unique_ptr<RenderGraph> rg;
+    std::vector<RTInstance> instances;
 };
 
 constexpr static size_t MAX_INFLIGHTS = 2; 
@@ -85,6 +87,9 @@ class Renderer : public IdResource {
     void run(Scene* scene);
 
   private:
+    void rasterSuite(Scene* scene);
+    void rtSuite(Scene* scene);
+
     Handle<HwUniformBuffer> createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model);
 
     Handle<HwProgram> fowradPassProgram;
@@ -94,6 +99,8 @@ class Renderer : public IdResource {
     Handle<HwPrimitive> quadPrimitive;
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
+    
+    std::unordered_map< Handle<HwPrimitive>, Handle<HwBLAS> > blasMap;
     VulkanDriver driver;
     Window* window;
 

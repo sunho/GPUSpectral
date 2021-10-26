@@ -2,8 +2,11 @@
 
 #include <array>
 #include <string>
+#include <glm/matrix.hpp>
 
 #include "Handles.h"
+
+struct HwBLAS;
 
 enum class ElementType : uint8_t {
     BYTE,
@@ -81,7 +84,7 @@ static TextureUsage operator|(TextureUsage lhs, TextureUsage rhs) {
     return static_cast<TextureUsage>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
 }
 
-static uint8_t operator&(TextureUsage lhs, TextureUsage rhs) {
+static TextureUsage operator&(TextureUsage lhs, TextureUsage rhs) {
     return static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs);
 }
 
@@ -92,11 +95,21 @@ enum class PrimitiveMode {
 };
 
 enum class BufferUsage : uint8_t {
-    VERTEX,
-    INDEX,
-    UNIFORM,
-    TRANSFER_SRC
+    VERTEX = 0x0,
+    INDEX = 0x1,
+    UNIFORM = 0x2,
+    TRANSFER_SRC = 0x4,
+    TRANSFER_DST = 0x8,
+    STORAGE = 0x10
 };
+
+static BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {
+    return static_cast<TextureUsage>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+}
+
+static BufferUsage operator&(BufferUsage lhs, BufferUsage rhs) {
+    return static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs);
+}
 
 struct Attribute {
     static constexpr uint8_t FLAG_NORMALIZED = 0x1;
@@ -157,4 +170,32 @@ struct ColorAttachment {
     static constexpr size_t MAX_MRT_NUM = 8;
     std::array<TextureAttachment, MAX_MRT_NUM> colors;
     uint32_t targetNum{};
+};
+
+struct RTInstance {
+    Handle<HwBLAS> blas;
+    glm::mat4x3 transfom;
+};
+
+struct RTSceneDescriptor {
+    RTInstance* instances{};
+    uint32_t count{};
+};
+
+struct Ray {
+    glm::vec3 origin;
+    float minTime;
+    glm::vec3 dir;
+    float maxTime;
+};
+
+struct RayHit {
+    glm::vec2 uv;
+    uint32_t instId{};
+    uint32_t primitiveId{};
+};
+
+struct Extent2D {
+    uint32_t width{};
+    uint32_t height{};
 };

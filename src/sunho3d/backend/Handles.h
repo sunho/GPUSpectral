@@ -12,6 +12,8 @@ struct HwPrimitive;
 struct HwTexture;
 struct HwFence;
 struct HwInflight;
+struct HwTLAS;
+struct HwBLAS;
 
 class HandleBase {
   public:
@@ -69,3 +71,5 @@ using PrimitiveHandle = Handle<HwPrimitive>;
 using TextureHandle = Handle<HwTexture>;
 using FenceHandle = Handle<HwFence>;
 using InflightHandle = Handle<HwInflight>;
+using TLASHandle = Handle<HwTLAS>;
+using BLASHandle = Handle<HwBLAS>;

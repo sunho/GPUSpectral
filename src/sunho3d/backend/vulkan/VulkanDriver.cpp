@@ -304,10 +304,6 @@ void VulkanDriver::endRenderPass(int dummy) {
     context.currentBinding = {};
 }
 
-void VulkanDriver::dispatch(int dummy) {
-
-}
-
 VkBool32 VulkanDriver::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                      VkDebugUtilsMessageTypeFlagsEXT messageType,
                                      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,

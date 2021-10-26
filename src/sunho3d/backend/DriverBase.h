@@ -87,3 +87,11 @@ struct HwFence : public HwBase {
 struct HwInflight : public HwBase {
     HwInflight() = default;
 };
+
+struct HwBLAS : public HwBase {
+    HwBLAS() = default;
+};
+
+struct HwTLAS : public HwBase {
+    HwTLAS() = default;
+};

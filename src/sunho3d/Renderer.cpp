@@ -92,18 +92,7 @@ Renderer::Renderer(Window* window)
 Renderer::~Renderer() {
 }
 
-Handle<HwUniformBuffer> Renderer::createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model) {
-    auto tb = rg.createUniformBuffer(sizeof(TransformBuffer));
-    TransformBuffer transformBuffer;
-    transformBuffer.MVP = camera.proj * camera.view * model;
-    transformBuffer.invModelT = glm::transpose(glm::inverse(model));
-    transformBuffer.model = model;
-    transformBuffer.cameraPos = glm::vec4(camera.pos(), 1.0f);
-    driver.updateUniformBuffer(tb, { .data = (uint32_t*)&transformBuffer }, 0);
-    return tb;
-}
-
-void Renderer::run(Scene* scene) {
+void Renderer::rasterSuite(Scene* scene) {
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
     if (inflight.handle) {
@@ -124,7 +113,7 @@ void Renderer::run(Scene* scene) {
     auto shadowMapRef = renderGraph.declareResource<Handle<HwTexture>>("ShadowMap");
     auto forwardRef = renderGraph.declareResource<Handle<HwTexture>>("Forward");
 
-    auto lightUB = renderGraph.createUniformBuffer(sizeof(LightBuffer));
+    auto lightUB = renderGraph.createUniformBufferSC(sizeof(LightBuffer));
 
     std::map<Material*, Handle<HwUniformBuffer>> materialBuffers;
 
@@ -136,21 +125,21 @@ void Renderer::run(Scene* scene) {
         MaterialBuffer materialBuffer;
         materialBuffer.phong = 100;
         materialBuffer.specular = glm::vec4(0.2, 0.2, 0.2, 1.0);
-        auto mb = renderGraph.createUniformBuffer(sizeof(MaterialBuffer));
+        auto mb = renderGraph.createUniformBufferSC(sizeof(MaterialBuffer));
         driver.updateUniformBuffer(mb, { .data = (uint32_t*)&materialBuffer }, 0);
         materialBuffers.emplace(material, mb);
         return mb;
     };
 
     renderGraph.addRenderPass("generate shadow maps", { sceneDataRef }, { shadowMapRef }, [this, scene, shadowMapRef, lightUB, sceneDataRef, &renderGraph, getOrCreateMaterialBuffer](FrameGraph& fg) {
-        auto color = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-        auto depth = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
         ColorAttachment att = {};
         att.colors[0] = {
             .handle = color
         };
         att.targetNum = 1;
-        auto renderTarget = renderGraph.createRenderTarget(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ .handle = depth });
+        auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ .handle = depth });
         SceneData* sceneData = fg.getResource<SceneData*>(sceneDataRef);
         auto camera = scene->getCamera();
 
@@ -184,16 +173,14 @@ void Renderer::run(Scene* scene) {
     });
 
     renderGraph.addRenderPass("forward", { sceneDataRef, shadowMapRef }, {forwardRef}, [this, scene, lightUB, forwardRef, sceneDataRef, shadowMapRef, &renderGraph, getOrCreateMaterialBuffer](FrameGraph& fg) {
-        auto color = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-        auto depth = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
         ColorAttachment att = {};
         att.colors[0] = {
             .handle = color
         };
         att.targetNum = 1;
-        auto renderTarget = renderGraph.createRenderTarget(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ .handle = depth });
-        
-
+        auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ .handle = depth });
         SceneData* sceneData = fg.getResource<SceneData*>(sceneDataRef);
         Handle<HwTexture> shadowMap = fg.getResource<Handle<HwTexture>>(shadowMapRef);
         auto& camera = scene->getCamera();
@@ -231,4 +218,108 @@ void Renderer::run(Scene* scene) {
     });
     renderGraph.submit();
     driver.endFrame();
+}
+
+Handle<HwUniformBuffer> Renderer::createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model) {
+    auto tb = rg.createUniformBufferSC(sizeof(TransformBuffer));
+    TransformBuffer transformBuffer;
+    transformBuffer.MVP = camera.proj * camera.view * model;
+    transformBuffer.invModelT = glm::transpose(glm::inverse(model));
+    transformBuffer.model = model;
+    transformBuffer.cameraPos = glm::vec4(camera.pos(), 1.0f);
+    driver.updateUniformBuffer(tb, { .data = (uint32_t*)&transformBuffer }, 0);
+    return tb;
+}
+
+void Renderer::run(Scene* scene) {
+    rtSuite(scene);
+}
+
+void Renderer::rtSuite(Scene* scene) {
+    InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
+    driver.waitFence(inflight.fence);
+    if (inflight.handle) {
+        driver.releaseInflight(inflight.handle);
+    }
+    Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
+    inflight.handle = handle;
+
+    RenderGraph& renderGraph = *inflight.rg;
+    renderGraph.reset();
+    inflight.instances.clear();
+
+    scene->prepare();
+    SceneData& sceneData = scene->getSceneData();
+
+    auto tlasRef = renderGraph.declareResource<Handle<HwTLAS>>("TLAS");
+    auto hitBufferRef = renderGraph.declareResource<Handle<HwBufferObject>>("Hit Buffer");
+    auto renderedRef = renderGraph.declareResource<Handle<HwTexture>>("Rendered texture");
+
+    renderGraph.addRenderPass("build tlas", { }, { tlasRef }, [this, tlasRef, &inflight, &sceneData, &renderGraph](FrameGraph& fg) {
+        for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
+            auto& geom = sceneData.geometries[i];
+            auto& model = sceneData.worldTransforms[i];
+            Handle<HwBLAS> blas;
+            auto it = this->blasMap.find(geom.primitive);
+            if (it == this->blasMap.end()) {
+                blas = driver.buildBLAS(geom.primitive);
+                this->blasMap.emplace(geom.primitive, blas);
+            } else {
+                blas = it->second;
+            }
+            RTInstance instance = {};
+            instance.blas = blas;
+            glm::mat4x3 t = {};
+            t[0] = model[0];
+            t[1] = model[1];
+            t[2] = model[2];
+            instance.transfom = t;
+            inflight.instances.push_back(instance); 
+        }
+        RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
+        auto tlas = driver.buildTLAS(desc);
+        renderGraph.defineResource(tlasRef, tlas);
+    });
+
+    renderGraph.addRenderPass("intersect", { tlasRef }, { hitBufferRef }, [this, hitBufferRef, tlasRef, &renderGraph](FrameGraph& fg) {
+        Handle<HwTLAS> tlas = fg.getResource<Handle<HwTLAS>>(tlasRef);
+        auto f = driver.getFrameSize();
+        std::vector<Ray> rays;
+        rays.resize(f.width * f.height);
+        auto rayBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(Ray), BufferUsage::TRANSFER_SRC | BufferUsage::STORAGE);
+        driver.updateBufferObject(rayBuffer, { reinterpret_cast<uint32_t*>(rays.data()) }, 0);
+        auto hitBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(RayHit), BufferUsage::TRANSFER_DST | BufferUsage::STORAGE);
+        driver.intersectRays(tlas, rayBuffer, hitBuffer);
+        renderGraph.defineResource(hitBufferRef, hitBuffer);
+    });
+
+    renderGraph.addRenderPass("render", { hitBufferRef }, { renderedRef }, [this, renderedRef, hitBufferRef, &renderGraph](FrameGraph& fg) {
+        Handle<HwBufferObject> hitBuffer = fg.getResource<Handle<HwBufferObject>>(hitBufferRef);
+        auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        ColorAttachment att = {};
+        att.colors[0] = {
+            .handle = color
+        };
+        att.targetNum = 1;
+        auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ });
+        driver.beginRenderPass(renderTarget, {});
+        driver.bindStorageBuffer(0, hitBuffer);
+        
+        PipelineState pipe = {};
+        pipe.program = this->rayRenderProgram;
+        driver.draw(pipe, this->quadPrimitive);
+
+    });
+
+    renderGraph.addRenderPass("blit", { renderedRef }, {}, [this, scene, renderedRef, &renderGraph](FrameGraph& fg) {
+        Handle<HwTexture> rendered = fg.getResource<Handle<HwTexture>>(renderedRef);
+
+        PipelineState pipe = {};
+        pipe.program = this->blitProgram;
+        RenderPassParams params;
+        driver.beginRenderPass(this->surfaceRenderTarget, params);
+        driver.bindTexture(0, rendered);
+        driver.draw(pipe, this->quadPrimitive);
+        driver.endRenderPass();
+    });
 }
