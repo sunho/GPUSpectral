@@ -39,8 +39,9 @@ void RenderGraph::submit() {
 
 Renderer::Renderer(Window* window)
     : window(window), driver(window) {
-    for (size_t i = 0; i < VULKAN_COMMANDS_SIZE; ++i) {
-        renderGraphs.push_back(RenderGraph(*this));
+    for (size_t i = 0; i < MAX_INFLIGHTS; ++i) {
+        inflights[i].fence = driver.createFence();
+        inflights[i].rg = std::make_unique<RenderGraph>(*this);
     }
 
     Program prog(ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag,ForwardPhongFragSize);
@@ -98,8 +99,15 @@ Handle<HwUniformBuffer> Renderer::createTransformBuffer(RenderGraph& rg, const C
 }
 
 void Renderer::run(Scene* scene) {
-    const uint32_t cmdIndex = driver.acquireCommandBuffer();
-    RenderGraph& renderGraph = renderGraphs[cmdIndex];
+    InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
+    driver.waitFence(inflight.fence);
+    if (inflight.handle) {
+        driver.releaseInflight(inflight.handle);
+    }
+    Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
+    inflight.handle = handle;
+
+    RenderGraph& renderGraph = *inflight.rg;
     renderGraph.reset();
 
     scene->prepare();
@@ -187,7 +195,7 @@ void Renderer::run(Scene* scene) {
             driver.draw(pipe, geom.primitive);
         }
         driver.endRenderPass();
-        driver.commit();
     });
     renderGraph.submit();
+    driver.endFrame();
 }

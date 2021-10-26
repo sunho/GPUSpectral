@@ -66,6 +66,14 @@ class RenderGraph {
     FrameGraph fg;
 };
 
+struct InflightData {
+    Handle<HwFence> fence;
+    Handle<HwInflight> handle{};
+    std::unique_ptr<RenderGraph> rg;
+};
+
+constexpr static size_t MAX_INFLIGHTS = 2; 
+
 class Renderer : public IdResource {
   public:
     Renderer(Window* window);
@@ -84,9 +92,11 @@ class Renderer : public IdResource {
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
 
-    std::vector<RenderGraph> renderGraphs;
+    std::array<InflightData, MAX_INFLIGHTS> inflights;
     VulkanDriver driver;
     Window* window;
+
+    size_t currentFrame{0};
 };
 
 }  // namespace sunho3d

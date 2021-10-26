@@ -77,3 +77,11 @@ struct HwPrimitive : public HwBase {
         : mode(mode) {
     }
 };
+
+struct HwFence : public HwBase {
+    HwFence() = default;
+};
+
+struct HwInflight : public HwBase {
+    HwInflight() = default;
+};

@@ -1,19 +1,19 @@
 #pragma once
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 #include <stdexcept>
 
 #include "../DriverBase.h"
 #include "../Handles.h"
-#include "VulkanContext.h"
+#include "VulkanDevice.h"
 
 struct VulkanBufferObject : public HwBufferObject {
-    explicit VulkanBufferObject(VulkanContext &context, uint32_t size, BufferUsage usage);
+    explicit VulkanBufferObject(VulkanDevice &device, uint32_t size, BufferUsage usage);
     ~VulkanBufferObject();
     void upload(const BufferDescriptor &descriptor);
-    VkDeviceMemory memory;
-    VkBuffer buffer;
+    vk::Buffer buffer;
 
   private:
-    VulkanContext &context;
+    VulkanDevice &device;
+    AllocatedBuffer _buffer;
 };

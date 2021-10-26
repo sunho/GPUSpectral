@@ -11,13 +11,44 @@
 #include "../DriverBase.h"
 #include "../PipelineState.h"
 #include "VulkanBuffer.h"
-#include "VulkanContext.h"
+#include "VulkanDevice.h"
 #include "VulkanHandles.h"
 #include "VulkanPipelineCache.h"
 #include "VulkanTexture.h"
 
 namespace sunho3d {
 using HandleData = std::vector<char>;
+
+struct VulkanInflight : public HwInflight {
+    VulkanInflight() = delete;
+    VulkanInflight(VulkanDevice& device) : device(device) {
+        auto cmdInfo = vk::CommandBufferAllocateInfo()
+            .setCommandBufferCount(1)
+            .setCommandPool(device.commandPool);
+        cmd = device.device.allocateCommandBuffers(cmdInfo).front();
+        imageSemaphore = device.semaphorePool.acquire();
+        renderSemaphore = device.semaphorePool.acquire();
+    }
+    ~VulkanInflight() {
+        device.device.freeCommandBuffers(device.commandPool, 1, &cmd);
+        device.semaphorePool.recycle(renderSemaphore);
+        device.semaphorePool.recycle(imageSemaphore);
+    }
+    vk::Fence inflightFence{};
+    vk::Semaphore imageSemaphore{};
+    vk::Semaphore renderSemaphore{};
+    vk::CommandBuffer cmd{};
+    VulkanDevice& device;
+};
+
+struct DriverContext { 
+    VulkanDescriptor currentBinding{};
+    vk::RenderPass currentRenderPass{};
+    VulkanPipeline currentPipeline{};
+    vk::DescriptorSet currentDescriptorSet{};
+    VulkanInflight* inflight{};
+    Viewport viewport{};
+};
 
 class VulkanDriver {
   public:
@@ -93,10 +124,8 @@ class VulkanDriver {
     std::map<HandleBase::HandleId, HandleData> handles;
     HandleBase::HandleId nextId{ 0 };
 
-    VulkanPipelineCache pipelineCache;
-    VulkanContext context;
-    VulkanDescriptor currentBinding{};
-    VulkanSurfaceContext surface;
+    std::unique_ptr<VulkanDevice> device;
+    DriverContext context;
 };
 
 }  // namespace sunho3d

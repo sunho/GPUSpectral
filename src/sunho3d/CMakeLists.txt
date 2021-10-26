@@ -6,18 +6,20 @@ set(SOURCE_LIST
     backend/PipelineState.h
     backend/DriverBase.h
     backend/DriverTypes.h
+    backend/vulkan/VulkanTypes.h
+    backend/vulkan/VulkanTypes.cpp
     backend/vulkan/VulkanHandles.h
     backend/vulkan/VulkanHandles.cpp
-    backend/vulkan/VulkanContext.h
-    backend/vulkan/VulkanContext.cpp
+    backend/vulkan/VulkanDevice.h
+    backend/vulkan/VulkanDevice.cpp
+    backend/vulkan/VulkanWSI.h
+    backend/vulkan/VulkanWSI.cpp
     backend/vulkan/VulkanDriver.h
     backend/vulkan/VulkanDriver.cpp
     backend/vulkan/VulkanBuffer.h
     backend/vulkan/VulkanBuffer.cpp
     backend/vulkan/VulkanPipelineCache.h
     backend/vulkan/VulkanPipelineCache.cpp
-    backend/vulkan/VulkanCommands.h
-    backend/vulkan/VulkanCommands.cpp
     backend/vulkan/VulkanTexture.h
     backend/vulkan/VulkanTexture.cpp
     framegraph/shaders/ForwardPhong.frag
@@ -57,7 +59,7 @@ set(SOURCE_LIST
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
 add_library(sunho3d ${SOURCE_LIST})
-target_link_libraries(sunho3d PUBLIC glfw glm Vulkan tinygltf tinyobjloader)
+target_link_libraries(sunho3d PUBLIC VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader)
 target_include_directories(sunho3d PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 add_executable(embedfile utils/EmbedFile.c)

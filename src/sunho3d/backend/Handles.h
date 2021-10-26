@@ -10,6 +10,8 @@ struct HwRenderTarget;
 struct HwBufferObject;
 struct HwPrimitive;
 struct HwTexture;
+struct HwFence;
+struct HwInflight;
 
 class HandleBase {
   public:
@@ -65,3 +67,5 @@ using RenderTargetHandle = Handle<HwRenderTarget>;
 using BufferObjectHandle = Handle<HwBufferObject>;
 using PrimitiveHandle = Handle<HwPrimitive>;
 using TextureHandle = Handle<HwTexture>;
+using FenceHandle = Handle<HwFence>;
+using InflightHandle = Handle<HwInflight>;

@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "../../utils/GCPool.h"
-#include "VulkanContext.h"
+#include "VulkanDevice.h"
 #include "VulkanHandles.h"
 
 struct VulkanPipelineKey {
@@ -45,13 +45,14 @@ struct VulkanDescriptor {
 
 class VulkanPipelineCache {
   public:
-    void init(VulkanContext &contex);
-    VkPipeline getOrCreatePipeline(VulkanContext &context, const VulkanPipelineKey &key);
-    VkFramebuffer getOrCreateFrameBuffer(VulkanContext &context, VkRenderPass renderPass,
+    VulkanPipelineCache(VulkanDevice &device);
+    VkPipeline getOrCreatePipeline(const VulkanPipelineKey &key);
+    vk::Framebuffer getOrCreateFrameBuffer(vk::RenderPass renderPass,
+                                         VulkanSwapChain swapchain, 
                                          VulkanRenderTarget *renderTarget);
-    VkRenderPass getOrCreateRenderPass(VulkanContext &context, VulkanRenderTarget *renderTarget);
-    void bindDescriptor(VulkanContext &context, const VulkanDescriptor &key);
-    void setDummyTexture(VkImageView imageView) {
+    VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
+    void bindDescriptor(vk::CommandBuffer cmd, const VulkanDescriptor &key);
+    void setDummyTexture(vk::ImageView imageView) {
         dummyImageView = imageView;
     }
     void tick();
@@ -59,11 +60,11 @@ class VulkanPipelineCache {
   private:
     struct PipelineLayout {
 		std::array<VkDescriptorSetLayout, 3> descriptorSetLayout;
-		VkPipelineLayout pipelineLayout;
+		vk::PipelineLayout pipelineLayout;
     };
 
-    void setupLayouts(VulkanContext &context, VulkanPipelineCache::PipelineLayout& layout, bool compute);
-    void getOrCreateDescriptors(VulkanContext &context, const VulkanDescriptor &key,
+    void setupLayouts(VulkanPipelineCache::PipelineLayout& layout, bool compute);
+    void getOrCreateDescriptors(const VulkanDescriptor &key,
                                 std::array<VkDescriptorSet, 3> &descripotrs);
 
 
@@ -81,7 +82,7 @@ class VulkanPipelineCache {
     VkDescriptorImageInfo dummyTargetInfo = {};
     VkWriteDescriptorSet dummyTargetWriteInfo = {};
 
-    VulkanContext *context;
+    VulkanDevice& device;
     VulkanBufferObject *dummyBuffer;
 
     PipelineLayout graphicsLayout;

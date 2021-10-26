@@ -6,6 +6,9 @@ add_subdirectory(glfw)
 
 add_subdirectory(glm)
 
+add_subdirectory(vk-bootstrap)
+add_subdirectory(VulkanMemoryAllocator)
+
 find_package(Vulkan)
 add_library(Vulkan INTERFACE)
 target_compile_definitions(Vulkan INTERFACE -DHAVE_VULKAN)

@@ -2,8 +2,9 @@
 
 #include "../Handles.h"
 #include "VulkanBuffer.h"
-#include "VulkanContext.h"
+#include "VulkanDevice.h"
 #include "VulkanTexture.h"
+#include "VulkanTypes.h"
 
 #include <stdexcept>
 
@@ -21,9 +22,9 @@ struct VulkanVertexBuffer : public HwVertexBuffer {
 };
 
 struct VulkanIndexBuffer : public HwIndexBuffer {
-    explicit VulkanIndexBuffer(VulkanContext &ctx, uint32_t count)
+    explicit VulkanIndexBuffer(VulkanDevice &device, uint32_t count)
         : HwIndexBuffer(count) {
-        buffer = new VulkanBufferObject(ctx, count * 2, BufferUsage::INDEX);
+        buffer = new VulkanBufferObject(device, count * 2, BufferUsage::INDEX);
     }
 
     ~VulkanIndexBuffer() {
@@ -32,7 +33,7 @@ struct VulkanIndexBuffer : public HwIndexBuffer {
     VulkanBufferObject *buffer;
 };
 
-static VkShaderModule createShaderModule(VulkanContext &context, const char *code,
+static VkShaderModule createShaderModule(VulkanDevice &device, const char *code,
                                          uint32_t codeSize) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -40,7 +41,7 @@ static VkShaderModule createShaderModule(VulkanContext &context, const char *cod
     createInfo.pCode = reinterpret_cast<const uint32_t *>(code);
     
     VkShaderModule shaderModule;
-    if (vkCreateShaderModule(context.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+    if (vkCreateShaderModule(device.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
     }
     return shaderModule;
@@ -48,13 +49,13 @@ static VkShaderModule createShaderModule(VulkanContext &context, const char *cod
 
 struct VulkanProgram : public HwProgram {
     VulkanProgram() = default;
-    explicit VulkanProgram(VulkanContext &ctx, const Program &program)
+    explicit VulkanProgram(VulkanDevice &device, const Program &program)
         : HwProgram(program) {
         if (program.type == ProgramType::PIPELINE) {
-            vertex = createShaderModule(ctx, program.vertex().data(), program.vertex().size());
-            fragment = createShaderModule(ctx, program.frag().data(), program.frag().size());
+            vertex = createShaderModule(device, program.vertex().data(), program.vertex().size());
+            fragment = createShaderModule(device, program.frag().data(), program.frag().size());
         } else {
-            compute = createShaderModule(ctx, program.compute().data(), program.compute().size());
+            compute = createShaderModule(device, program.compute().data(), program.compute().size());
         }
     }
 
@@ -64,9 +65,8 @@ struct VulkanProgram : public HwProgram {
 };
 
 struct VulkanRenderTarget : public HwRenderTarget {
-    VulkanRenderTarget() = default;
-    explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachment depth)
-        : HwRenderTarget(w, h), surface(true), depth(depth) {
+    VulkanRenderTarget()
+        : HwRenderTarget(0, 0), surface(true) {
     }
     explicit VulkanRenderTarget(uint32_t w, uint32_t h, std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> color,
                                 VulkanAttachment depth)
@@ -77,14 +77,6 @@ struct VulkanRenderTarget : public HwRenderTarget {
             if (texture == nullptr) {
                 continue;
             }
-            color[i].format = texture->vkFormat;
-            color[i].view = texture->view;
-        }
-
-        const VulkanAttachment &depthSpec = depth;
-        VulkanTexture *depthTexture = depth.texture;
-        if (depthTexture) {
-            depth.view = depthTexture->view;
         }
     }
     bool surface;
@@ -102,7 +94,7 @@ struct VulkanPrimitive : public HwPrimitive {
 
 struct VulkanUniformBuffer : public HwUniformBuffer {
     VulkanUniformBuffer() = default;
-    explicit VulkanUniformBuffer(VulkanContext &ctx, uint32_t size)
+    explicit VulkanUniformBuffer(VulkanDevice &ctx, uint32_t size)
         : HwUniformBuffer(size) {
         buffer = new VulkanBufferObject(ctx, size, BufferUsage::UNIFORM);
     }
@@ -110,4 +102,11 @@ struct VulkanUniformBuffer : public HwUniformBuffer {
         delete buffer;
     }
     VulkanBufferObject *buffer;
+};
+
+struct VulkanFence : public HwFence {
+    VulkanFence() = default;
+    explicit VulkanFence(VulkanDevice &device) : fence(device.device.createFence(vk::FenceCreateInfo())) {
+    }
+    vk::Fence fence{};
 };

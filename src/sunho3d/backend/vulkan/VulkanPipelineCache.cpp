@@ -1,6 +1,6 @@
 #include "VulkanPipelineCache.h"
 
-void VulkanPipelineCache::init(VulkanContext &context) {
+VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) {
     dummyBufferWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     dummyBufferWriteInfo.pNext = nullptr;
     dummyBufferWriteInfo.dstArrayElement = 0;
@@ -28,7 +28,7 @@ void VulkanPipelineCache::init(VulkanContext &context) {
     dummyTargetWriteInfo.pImageInfo = &dummyTargetInfo;
     dummyTargetWriteInfo.pBufferInfo = nullptr;
     dummyTargetWriteInfo.pTexelBufferView = nullptr;
-    setupLayouts(context, graphicsLayout, false);
+    setupLayouts(graphicsLayout, false);
 
     VkBufferCreateInfo bufferInfo{
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -36,23 +36,22 @@ void VulkanPipelineCache::init(VulkanContext &context) {
         .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     };
 
-    dummyBuffer = new VulkanBufferObject(context, 16, BufferUsage::UNIFORM);
+    dummyBuffer = new VulkanBufferObject(device, 16, BufferUsage::UNIFORM);
     dummyBufferInfo.buffer = dummyBuffer->buffer;
     dummyBufferInfo.range = bufferInfo.size;
 
-    this->context = &context;
 
     pipelines.setDestroyer([=](VkPipeline pipeline) {
-        vkDestroyPipeline(this->context->device, pipeline, nullptr);
+        vkDestroyPipeline(this->device.device, pipeline, nullptr);
     });
     framebuffers.setDestroyer([=](VkFramebuffer framebuffer) {
-        vkDestroyFramebuffer(this->context->device, framebuffer, nullptr);
+        vkDestroyFramebuffer(this->device.device, framebuffer, nullptr);
     });
     descriptorSets.setDestroyer([=](std::array<VkDescriptorSet, 3> descriptors) {
-        vkFreeDescriptorSets(this->context->device, descriptorPool, 3, descriptors.data());
+        vkFreeDescriptorSets(this->device.device, descriptorPool, 3, descriptors.data());
     });
     renderpasses.setDestroyer([=](VkRenderPass renderPass) {
-        vkDestroyRenderPass(this->context->device, renderPass, nullptr);
+        vkDestroyRenderPass(this->device.device, renderPass, nullptr);
     });
 }
 
@@ -63,7 +62,7 @@ void VulkanPipelineCache::tick() {
     renderpasses.tick();
 }
 
-void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& layout, bool compute) {
+void VulkanPipelineCache::setupLayouts(PipelineLayout& layout, bool compute) {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
@@ -84,7 +83,7 @@ void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& l
     dlinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     dlinfo.bindingCount = ubindings.size();
     dlinfo.pBindings = ubindings.data();
-    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[0]);
+    vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[0]);
 
     std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::SAMPLER_BINDING_COUNT> sbindings;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -94,7 +93,7 @@ void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& l
     }
     dlinfo.bindingCount = sbindings.size();
     dlinfo.pBindings = sbindings.data();
-    vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[1]);
+    vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[1]);
     
     if (compute) {
         std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
@@ -105,7 +104,7 @@ void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& l
         }
         dlinfo.bindingCount = bindings.size();
         dlinfo.pBindings = bindings.data();
-        vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
+        vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
     } else {
         std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
         binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
@@ -116,16 +115,13 @@ void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& l
         }
         dlinfo.bindingCount = bindings.size();
         dlinfo.pBindings = bindings.data();
-        vkCreateDescriptorSetLayout(context.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
+        vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
     }
 
     pipelineLayoutInfo.setLayoutCount = 3;
     pipelineLayoutInfo.pSetLayouts = layout.descriptorSetLayout.data();
 
-    if (vkCreatePipelineLayout(context.device, &pipelineLayoutInfo, nullptr, &layout.pipelineLayout) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("failed to create pipeline layout!");
-    }
+    layout.pipelineLayout = device.device.createPipelineLayout(pipelineLayoutInfo, nullptr);
     VkDescriptorPoolSize poolSizes[3] = {};
     VkDescriptorPoolCreateInfo poolInfo{ .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                                          .pNext = nullptr,
@@ -139,13 +135,12 @@ void VulkanPipelineCache::setupLayouts(VulkanContext &context, PipelineLayout& l
     poolSizes[1].descriptorCount = poolInfo.maxSets * VulkanDescriptor::SAMPLER_BINDING_COUNT;
     poolSizes[2].type = compute ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
     poolSizes[2].descriptorCount = poolInfo.maxSets * VulkanDescriptor::TARGET_BINDING_COUNT;
-    if (vkCreateDescriptorPool(context.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
 }
 
-void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
-                                                 const VulkanDescriptor &key,
+void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
                                                  std::array<VkDescriptorSet, 3> &descriptors) {
     auto it = descriptorSets.get(key);
     if (it) {
@@ -157,7 +152,7 @@ void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
     allocInfo.descriptorPool = descriptorPool;
     allocInfo.descriptorSetCount = 3;
     allocInfo.pSetLayouts = graphicsLayout.descriptorSetLayout.data();
-    if (vkAllocateDescriptorSets(context.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
     dummySamplerInfo.imageLayout = dummyTargetInfo.imageLayout;
@@ -180,7 +175,7 @@ void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
                                          .maxLod = 1.0f,
                                          .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
                                          .unnormalizedCoordinates = VK_FALSE };
-        vkCreateSampler(context.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
+        vkCreateSampler(device.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
     }
 
     VkDescriptorBufferInfo descriptorBuffers[VulkanDescriptor::UBUFFER_BINDING_COUNT];
@@ -251,19 +246,18 @@ void VulkanPipelineCache::getOrCreateDescriptors(VulkanContext &context,
         writeInfo.dstSet = descriptors[2];
         writeInfo.dstBinding = binding;
     }
-    vkUpdateDescriptorSets(context.device, nwrites, writes, 0, nullptr);
+    vkUpdateDescriptorSets(device.device, nwrites, writes, 0, nullptr);
     descriptorSets.add(key, descriptors);
 }
 
-void VulkanPipelineCache::bindDescriptor(VulkanContext &context, const VulkanDescriptor &key) {
+void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanDescriptor &key) {
     std::array<VkDescriptorSet, 3> descriptors;
-    getOrCreateDescriptors(context, key, descriptors);
-    vkCmdBindDescriptorSets(context.commands->get(), VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout.pipelineLayout,
+    getOrCreateDescriptors(key, descriptors);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout.pipelineLayout,
                             0, 3, descriptors.data(), 0, nullptr);
 }
 
-VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
-                                                    const VulkanPipelineKey &key) {
+VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key) {
     auto it = pipelines.get(key);
     if (it) {
         return *it;
@@ -292,7 +286,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
         Attribute attrib = key.attributes[i];
         attributes[i] = { .location = i,
                           .binding = i,
-                          .format = context.translateElementFormat(attrib.type,
+                          .format = (VkFormat)translateElementFormat(attrib.type,
                                                                    attrib.flags & Attribute::FLAG_NORMALIZED, false) };
         bindings[i] = {
             .binding = i,
@@ -417,7 +411,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;  // Optional
     pipelineInfo.basePipelineIndex = -1;               // Optional
     VkPipeline out;
-    if (vkCreateGraphicsPipelines(context.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
+    if (vkCreateGraphicsPipelines(device.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
                                   &out) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline!");
     }
@@ -426,8 +420,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(VulkanContext &context,
     return out;
 }
 
-VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
-                                                        VulkanRenderTarget *renderTarget) {
+VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget) {
     auto it = renderpasses.get(renderTarget);
     if (it) {
         return *it;
@@ -438,7 +431,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
     std::vector<VkAttachmentReference> colorAttachmentRef;
 
     if (renderTarget->surface) {
-        attachments.push_back({ .format = context.surface->format.format,
+        attachments.push_back({ .format = (VkFormat)swapchain.format,
                                 .samples = VK_SAMPLE_COUNT_1_BIT,
                                 .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                                 .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -464,7 +457,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
         for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
             auto &texture = renderTarget->color[i].texture;
             if (texture) {
-                attachments.push_back({ .format = texture->vkFormat,
+                attachments.push_back({ .format = (VkFormat)texture->vkFormat,
                                         .samples = VK_SAMPLE_COUNT_1_BIT,
                                         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                                         .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -479,7 +472,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
         }
         if (renderTarget->depth.texture) {
             depthAttachmentRef.attachment = attachments.size();
-            attachments.push_back({ .format = renderTarget->depth.texture->vkFormat,
+            attachments.push_back({ .format = (VkFormat)renderTarget->depth.texture->vkFormat,
                                     .samples = VK_SAMPLE_COUNT_1_BIT,
                                     .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
                                     .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
@@ -505,7 +498,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
         .pSubpasses = &subpass,
     };
 
-    if (vkCreateRenderPass(context.device, &renderPassInfo, nullptr, &out) != VK_SUCCESS) {
+    if (vkCreateRenderPass(device.device, &renderPassInfo, nullptr, &out) != VK_SUCCESS) {
         throw std::runtime_error("failed to create render pass!");
     }
 
@@ -513,19 +506,18 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanContext &context,
     return out;
 }
 
-VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext &context,
-                                                          VkRenderPass renderPass,
+vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass renderPass,
+                                                        VulkanSwapChain swapchain, 
                                                           VulkanRenderTarget *renderTarget) {
     auto it = framebuffers.get(
-        std::make_pair(renderTarget, context.currentSwapContext->attachment.view));
+        std::make_pair(renderTarget, renderTarget->surface ? swapchain.view : nullptr));
     if (it) {
         return *it;
     }
 
     std::vector<VkImageView> attachments;
     if (renderTarget->surface) {
-        attachments.push_back(context.currentSwapContext->attachment.view);
-        attachments.push_back(renderTarget->depth.view);
+        attachments.push_back(swapchain.view);
     } else {
         for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
             auto &texture = renderTarget->color[i].texture;
@@ -546,12 +538,12 @@ VkFramebuffer VulkanPipelineCache::getOrCreateFrameBuffer(VulkanContext &context
                                              .height = renderTarget->height,
                                              .layers = 1 };
 
-    if (vkCreateFramebuffer(context.device, &framebufferInfo, nullptr, &framebuffer) !=
+    if (vkCreateFramebuffer(device.device, &framebufferInfo, nullptr, &framebuffer) !=
         VK_SUCCESS) {
         throw std::runtime_error("failed to create framebuffer!");
     }
 
-    framebuffers.add(std::make_pair(renderTarget, context.currentSwapContext->attachment.view),
+    framebuffers.add(std::make_pair(renderTarget, renderTarget->surface ? swapchain.view : nullptr),
                      framebuffer);
     return framebuffer;
 }

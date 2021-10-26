@@ -32,47 +32,49 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
 }
 
 VulkanDriver::VulkanDriver(Window *window) {
-    initContext(context);
-    initSurfaceContext(context, surface, window);
-    pickPhysicalDevice(context, surface);
-    createLogicalDevice(context, surface);
-    createSwapChain(context, surface, window);
-    populateSwapContexts(context, surface);
+    device = std::make_unique<VulkanDevice>(window);
     setupDebugMessenger();
-    pipelineCache.init(context);
-    pipelineCache.setDummyTexture(context.emptyTexture->view);
 }
 
 VulkanDriver::~VulkanDriver() {
-    destroyContext(context, surface);
-    DestroyDebugUtilsMessengerEXT(context.instance, debugMessenger, nullptr);
-    vkDestroyInstance(context.instance, nullptr);
+    DestroyDebugUtilsMessengerEXT(device->instance, debugMessenger, nullptr);
 }
 
-uint32_t VulkanDriver::acquireCommandBuffer(int dummy) {
-    const VkCommandBuffer cmdbuffer = context.commands->get();
-    VkFence fence = context.commands->fence();
-    vkWaitForFences(context.device, 1, &fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(context.device, 1, &fence);
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;                   // Optional
-    beginInfo.pInheritanceInfo = nullptr;  // Optional
+InflightHandle VulkanDriver::beginFrame(FenceHandle handle) {
+    VulkanFence* fence = handle_cast<VulkanFence>(handle);
+    Handle<HwInflight> inflightHandle = alloc_handle<VulkanInflight, HwInflight>();
+    construct_handle<VulkanInflight>(inflightHandle, *device);
+    auto inflight = handle_cast<VulkanInflight>(inflightHandle);
+    context.inflight = inflight;
+    inflight->inflightFence = fence->fence;
+    inflight->cmd.begin(vk::CommandBufferBeginInfo());
+    device->wsi->beginFrame(inflight->imageSemaphore);
+    return inflightHandle;
+}
 
-    if (vkBeginCommandBuffer(cmdbuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-    }
-    return context.commands->getIndex();
+void VulkanDriver::endFrame(int) {
+    context.inflight->cmd.end();
+    std::array<vk::PipelineStageFlags, 1> waitStages = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+    std::array<vk::Semaphore, 1> waitSemaphores = { context.inflight->imageSemaphore };
+    std::array<vk::Semaphore, 1> signalSemaphores = { context.inflight->renderSemaphore };
+    auto info = vk::SubmitInfo()
+        .setWaitSemaphores(waitSemaphores)
+        .setSignalSemaphores(signalSemaphores)
+        .setWaitDstStageMask(waitStages)
+        .setPCommandBuffers(&context.inflight->cmd)
+        .setCommandBufferCount(1);
+    device->graphicsQueue.submit(1, &info, context.inflight->inflightFence);
+    device->wsi->endFrame(context.inflight->renderSemaphore);
+    device->cache->tick();
+}
+
+void VulkanDriver::releaseInflight(InflightHandle handle) {
+    destruct_handle<VulkanInflight>(handle);
 }
 
 RenderTargetHandle VulkanDriver::createDefaultRenderTarget(int dummy) {
-    VulkanAttachment depth;
-    depth.image = surface.depthTexture->image;
-    depth.format = surface.depthTexture->vkFormat;
-    depth.view = surface.depthTexture->view;
     Handle<HwRenderTarget> handle = alloc_handle<VulkanRenderTarget, HwRenderTarget>();
-    construct_handle<VulkanRenderTarget>(handle, surface.extent.width, surface.extent.height,
-                                         depth);
+    construct_handle<VulkanRenderTarget>(handle);
     return handle;
 }
 
@@ -101,19 +103,19 @@ VertexBufferHandle VulkanDriver::createVertexBuffer(uint32_t bufferCount, uint32
 
 IndexBufferHandle VulkanDriver::createIndexBuffer(uint32_t indexCount) {
     Handle<HwIndexBuffer> handle = alloc_handle<VulkanIndexBuffer, HwIndexBuffer>();
-    construct_handle<VulkanIndexBuffer>(handle, context, indexCount);
+    construct_handle<VulkanIndexBuffer>(handle, *device, indexCount);
     return handle;
 }
 
 ProgramHandle VulkanDriver::createProgram(Program program) {
     Handle<HwProgram> handle = alloc_handle<VulkanProgram, HwProgram>();
-    construct_handle<VulkanProgram>(handle, context, program);
+    construct_handle<VulkanProgram>(handle, *device, program);
     return handle;
 }
 
 BufferObjectHandle VulkanDriver::createBufferObject(uint32_t size, BufferUsage usage) {
     Handle<HwBufferObject> handle = alloc_handle<VulkanBufferObject, HwBufferObject>();
-    construct_handle<VulkanBufferObject>(handle, context, size, usage);
+    construct_handle<VulkanBufferObject>(handle, *device, size, usage);
 
     return handle;
 }
@@ -135,19 +137,11 @@ void VulkanDriver::updateBufferObject(BufferObjectHandle handle, BufferDescripto
 }
 
 void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassParams params) {
-    const VkCommandBuffer cmdbuffer = context.commands->get();
-    if (context.firstPass) {
-        vkAcquireNextImageKHR(context.device, surface.swapChain, UINT64_MAX,
-                              context.commands->imageAvailableSemaphore(), VK_NULL_HANDLE,
-                              &surface.swapContextIndex);
-        context.currentSwapContext = &surface.swapContexts[surface.swapContextIndex];
-        context.firstPass = false;
-    }
-
+    auto& cmd = context.inflight->cmd;
     VulkanRenderTarget *rt = handle_cast<VulkanRenderTarget>(renderTarget);
 
-    VkRenderPass renderPass = pipelineCache.getOrCreateRenderPass(context, rt);
-    VkFramebuffer frameBuffer = pipelineCache.getOrCreateFrameBuffer(context, renderPass, rt);
+    vk::RenderPass renderPass = device->cache->getOrCreateRenderPass(device->wsi->currentSwapChain(), rt);
+    vk::Framebuffer frameBuffer = device->cache->getOrCreateFrameBuffer(renderPass, device->wsi->currentSwapChain(), rt);
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -160,7 +154,7 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     clearValues[1].depthStencil = { 1.0f, 0 };
     renderPassInfo.clearValueCount = 2;
     renderPassInfo.pClearValues = clearValues.data();
-    vkCmdBeginRenderPass(cmdbuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     if (params.viewport.width == 0 && params.viewport.height == 0) {
         params.viewport.width = rt->width;
         params.viewport.height = rt->height;
@@ -178,12 +172,12 @@ PrimitiveHandle VulkanDriver::createPrimitive(PrimitiveMode mode) {
 TextureHandle VulkanDriver::createTexture(SamplerType type, TextureUsage usage,
                                           TextureFormat format, uint32_t width, uint32_t height) {
     Handle<HwTexture> handle = alloc_handle<VulkanTexture, HwTexture>();
-    construct_handle<VulkanTexture>(handle, context, type, usage, 1, format, width, height);
+    construct_handle<VulkanTexture>(handle, *device, type, usage, 1, format, width, height);
     return handle;
 }
 
 void VulkanDriver::updateTexture(TextureHandle handle, BufferDescriptor data) {
-    handle_cast<VulkanTexture>(handle)->update2DImage(context, data);
+    handle_cast<VulkanTexture>(handle)->update2DImage(*device, data);
 }
 
 void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle vertexBuffer,
@@ -200,38 +194,38 @@ void VulkanDriver::updateUniformBuffer(UniformBufferHandle handle, BufferDescrip
 }
 
 void VulkanDriver::bindUniformBuffer(uint32_t binding, UniformBufferHandle handle) {
-    const VkCommandBuffer cmdbuffer = context.commands->get();
+    auto& cmd = context.inflight->cmd;
 
     VulkanUniformBuffer *ubo = handle_cast<VulkanUniformBuffer>(handle);
-    currentBinding.uniformBuffers[binding] = ubo->buffer->buffer;
-    currentBinding.uniformBufferOffsets[binding] = 0;
-    currentBinding.uniformBufferSizes[binding] = ubo->size;
+    context.currentBinding.uniformBuffers[binding] = ubo->buffer->buffer;
+    context.currentBinding.uniformBufferOffsets[binding] = 0;
+    context.currentBinding.uniformBufferSizes[binding] = ubo->size;
 
-    pipelineCache.bindDescriptor(context, currentBinding);
+    device->cache->bindDescriptor(cmd, context.currentBinding);
 }
 
 void VulkanDriver::bindTexture(uint32_t binding, TextureHandle handle) {
-    const VkCommandBuffer cmdbuffer = context.commands->get();
+    auto& cmd = context.inflight->cmd;
 
     VulkanTexture *tex = handle_cast<VulkanTexture>(handle);
     VkDescriptorImageInfo info;
-    info.imageLayout = tex->imageLayout;
+    info.imageLayout = (VkImageLayout)tex->imageLayout;
     info.imageView = tex->view;
     info.sampler = tex->sampler;
-    currentBinding.samplers[binding] = info;
+    context.currentBinding.samplers[binding] = info;
 
-    pipelineCache.bindDescriptor(context, currentBinding);
+    device->cache->bindDescriptor(cmd, context.currentBinding);
 }
 
 Handle<HwUniformBuffer> VulkanDriver::createUniformBuffer(size_t size) {
     Handle<HwUniformBuffer> handle = alloc_handle<VulkanUniformBuffer, HwUniformBuffer>();
-    construct_handle<VulkanUniformBuffer>(handle, context, size);
+    construct_handle<VulkanUniformBuffer>(handle, *device, size);
     return handle;
 }
 
 void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     VulkanPrimitive *prim = handle_cast<VulkanPrimitive>(handle);
-    const VkCommandBuffer cmdbuffer = context.commands->get();
+    auto& cmd = context.inflight->cmd;
 
     const uint32_t bufferCount = prim->vertex->attributeCount;
     VkBuffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
@@ -249,11 +243,11 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         .attributes = prim->vertex->attributes, .attributeCount = prim->vertex->attributeCount, .program = program, .viewport = context.viewport, .renderPass = context.currentRenderPass
     };
 
-    VkPipeline pl = pipelineCache.getOrCreatePipeline(context, key);
-    vkCmdBindPipeline(cmdbuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pl);
-    vkCmdBindVertexBuffers(cmdbuffer, 0, bufferCount, buffers, offsets);
-    vkCmdBindIndexBuffer(cmdbuffer, prim->index->buffer->buffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(cmdbuffer, prim->index->count, 1, 0, 0, 0);
+    VkPipeline pl = device->cache->getOrCreatePipeline(key);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl);
+    vkCmdBindVertexBuffers(cmd, 0, bufferCount, buffers, offsets);
+    vkCmdBindIndexBuffer(cmd, prim->index->buffer->buffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdDrawIndexed(cmd, prim->index->count, 1, 0, 0, 0);
 }
 
 void VulkanDriver::destroyVertexBuffer(VertexBufferHandle handle) {
@@ -285,51 +279,13 @@ void VulkanDriver::destroyRenderTarget(RenderTargetHandle handle) {
 }
 
 void VulkanDriver::endRenderPass(int dummy) {
-    const VkCommandBuffer cmdbuffer = context.commands->get();
-    vkCmdEndRenderPass(cmdbuffer);
-    currentBinding = {};
+    auto& cmd = context.inflight->cmd;
+    vkCmdEndRenderPass(cmd);
+    context.currentBinding = {};
 }
 
 void VulkanDriver::dispatch(int dummy) {
 
-}
-
-uint32_t VulkanDriver::commit(int dummy) {
-    uint32_t imageIndex = surface.swapContextIndex;
-    const VkCommandBuffer cmdbuffer = context.commands->get();
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    vkEndCommandBuffer(cmdbuffer);
-
-    VkSemaphore waitSemaphores[] = { context.commands->imageAvailableSemaphore() };
-    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &cmdbuffer;
-    VkSemaphore signalSemaphores[] = { context.commands->renderFinishedSemaphore() };
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-    if (vkQueueSubmit(context.graphicsQueue, 1, &submitInfo, context.commands->fence()) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("failed to submit draw command buffer!");
-    }
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-    VkSwapchainKHR swapChains[] = { surface.swapChain };
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = nullptr;
-    vkQueuePresentKHR(surface.presentQueue, &presentInfo);
-    pipelineCache.tick();
-    context.firstPass = true;
-    return context.commands->next();
 }
 
 VkBool32 VulkanDriver::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -353,7 +309,7 @@ void VulkanDriver::setupDebugMessenger() {
                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     createInfo.pfnUserCallback = VulkanDriver::debugCallback;
     createInfo.pUserData = nullptr;
-    if (CreateDebugUtilsMessengerEXT(context.instance, &createInfo, nullptr, &debugMessenger) !=
+    if (CreateDebugUtilsMessengerEXT(device->instance, &createInfo, nullptr, &debugMessenger) !=
         VK_SUCCESS) {
         throw std::runtime_error("failed to set up debug messenger!");
     }
