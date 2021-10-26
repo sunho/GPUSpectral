@@ -32,7 +32,7 @@ static uint64_t hashStructBase(const T& value) {
 }
 
 template <typename T>
-static uint64_t hashStruct(const T& value) {
+inline uint64_t hashStruct(const T& value) {
     static constexpr auto block_sz = sizeof(T);
 
     if constexpr ((block_sz & 0x7) == 0) {

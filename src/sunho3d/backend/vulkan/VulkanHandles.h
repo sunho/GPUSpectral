@@ -5,6 +5,7 @@
 #include "VulkanDevice.h"
 #include "VulkanTexture.h"
 #include "VulkanTypes.h"
+#include <sunho3d/utils/Hash.h>
 
 #include <stdexcept>
 
@@ -64,24 +65,49 @@ struct VulkanProgram : public HwProgram {
     VkShaderModule compute;
 };
 
+struct VulkanAttachment {
+    uint32_t valid{};
+    VkImageView view{};
+    VkFormat format{};
+
+    VulkanAttachment() = default;
+    VulkanAttachment(VulkanTexture* texture) : view(texture->view), format((VkFormat)texture->vkFormat), valid(true) {}
+    bool operator==(const VulkanAttachment &other) const = default;
+};
+
+struct VulkanAttachments {
+    std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> colors;
+    VulkanAttachment depth{};
+    bool operator==(const VulkanAttachments &other) const = default;
+};
+
 struct VulkanRenderTarget : public HwRenderTarget {
     VulkanRenderTarget()
         : HwRenderTarget(0, 0), surface(true) {
     }
-    explicit VulkanRenderTarget(uint32_t w, uint32_t h, std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> color,
-                                VulkanAttachment depth)
-        : HwRenderTarget(w, h), color(color), depth(depth), surface(false) {
-        for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
-            const VulkanAttachment &spec = color[i];
-            VulkanTexture *texture = spec.texture;
-            if (texture == nullptr) {
-                continue;
-            }
-        }
+    explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachments attachments)
+        : HwRenderTarget(w, h), attachments(attachments), surface(false) {
     }
+    vk::Extent2D getExtent(VulkanDevice& device) {
+        if (surface) {
+            return device.wsi->getExtent();
+        }
+        auto out = vk::Extent2D();
+        if (width == HwTexture::FRAME_WIDTH) {
+            out.width = device.wsi->getExtent().width;
+        } else {
+            out.width = width;
+        }
+        if (height == HwTexture::FRAME_HEIGHT) {
+            out.height = device.wsi->getExtent().height;
+        } else {
+            out.height = height;
+        }
+        return out;
+    }
+
     bool surface;
-    std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> color;
-    VulkanAttachment depth;
+    VulkanAttachments attachments;
 };
 
 struct VulkanPrimitive : public HwPrimitive {

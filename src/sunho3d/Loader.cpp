@@ -14,6 +14,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#include <filesystem>
+
 using namespace sunho3d;
 
 Loader::Loader(Engine &engine, Renderer &renderer)
@@ -53,7 +55,9 @@ Entity *Loader::loadObj(const std::string &path) {
     std::vector<tinyobj::material_t> materials;
     std::map<int, Material *> generatedMaterials;
 
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), "");
+    auto p = std::filesystem::path(path);
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), p.parent_path().string().c_str());
     if (!warn.empty()) {
         std::cout << "WARN: " << warn << std::endl;
     }
@@ -72,7 +76,7 @@ Entity *Loader::loadObj(const std::string &path) {
         if (it == generatedMaterials.end()) {
             int width, height, comp;
             unsigned char *data =
-                stbi_load(materials[matId].diffuse_texname.c_str(), &width, &height, &comp, 0);
+                stbi_load((p.parent_path() / materials[matId].diffuse_texname).string().c_str(), &width, &height, &comp, 0);
             if (!data) {
                 throw std::runtime_error("FUCK");
             }

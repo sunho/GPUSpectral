@@ -89,6 +89,7 @@ class Renderer : public IdResource {
 
     Handle<HwProgram> fowradPassProgram;
     Handle<HwProgram> quadDrawProgram;
+    Handle<HwProgram> blitProgram;
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
 

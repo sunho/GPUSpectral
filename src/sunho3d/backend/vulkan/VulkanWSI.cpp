@@ -57,3 +57,7 @@ VulkanSwapChain VulkanWSI::currentSwapChain() {
     };
 }
 
+vk::Extent2D VulkanWSI::getExtent() {
+    return vkbSwapchain.extent;
+}
+

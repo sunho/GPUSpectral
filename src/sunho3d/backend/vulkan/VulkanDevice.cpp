@@ -21,9 +21,6 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     // Init vulkan device
     vkb::PhysicalDeviceSelector selector{ vkbInstance };
     auto physRet = selector.set_surface(wsi->surface)
-                    .add_required_extension("VK_KHR_ray_tracing_pipeline")
-                    .add_required_extension_features(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR)
-                    .add_required_extension_features(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR)
                        .select ();
     if (!physRet) {
        throw std::runtime_error("error get physical device");
@@ -51,12 +48,16 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
 
     // Init upload context:
     auto fi = vk::FenceCreateInfo();
-    auto info = vk::CommandPoolCreateInfo()
+    auto ci = vk::CommandPoolCreateInfo()
         .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
         .setQueueFamilyIndex(vkbDevice.get_queue_index(vkb::QueueType::graphics).value());
     
     uploadContext.uploadFence = device.createFence(fi);
-    uploadContext.commandPool = device.createCommandPool(info);
+    uploadContext.commandPool = device.createCommandPool(ci);
+
+    auto ci2 = vk::CommandPoolCreateInfo()
+        .setQueueFamilyIndex(vkbDevice.get_queue_index(vkb::QueueType::graphics).value());
+    commandPool = device.createCommandPool(ci2);
 
     // Init allocator    
     VmaAllocatorCreateInfo allocatorInfo = {};
@@ -75,6 +76,30 @@ VulkanDevice::~VulkanDevice() {
     device.destroyFence(uploadContext.uploadFence);
     vkb::destroy_device(vkbDevice);
     vkb::destroy_instance(vkbInstance);
+}
+
+void VulkanDevice::immediateSubmit(std::function<void(vk::CommandBuffer)> func) {
+    auto cmdInfo = vk::CommandBufferAllocateInfo()
+        .setCommandBufferCount(1)
+        .setCommandPool(uploadContext.commandPool);
+    auto cmd = device.allocateCommandBuffers(cmdInfo).front();
+
+    auto beginInfo = vk::CommandBufferBeginInfo()
+        .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+
+    cmd.begin(beginInfo);
+	func(cmd);
+    cmd.end();
+
+    auto submitInfo = vk::SubmitInfo()
+        .setCommandBufferCount(1)
+        .setPCommandBuffers(&cmd);
+    graphicsQueue.submit(submitInfo, uploadContext.uploadFence);
+
+    device.waitForFences(1, &uploadContext.uploadFence, true, UINT64_MAX);
+	device.resetFences(1, &uploadContext.uploadFence);
+
+    device.resetCommandPool(uploadContext.commandPool);
 }
 
 AllocatedBuffer VulkanDevice::allocateBuffer(vk::BufferCreateInfo info, VmaMemoryUsage usage) {
@@ -126,4 +151,28 @@ vk::Semaphore SemaphorePool::acquire() {
     auto sem = semaphores.back();
     semaphores.pop_back();
     return sem;
+}
+
+void AllocatedBuffer::map(VulkanDevice& device, void** data) {
+    vmaMapMemory(device.allocator, allocation, data);
+}
+
+void AllocatedBuffer::unmap(VulkanDevice& device) {
+    vmaUnmapMemory(device.allocator, allocation);
+}
+
+void AllocatedBuffer::destroy(VulkanDevice& device) {
+    vmaDestroyBuffer(device.allocator, buffer, allocation);
+}
+
+void AllocatedImage::map(VulkanDevice& device, void** data) {
+    vmaMapMemory(device.allocator, allocation, data);
+}
+
+void AllocatedImage::unmap(VulkanDevice& device) {
+    vmaUnmapMemory(device.allocator, allocation);
+}
+
+void AllocatedImage::destroy(VulkanDevice& device) {
+    vmaDestroyImage(device.allocator, image, allocation);
 }

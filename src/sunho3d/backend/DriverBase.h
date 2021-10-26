@@ -38,6 +38,8 @@ struct HwTexture : public HwBase {
     TextureFormat format{};
     uint32_t width{};
     uint32_t height{};
+    constexpr static uint32_t FRAME_WIDTH = 0xFFFFFFF0;
+    constexpr static uint32_t FRAME_HEIGHT = 0xFFFFFFF1;
     HwTexture() = default;
     HwTexture(SamplerType type, uint8_t levels, TextureFormat format, uint32_t width,
               uint32_t height)

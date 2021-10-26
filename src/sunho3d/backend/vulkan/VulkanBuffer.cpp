@@ -25,7 +25,7 @@ void VulkanBufferObject::upload(const BufferDescriptor &descriptor) {
             .setUsage(vk::BufferUsageFlagBits::eTransferSrc);
     auto staging = device.allocateBuffer(bi, VMA_MEMORY_USAGE_CPU_ONLY);
     void* data;
-    staging.map(device, data);
+    staging.map(device, &data);
     memcpy(data, descriptor.data, size);
     staging.unmap(device);
     device.immediateSubmit([=](vk::CommandBuffer cmd) {

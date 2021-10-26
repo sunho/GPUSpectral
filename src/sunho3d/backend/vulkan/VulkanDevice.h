@@ -30,7 +30,7 @@ private:
 struct AllocatedBuffer {
     vk::Buffer buffer;
     VmaAllocation allocation;
-    void map(VulkanDevice& device, void* data);
+    void map(VulkanDevice& device, void** data);
     void unmap(VulkanDevice& device);
     void destroy(VulkanDevice& device);
 };
@@ -38,7 +38,7 @@ struct AllocatedBuffer {
 struct AllocatedImage {
     vk::Image image;
     VmaAllocation allocation;
-    void map(VulkanDevice& device, void* data);
+    void map(VulkanDevice& device, void** data);
     void unmap(VulkanDevice& device);
     void destroy(VulkanDevice& device);
 };
@@ -64,8 +64,6 @@ public:
     void immediateSubmit(std::function<void(vk::CommandBuffer)> func);
     AllocatedBuffer allocateBuffer(vk::BufferCreateInfo info, VmaMemoryUsage usage);
     AllocatedImage allocateImage(vk::ImageCreateInfo info, VmaMemoryUsage usage);
-
-    VulkanTexture *emptyTexture;
 private:
     vkb::Device vkbDevice{};
     vkb::Instance vkbInstance{};

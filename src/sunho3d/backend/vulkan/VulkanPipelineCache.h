@@ -10,20 +10,64 @@
 #include "VulkanDevice.h"
 #include "VulkanHandles.h"
 
+template <>
+inline uint64_t hashStruct<VulkanAttachment>(const VulkanAttachment& attachment) {
+    uint64_t seed = hashBase(attachment.valid);
+    seed ^= hashStruct(attachment.view);
+    seed ^= hashBase(attachment.format);
+    return hashBase(seed);
+}
+
+template <>
+inline uint64_t hashStruct<VulkanAttachments>(const VulkanAttachments& attachment) {
+    uint64_t seed = hashStruct(attachment.depth);
+    for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+			seed ^= hashStruct(attachment.colors[i]);
+    }
+    return hashBase(seed);
+}
+
 struct VulkanPipelineKey {
     AttributeArray attributes;
     size_t attributeCount;
     VulkanProgram *program;
     Viewport viewport;
     VkRenderPass renderPass;
+    DepthTest depthTest;
 
-    bool operator<(const VulkanPipelineKey &other) const {
-        return std::tie(attributeCount, program, viewport, attributes, renderPass) < std::tie(other.attributeCount, other.program, other.viewport, other.attributes, other.renderPass);
+    bool operator==(const VulkanPipelineKey &other) const {
+        return attributes == other.attributes && attributeCount == other.attributeCount && program == other.program
+        &&viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
 };
 
-static bool operator<(const VkDescriptorImageInfo &lhs, const VkDescriptorImageInfo &rhs) {
-    return std::tie(lhs.imageLayout, lhs.imageView, lhs.sampler) < std::tie(rhs.imageLayout, rhs.imageView, rhs.sampler);
+template <>
+inline uint64_t hashStruct<Attribute>(const Attribute& attribute) {
+    uint64_t seed = hashStruct(attribute.flags);
+    seed ^= hashStruct(attribute.index);
+    seed ^= hashStruct(attribute.offset);
+    seed ^= hashStruct(attribute.stride);
+    seed ^= hashStruct(attribute.type);
+    seed ^= hashStruct(attribute.flags);
+    return hashBase(seed);
+}
+
+template <>
+inline uint64_t hashStruct<VulkanPipelineKey>(const VulkanPipelineKey& pipelineKey) {
+    uint64_t seed = hashStruct(pipelineKey.attributeCount);
+
+    for (size_t i = 0; i < MAX_VERTEX_ATTRIBUTE_COUNT; ++i) {
+        seed ^= hashStruct(pipelineKey.attributes[i]);
+    }
+    seed ^= hashStruct(pipelineKey.program);
+    seed ^= hashStruct(pipelineKey.renderPass);
+    seed ^= hashStruct(pipelineKey.viewport);
+    seed ^= hashStruct(pipelineKey.depthTest);
+    return hashBase(seed);
+}
+
+static bool operator==(const VkDescriptorImageInfo &lhs, const VkDescriptorImageInfo &rhs) {
+    return lhs.imageLayout == rhs.imageLayout && lhs.imageView == rhs.imageView && lhs.sampler == rhs.sampler;
 };
 
 struct VulkanDescriptor {
@@ -38,9 +82,7 @@ struct VulkanDescriptor {
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
 
-    bool operator<(const VulkanDescriptor &other) const {
-        return std::tie(uniformBuffers, samplers, inputAttachments, uniformBufferOffsets, uniformBufferSizes) < std::tie(other.uniformBuffers, other.samplers, other.inputAttachments, other.uniformBufferOffsets, other.uniformBufferSizes);
-    }
+    bool operator==(const VulkanDescriptor &other) const = default;
 };
 
 class VulkanPipelineCache {
@@ -52,9 +94,6 @@ class VulkanPipelineCache {
                                          VulkanRenderTarget *renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
     void bindDescriptor(vk::CommandBuffer cmd, const VulkanDescriptor &key);
-    void setDummyTexture(vk::ImageView imageView) {
-        dummyImageView = imageView;
-    }
     void tick();
 
   private:
@@ -68,13 +107,35 @@ class VulkanPipelineCache {
                                 std::array<VkDescriptorSet, 3> &descripotrs);
 
 
-    GCPool<VulkanPipelineKey, VkPipeline> pipelines;
-    GCPool<std::pair<VulkanRenderTarget *, VkImageView>, VkFramebuffer> framebuffers;
-    GCPool<VulkanRenderTarget *, VkRenderPass> renderpasses;
-    GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 3>> descriptorSets;
+    struct VulkanPipelineKeyHasher
+    {
+        std::size_t operator()(const VulkanPipelineKey& k) const {
+            return hashStruct(k);
+        }
+    };
+    struct FrameBufferKeyHasher {
+        std::size_t operator()(const std::pair<VkRenderPass, VkImageView>& k) const {
+            return hashStruct(k.first) ^ hashStruct(k.second);
+        }
+    };
+    struct RenderPassKeyHasher {
+        std::size_t operator()(const VulkanAttachments& k) const
+        {
+            return hashStruct<VulkanAttachments>(k);
+        }
+    };
+    struct DescriptorKeyHasher {
+        std::size_t operator()(const VulkanDescriptor& k) const {
+            return hashStruct(k);
+        }
+    };
+    GCPool<VulkanPipelineKey, VkPipeline, VulkanPipelineKeyHasher> pipelines;
+    GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, FrameBufferKeyHasher> framebuffers;
+    GCPool<VulkanAttachments, VkRenderPass, RenderPassKeyHasher> renderpasses;
+    GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 3>, DescriptorKeyHasher> descriptorSets;
 	VkDescriptorPool descriptorPool;
 
-    VkImageView dummyImageView = VK_NULL_HANDLE;
+    std::unique_ptr<VulkanTexture> dummyImage;
     VkDescriptorBufferInfo dummyBufferInfo = {};
     VkWriteDescriptorSet dummyBufferWriteInfo = {};
     VkDescriptorImageInfo dummySamplerInfo = {};

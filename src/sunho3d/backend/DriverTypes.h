@@ -110,6 +110,10 @@ struct Attribute {
     bool operator<(const Attribute& other) const {
         return std::tie(index, offset, stride, type, flags) < std::tie(other.index, other.offset, other.stride, other.type, other.flags);
     }
+
+    bool operator==(const Attribute& other) const {
+        return index == other.index && offset == other.offset && stride == other.stride && type == other.type && flags == other.flags;
+    }
 };
 
 static constexpr const size_t MAX_VERTEX_ATTRIBUTE_COUNT = 16;

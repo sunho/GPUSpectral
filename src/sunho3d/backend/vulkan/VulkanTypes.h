@@ -1,6 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.hpp>
 #include "../DriverTypes.h"
+#include "../PipelineState.h"
 
 struct VulkanTexture;
 
@@ -10,10 +11,7 @@ struct VulkanPipeline {
     vk::PipelineLayout pipelineLayout{};
 };
 
-struct VulkanAttachment {
-    VulkanTexture *texture{};
-};
-
 vk::Format translateTextureFormat(TextureFormat format);
 vk::Format translateElementFormat(ElementType type, bool normalized, bool integer);
+vk::CompareOp translateCompareOp(CompareOp op);
 vk::BufferUsageFlags translateBufferUsage(BufferUsage usage);

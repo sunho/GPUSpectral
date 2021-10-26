@@ -23,6 +23,7 @@ public:
     void beginFrame(vk::Semaphore imageSemaphore);
     void endFrame(vk::Semaphore renderSemaphore);
     VulkanSwapChain currentSwapChain();
+    vk::Extent2D getExtent();
 
     VkSurfaceKHR surface{};
 private:

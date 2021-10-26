@@ -4,7 +4,7 @@
 #include <optional>
 #include <functional>
 
-template <typename K, typename V>
+template <typename K, typename V, typename Hasher>
 class GCPool {
   public:
     const static constexpr uint32_t INITIAL_REF_COUNT = 2;
@@ -46,5 +46,5 @@ class GCPool {
 
   private:
     std::function<void(V)> destroyer;
-    std::map<K, Holder<V>> objs;
+    std::unordered_map<K, Holder<V>, Hasher> objs;
 };

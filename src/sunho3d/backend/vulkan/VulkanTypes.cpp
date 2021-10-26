@@ -153,6 +153,27 @@ vk::Format translateElementFormat(ElementType type, bool normalized, bool intege
     return vk::Format::eUndefined;
 }
 
+vk::CompareOp translateCompareOp(CompareOp op) {
+    switch (op) {
+        case CompareOp::ALWAYS:
+            return vk::CompareOp::eAlways;
+        case CompareOp::EQUAL:
+            return vk::CompareOp::eEqual;
+        case CompareOp::GREATER:
+            return vk::CompareOp::eGreater;
+        case CompareOp::GREATER_OR_EQUAL:
+            return vk::CompareOp::eGreaterOrEqual;
+        case CompareOp::LESS:
+            return vk::CompareOp::eLess;
+        case CompareOp::LESS_OR_EQUAL:
+            return vk::CompareOp::eLessOrEqual;
+        case CompareOp::NEVER:
+            return vk::CompareOp::eNever;
+        case CompareOp::NOT_EQUAL:
+            return vk::CompareOp::eNotEqual;
+    };
+}
+
 vk::BufferUsageFlags translateBufferUsage(BufferUsage usage) {
     switch (usage) {
         case BufferUsage::TRANSFER_SRC:

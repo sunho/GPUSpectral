@@ -79,17 +79,16 @@ RenderTargetHandle VulkanDriver::createDefaultRenderTarget(int dummy) {
 }
 
 RenderTargetHandle VulkanDriver::createRenderTarget(uint32_t width, uint32_t height, ColorAttachment color, TextureAttachment depth) {
+    VulkanAttachments attachments = {};
     std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> colorTargets = {};
     for (size_t i = 0; i < color.targetNum; ++i) {
-        colorTargets[i].texture = handle_cast<VulkanTexture>(color.colors[i].handle);
+        attachments.colors[i] = VulkanAttachment(handle_cast<VulkanTexture>(color.colors[i].handle));
     }
-    VulkanAttachment depthTarget = {};
     if (depth.handle) {
-        depthTarget.texture = handle_cast<VulkanTexture>(depth.handle);
+        attachments.depth = VulkanAttachment(handle_cast<VulkanTexture>(depth.handle));
     }
     Handle<HwRenderTarget> handle = alloc_handle<VulkanRenderTarget, HwRenderTarget>();
-    construct_handle<VulkanRenderTarget>(handle, width, height,
-                                         colorTargets, depthTarget);
+    construct_handle<VulkanRenderTarget>(handle, width, height, attachments);
     return handle;
 }
 
@@ -120,6 +119,19 @@ BufferObjectHandle VulkanDriver::createBufferObject(uint32_t size, BufferUsage u
     return handle;
 }
 
+FenceHandle VulkanDriver::createFence(int) {
+    Handle<HwFence> handle = alloc_handle<VulkanFence, HwFence>();
+    construct_handle<VulkanFence>(handle, *device);
+
+    return handle;
+}
+
+void VulkanDriver::waitFence(FenceHandle handle) {
+    std::array<vk::Fence, 1> fences = {handle_cast<VulkanFence>(handle)->fence};
+    device->device.waitForFences(fences, true, UINT64_MAX); 
+    device->device.resetFences(fences);
+}
+
 void VulkanDriver::setVertexBuffer(VertexBufferHandle handle, uint32_t index,
                                    BufferObjectHandle bufferObject) {
     handle_cast<VulkanVertexBuffer>(handle)->buffers[index] =
@@ -143,21 +155,24 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     vk::RenderPass renderPass = device->cache->getOrCreateRenderPass(device->wsi->currentSwapChain(), rt);
     vk::Framebuffer frameBuffer = device->cache->getOrCreateFrameBuffer(renderPass, device->wsi->currentSwapChain(), rt);
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    vk::RenderPassBeginInfo renderPassInfo{};
     renderPassInfo.renderPass = renderPass;
     renderPassInfo.framebuffer = frameBuffer;
-    renderPassInfo.renderArea.offset = { 0, 0 };
-    renderPassInfo.renderArea.extent = { .width = rt->width, .height = rt->height };
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-    clearValues[1].depthStencil = { 1.0f, 0 };
-    renderPassInfo.clearValueCount = 2;
+    renderPassInfo.renderArea.offset = { .x = 0, .y= 0 };
+    renderPassInfo.renderArea.extent = rt->getExtent(*device);
+    std::vector<vk::ClearValue> clearValues{};
+    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}));
+    if (rt->attachments.depth.valid) {
+        clearValues.push_back(vk::ClearDepthStencilValue().setDepth(1.0f));
+    }
+    
+    renderPassInfo.clearValueCount = clearValues.size();
     renderPassInfo.pClearValues = clearValues.data();
-    vkCmdBeginRenderPass(cmd, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
     if (params.viewport.width == 0 && params.viewport.height == 0) {
-        params.viewport.width = rt->width;
-        params.viewport.height = rt->height;
+        auto extent = rt->getExtent(*device);
+        params.viewport.width = extent.width;
+        params.viewport.height = extent.height;
     }
     context.viewport = params.viewport;
     context.currentRenderPass = renderPass;
@@ -240,7 +255,12 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     VulkanProgram *program = handle_cast<VulkanProgram>(pipeline.program);
 
     VulkanPipelineKey key = {
-        .attributes = prim->vertex->attributes, .attributeCount = prim->vertex->attributeCount, .program = program, .viewport = context.viewport, .renderPass = context.currentRenderPass
+        .attributes = prim->vertex->attributes, 
+        .attributeCount = prim->vertex->attributeCount, 
+        .program = program, 
+        .viewport = context.viewport, 
+        .renderPass = context.currentRenderPass,
+        .depthTest = pipeline.depthTest
     };
 
     VkPipeline pl = device->cache->getOrCreatePipeline(key);

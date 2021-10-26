@@ -1,6 +1,19 @@
 #include "VulkanPipelineCache.h"
+#include <iostream>
+
 
 VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) {
+    dummyImage = std::make_unique<VulkanTexture>(device, SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::INPUT_ATTACHMENT, 1, TextureFormat::RGBA8, 1,1);
+    
+    VkBufferCreateInfo bufferInfo{
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = 16,
+        .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    };
+    dummyBuffer = new VulkanBufferObject(device, 16, BufferUsage::UNIFORM);
+    dummyBufferInfo.buffer = dummyBuffer->buffer;
+    dummyBufferInfo.range = bufferInfo.size;
+
     dummyBufferWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     dummyBufferWriteInfo.pNext = nullptr;
     dummyBufferWriteInfo.dstArrayElement = 0;
@@ -10,6 +23,25 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
     dummyBufferWriteInfo.pBufferInfo = &dummyBufferInfo;
     dummyBufferWriteInfo.pTexelBufferView = nullptr;
 
+    dummySamplerInfo.imageView = dummyImage->view;
+    dummySamplerInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkSamplerCreateInfo samplerInfo{ .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                                        .magFilter = VK_FILTER_NEAREST,
+                                        .minFilter = VK_FILTER_NEAREST,
+                                        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+                                        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                                        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                                        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                                        .anisotropyEnable = VK_FALSE,
+                                        .maxAnisotropy = 1,
+                                        .compareEnable = VK_FALSE,
+                                        .compareOp = VK_COMPARE_OP_ALWAYS,
+                                        .minLod = 0.0f,
+                                        .maxLod = 1.0f,
+                                        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+                                        .unnormalizedCoordinates = VK_FALSE };
+    vkCreateSampler(device.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
+
     dummySamplerWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     dummySamplerWriteInfo.pNext = nullptr;
     dummySamplerWriteInfo.dstArrayElement = 0;
@@ -18,8 +50,9 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
     dummySamplerWriteInfo.pBufferInfo = nullptr;
     dummySamplerWriteInfo.pTexelBufferView = nullptr;
     dummySamplerWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-
-    dummyTargetInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   
+    dummyTargetInfo.imageView = dummyImage->view;
+    dummyTargetInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     dummyTargetWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     dummyTargetWriteInfo.pNext = nullptr;
     dummyTargetWriteInfo.dstArrayElement = 0;
@@ -30,17 +63,7 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
     dummyTargetWriteInfo.pTexelBufferView = nullptr;
     setupLayouts(graphicsLayout, false);
 
-    VkBufferCreateInfo bufferInfo{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = 16,
-        .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    };
-
-    dummyBuffer = new VulkanBufferObject(device, 16, BufferUsage::UNIFORM);
-    dummyBufferInfo.buffer = dummyBuffer->buffer;
-    dummyBufferInfo.range = bufferInfo.size;
-
-
+    
     pipelines.setDestroyer([=](VkPipeline pipeline) {
         vkDestroyPipeline(this->device.device, pipeline, nullptr);
     });
@@ -154,28 +177,6 @@ void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
     allocInfo.pSetLayouts = graphicsLayout.descriptorSetLayout.data();
     if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate descriptor sets!");
-    }
-    dummySamplerInfo.imageLayout = dummyTargetInfo.imageLayout;
-    dummySamplerInfo.imageView = dummyImageView;
-    dummyTargetInfo.imageView = dummyImageView;
-
-    if (dummySamplerInfo.sampler == VK_NULL_HANDLE) {
-        VkSamplerCreateInfo samplerInfo{ .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                         .magFilter = VK_FILTER_NEAREST,
-                                         .minFilter = VK_FILTER_NEAREST,
-                                         .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-                                         .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                         .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                         .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                         .anisotropyEnable = VK_FALSE,
-                                         .maxAnisotropy = 1,
-                                         .compareEnable = VK_FALSE,
-                                         .compareOp = VK_COMPARE_OP_ALWAYS,
-                                         .minLod = 0.0f,
-                                         .maxLod = 1.0f,
-                                         .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-                                         .unnormalizedCoordinates = VK_FALSE };
-        vkCreateSampler(device.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
     }
 
     VkDescriptorBufferInfo descriptorBuffers[VulkanDescriptor::UBUFFER_BINDING_COUNT];
@@ -324,9 +325,9 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthTestEnable = key.depthTest.enabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = key.depthTest.write ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = (VkCompareOp)translateCompareOp(key.depthTest.compareOp);
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f;  // Optional
     depthStencil.maxDepthBounds = 1.0f;  // Optional
@@ -421,12 +422,13 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
 }
 
 VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget) {
-    auto it = renderpasses.get(renderTarget);
+    auto it = renderpasses.get(renderTarget->attachments);
     if (it) {
         return *it;
     }
     VkRenderPass out;
     std::vector<VkAttachmentDescription> attachments;
+    bool hasDepth = false;
     VkAttachmentReference depthAttachmentRef{};
     std::vector<VkAttachmentReference> colorAttachmentRef;
 
@@ -441,26 +443,14 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
                                 .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR });
         colorAttachmentRef.push_back({ .attachment = 0,
                                        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
-
-        attachments.push_back({ .format = VK_FORMAT_D32_SFLOAT,
-                                .samples = VK_SAMPLE_COUNT_1_BIT,
-                                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                                .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL });
-
-        depthAttachmentRef.attachment = 1;
-        depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     } else {
         for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
-            auto &texture = renderTarget->color[i].texture;
-            if (texture) {
-                attachments.push_back({ .format = (VkFormat)texture->vkFormat,
+            auto &color = renderTarget->attachments.colors[i];
+            if (color.valid) {
+                attachments.push_back({ .format = color.format,
                                         .samples = VK_SAMPLE_COUNT_1_BIT,
                                         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                        .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
                                         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                                         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
                                         .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
@@ -470,25 +460,26 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
                                                .layout = VK_IMAGE_LAYOUT_GENERAL });
             }
         }
-        if (renderTarget->depth.texture) {
+        if (renderTarget->attachments.depth.valid) {
             depthAttachmentRef.attachment = attachments.size();
-            attachments.push_back({ .format = (VkFormat)renderTarget->depth.texture->vkFormat,
+            attachments.push_back({ .format = renderTarget->attachments.depth.format,
                                     .samples = VK_SAMPLE_COUNT_1_BIT,
                                     .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                    .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
                                     .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                                     .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
                                     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                                     .finalLayout = VK_IMAGE_LAYOUT_GENERAL });
 
             depthAttachmentRef.layout = VK_IMAGE_LAYOUT_GENERAL;
+            hasDepth = true;
         }
     }
 
     VkSubpassDescription subpass{ .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
                                   .colorAttachmentCount = (uint32_t)colorAttachmentRef.size(),
                                   .pColorAttachments = colorAttachmentRef.data(),
-                                  .pDepthStencilAttachment = &depthAttachmentRef };
+                                  .pDepthStencilAttachment = hasDepth ? &depthAttachmentRef : nullptr };
 
     VkRenderPassCreateInfo renderPassInfo{
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -502,7 +493,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
         throw std::runtime_error("failed to create render pass!");
     }
 
-    renderpasses.add(renderTarget, out);
+    renderpasses.add(renderTarget->attachments, out);
     return out;
 }
 
@@ -510,7 +501,7 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
                                                         VulkanSwapChain swapchain, 
                                                           VulkanRenderTarget *renderTarget) {
     auto it = framebuffers.get(
-        std::make_pair(renderTarget, renderTarget->surface ? swapchain.view : nullptr));
+        std::make_pair(renderPass, renderTarget->surface ? swapchain.view : nullptr));
     if (it) {
         return *it;
     }
@@ -520,22 +511,23 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
         attachments.push_back(swapchain.view);
     } else {
         for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
-            auto &texture = renderTarget->color[i].texture;
-            if (texture) {
-                attachments.push_back(texture->view);
+            auto &color = renderTarget->attachments.colors[i];
+            if (color.valid) {
+                attachments.push_back(color.view);
             }
         }
-        if (renderTarget->depth.texture) {
-            attachments.push_back(renderTarget->depth.texture->view);
+        if (renderTarget->attachments.depth.valid) {
+            attachments.push_back(renderTarget->attachments.depth.view);
         }
     }
     VkFramebuffer framebuffer;
+    auto extent = renderTarget->getExtent(device);
     VkFramebufferCreateInfo framebufferInfo{ .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
                                              .renderPass = renderPass,
                                              .attachmentCount = (uint32_t)attachments.size(),
                                              .pAttachments = attachments.data(),
-                                             .width = renderTarget->width,
-                                             .height = renderTarget->height,
+                                             .width = extent.width,
+                                             .height = extent.height,
                                              .layers = 1 };
 
     if (vkCreateFramebuffer(device.device, &framebufferInfo, nullptr, &framebuffer) !=
@@ -543,7 +535,7 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
         throw std::runtime_error("failed to create framebuffer!");
     }
 
-    framebuffers.add(std::make_pair(renderTarget, renderTarget->surface ? swapchain.view : nullptr),
+    framebuffers.add(std::make_pair(renderPass, renderTarget->surface ? swapchain.view : nullptr),
                      framebuffer);
     return framebuffer;
 }

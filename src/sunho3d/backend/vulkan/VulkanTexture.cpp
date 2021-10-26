@@ -35,8 +35,15 @@ static VkImageView createImageView(VulkanDevice &device, vk::Image image, vk::Fo
 }
 
 VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsage usage,
-                             uint8_t levels, TextureFormat format, uint32_t width, uint32_t height)
-    : HwTexture(type, levels, format, width, height), device(device) {
+                             uint8_t levels, TextureFormat format, uint32_t w, uint32_t h)
+    : HwTexture(type, levels, format, w, h), device(device) {
+    if (width == HwTexture::FRAME_WIDTH) {
+        width = device.wsi->getExtent().width;
+    }
+    if (height == HwTexture::FRAME_HEIGHT) {
+        height = device.wsi->getExtent().height;
+    }
+    
     const vk::ImageUsageFlags blittable =  vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc;
     vk::ImageUsageFlags flags{};
     if (usage & TextureUsage::SAMPLEABLE) {
@@ -69,9 +76,32 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
         imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     }*/
 
+    imageLayout = vk::ImageLayout::eGeneral;
 
     _image = createImage(device, width, height, vkFormat, vk::ImageTiling::eOptimal, flags);
+    image = _image.image;
     view = createImageView(device, image, vkFormat, aspect);
+
+    
+    if ((usage & TextureUsage::DEPTH_ATTACHMENT) || (usage & TextureUsage::COLOR_ATTACHMENT)) {
+    device.immediateSubmit([=](vk::CommandBuffer cmd) {
+        vk::ImageSubresourceRange range;
+		range.baseMipLevel = 0;
+		range.levelCount = 1;
+		range.baseArrayLayer = 0;
+		range.layerCount = 1;
+        range.aspectMask = aspect;
+		vk::ImageMemoryBarrier imageBarrier_toTransfer = {};
+		imageBarrier_toTransfer.oldLayout = vk::ImageLayout::eUndefined;
+		imageBarrier_toTransfer.newLayout = vk::ImageLayout::eGeneral;
+		imageBarrier_toTransfer.image = image;
+		imageBarrier_toTransfer.subresourceRange = range;
+
+		imageBarrier_toTransfer.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
+		imageBarrier_toTransfer.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {}, nullptr, nullptr, imageBarrier_toTransfer);
+    });
+    }
 
     vk::SamplerCreateInfo samplerInfo{};
     samplerInfo.magFilter = vk::Filter::eLinear;
@@ -107,7 +137,7 @@ void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &
     auto bi = vk::BufferCreateInfo().setSize(width * height * 4).setUsage(vk::BufferUsageFlagBits::eTransferSrc);
     auto staging = device.allocateBuffer(bi, VMA_MEMORY_USAGE_CPU_ONLY);
     void* d;
-    staging.map(device, d);
+    staging.map(device, &d);
     memcpy(d, data.data, width*height*4);
     staging.unmap(device);
     device.immediateSubmit([&](vk::CommandBuffer cmd) {
@@ -145,7 +175,7 @@ void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &
         vk::ImageMemoryBarrier imageBarrier_toReadable = imageBarrier_toTransfer;
 
         imageBarrier_toReadable.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-        imageBarrier_toReadable.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        imageBarrier_toReadable.newLayout = vk::ImageLayout::eGeneral;
         imageBarrier_toReadable.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
         imageBarrier_toReadable.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 

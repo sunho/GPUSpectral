@@ -9,6 +9,7 @@
 #include "Entity.h"
 #include "Scene.h"
 
+#include <iostream>
 using namespace sunho3d;
 
 RenderGraph::RenderGraph(Renderer& renderer)
@@ -46,7 +47,9 @@ Renderer::Renderer(Window* window)
 
     Program prog(ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag,ForwardPhongFragSize);
     fowradPassProgram = driver.createProgram(prog);
-    surfaceRenderTarget = driver.createDefaultRenderTarget();
+
+    Program prog2(DisplayTextureVert, DisplayTextureVertSize, DisplayTextureFrag, DisplayTextureFragSize);
+    blitProgram = driver.createProgram(prog2);
 
     Primitive primitive;
     std::vector<float> v = {
@@ -82,6 +85,8 @@ Renderer::Renderer(Window* window)
     primitive.vertexBuffer = vbo;
     quadPrimitive = driver.createPrimitive(PrimitiveMode::TRIANGLES);
     driver.setPrimitiveBuffer(quadPrimitive, vbo, ibo);
+
+    surfaceRenderTarget = driver.createDefaultRenderTarget();
 }
 
 Renderer::~Renderer() {
@@ -117,6 +122,7 @@ void Renderer::run(Scene* scene) {
     renderGraph.defineResource(sceneDataRef, &sceneData);
 
     auto shadowMapRef = renderGraph.declareResource<Handle<HwTexture>>("ShadowMap");
+    auto forwardRef = renderGraph.declareResource<Handle<HwTexture>>("Forward");
 
     auto lightUB = renderGraph.createUniformBuffer(sizeof(LightBuffer));
 
@@ -137,15 +143,14 @@ void Renderer::run(Scene* scene) {
     };
 
     renderGraph.addRenderPass("generate shadow maps", { sceneDataRef }, { shadowMapRef }, [this, scene, shadowMapRef, lightUB, sceneDataRef, &renderGraph, getOrCreateMaterialBuffer](FrameGraph& fg) {
-        auto color = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, 1600u, 1600u);
-        auto depth = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, 1600u, 1600u);
+        auto color = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto depth = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
         ColorAttachment att = {};
         att.colors[0] = {
             .handle = color
         };
         att.targetNum = 1;
-        auto renderTarget = renderGraph.createRenderTarget(1600u, 1600u, att, TextureAttachment{ .handle = depth });
-
+        auto renderTarget = renderGraph.createRenderTarget(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ .handle = depth });
         SceneData* sceneData = fg.getResource<SceneData*>(sceneDataRef);
         auto camera = scene->getCamera();
 
@@ -156,8 +161,11 @@ void Renderer::run(Scene* scene) {
         camera.setProjectionFov(90.0f, 1.0f, 0.8f, 12.0f);
         sceneData->lightBuffer.lightVP[0] = camera.proj * camera.view;
 
-        PipelineState pipe;
+        PipelineState pipe = {};
         pipe.program = this->fowradPassProgram;
+        pipe.depthTest.enabled = 1;
+        pipe.depthTest.write = 1;
+        pipe.depthTest.compareOp = CompareOp::LESS;
         RenderPassParams params;
         driver.beginRenderPass(renderTarget, params);
         for (size_t i = 0; i < sceneData->geometries.size(); ++i) {
@@ -175,15 +183,28 @@ void Renderer::run(Scene* scene) {
         fg.defineResource<Handle<HwTexture>>(shadowMapRef, depth);
     });
 
-    renderGraph.addRenderPass("forward", { sceneDataRef, shadowMapRef }, {}, [this, scene, lightUB, sceneDataRef, shadowMapRef, &renderGraph, getOrCreateMaterialBuffer](FrameGraph& fg) {
+    renderGraph.addRenderPass("forward", { sceneDataRef, shadowMapRef }, {forwardRef}, [this, scene, lightUB, forwardRef, sceneDataRef, shadowMapRef, &renderGraph, getOrCreateMaterialBuffer](FrameGraph& fg) {
+        auto color = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto depth = renderGraph.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        ColorAttachment att = {};
+        att.colors[0] = {
+            .handle = color
+        };
+        att.targetNum = 1;
+        auto renderTarget = renderGraph.createRenderTarget(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ .handle = depth });
+        
+
         SceneData* sceneData = fg.getResource<SceneData*>(sceneDataRef);
         Handle<HwTexture> shadowMap = fg.getResource<Handle<HwTexture>>(shadowMapRef);
         auto& camera = scene->getCamera();
 
-        PipelineState pipe;
+        PipelineState pipe = {};
         pipe.program = this->fowradPassProgram;
+        pipe.depthTest.enabled = 1;
+        pipe.depthTest.write = 1;
+        pipe.depthTest.compareOp = CompareOp::LESS;
         RenderPassParams params;
-        driver.beginRenderPass(this->surfaceRenderTarget, params);
+        driver.beginRenderPass(renderTarget, params);
         for (size_t i = 0; i < sceneData->geometries.size(); ++i) {
             auto& geom = sceneData->geometries[i];
             auto& model = sceneData->worldTransforms[i];
@@ -194,6 +215,18 @@ void Renderer::run(Scene* scene) {
             driver.bindTexture(1, shadowMap);
             driver.draw(pipe, geom.primitive);
         }
+        driver.endRenderPass();
+        fg.defineResource<Handle<HwTexture>>(forwardRef, color);
+    });
+    renderGraph.addRenderPass("blit", { forwardRef }, {}, [this, scene, lightUB, sceneDataRef, forwardRef, &renderGraph, getOrCreateMaterialBuffer](FrameGraph& fg) {
+        Handle<HwTexture> forwardMap = fg.getResource<Handle<HwTexture>>(forwardRef);
+
+        PipelineState pipe = {};
+        pipe.program = this->blitProgram;
+        RenderPassParams params;
+        driver.beginRenderPass(this->surfaceRenderTarget, params);
+        driver.bindTexture(0, forwardMap);
+        driver.draw(pipe, this->quadPrimitive);
         driver.endRenderPass();
     });
     renderGraph.submit();
