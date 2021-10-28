@@ -6,8 +6,15 @@ add_subdirectory(glfw)
 
 add_subdirectory(glm)
 
+
 add_subdirectory(vk-bootstrap)
 add_subdirectory(VulkanMemoryAllocator)
+
+add_subdirectory(spdlog EXCLUDE_FROM_ALL)
+set(spdlog_DIR ${CMAKE_CURRENT_SOURCE_DIR}/spdlog/include)
+set(ENABLE_VULKAN on)
+set(ENABLE_TESTING off)
+add_subdirectory(RadeonRays)
 
 find_package(Vulkan)
 add_library(Vulkan INTERFACE)
