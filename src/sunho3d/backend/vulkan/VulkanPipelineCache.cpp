@@ -10,7 +10,7 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
         .size = 16,
         .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     };
-    dummyBuffer = new VulkanBufferObject(device, 16, BufferUsage::UNIFORM);
+    dummyBuffer = new VulkanBufferObject(device, 16, BufferUsage::UNIFORM | BufferUsage::STORAGE);
     dummyBufferInfo.buffer = dummyBuffer->buffer;
     dummyBufferInfo.range = bufferInfo.size;
 
@@ -70,8 +70,8 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
     framebuffers.setDestroyer([=](VkFramebuffer framebuffer) {
         vkDestroyFramebuffer(this->device.device, framebuffer, nullptr);
     });
-    descriptorSets.setDestroyer([=](std::array<VkDescriptorSet, 3> descriptors) {
-        vkFreeDescriptorSets(this->device.device, descriptorPool, 3, descriptors.data());
+    descriptorSets.setDestroyer([=](std::array<VkDescriptorSet, 4> descriptors) {
+        vkFreeDescriptorSets(this->device.device, descriptorPool, 4, descriptors.data());
     });
     renderpasses.setDestroyer([=](VkRenderPass renderPass) {
         vkDestroyRenderPass(this->device.device, renderPass, nullptr);
@@ -129,6 +129,16 @@ void VulkanPipelineCache::setupLayouts(PipelineLayout& layout, bool compute) {
         dlinfo.pBindings = bindings.data();
         vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
     } else {
+        std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::STORAGE_BINDING_COUNT> bindings2;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        for (uint32_t i = 0; i < VulkanDescriptor::STORAGE_BINDING_COUNT; i++) {
+            binding.binding = i;
+            bindings2[i] = binding;
+        }
+        dlinfo.bindingCount = bindings2.size();
+        dlinfo.pBindings = bindings2.data();
+        vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[3]);
+
         std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
         binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -141,11 +151,11 @@ void VulkanPipelineCache::setupLayouts(PipelineLayout& layout, bool compute) {
         vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
     }
 
-    pipelineLayoutInfo.setLayoutCount = 3;
+    pipelineLayoutInfo.setLayoutCount = 4;
     pipelineLayoutInfo.pSetLayouts = layout.descriptorSetLayout.data();
 
     layout.pipelineLayout = device.device.createPipelineLayout(pipelineLayoutInfo, nullptr);
-    VkDescriptorPoolSize poolSizes[3] = {};
+    VkDescriptorPoolSize poolSizes[4] = {};
     VkDescriptorPoolCreateInfo poolInfo{ .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
                                          .pNext = nullptr,
                                          .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
@@ -158,13 +168,15 @@ void VulkanPipelineCache::setupLayouts(PipelineLayout& layout, bool compute) {
     poolSizes[1].descriptorCount = poolInfo.maxSets * VulkanDescriptor::SAMPLER_BINDING_COUNT;
     poolSizes[2].type = compute ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
     poolSizes[2].descriptorCount = poolInfo.maxSets * VulkanDescriptor::TARGET_BINDING_COUNT;
+    poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSizes[3].descriptorCount = poolInfo.maxSets * VulkanDescriptor::STORAGE_BINDING_COUNT;
     if (vkCreateDescriptorPool(device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor pool!");
     }
 }
 
 void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
-                                                 std::array<VkDescriptorSet, 3> &descriptors) {
+                                                 std::array<VkDescriptorSet, 4> &descriptors) {
     auto it = descriptorSets.get(key);
     if (it) {
         descriptors = *it;
@@ -173,7 +185,7 @@ void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 3;
+    allocInfo.descriptorSetCount = 4;
     allocInfo.pSetLayouts = graphicsLayout.descriptorSetLayout.data();
     if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate descriptor sets!");
@@ -182,8 +194,9 @@ void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
     VkDescriptorBufferInfo descriptorBuffers[VulkanDescriptor::UBUFFER_BINDING_COUNT];
     VkDescriptorImageInfo descriptorSamplers[VulkanDescriptor::SAMPLER_BINDING_COUNT];
     VkDescriptorImageInfo descriptorInputAttachments[VulkanDescriptor::TARGET_BINDING_COUNT];
+    VkDescriptorBufferInfo descriptorStorageBuffers[VulkanDescriptor::STORAGE_BINDING_COUNT];
     VkWriteDescriptorSet
-        descriptorWrites[VulkanDescriptor::UBUFFER_BINDING_COUNT + VulkanDescriptor::SAMPLER_BINDING_COUNT + VulkanDescriptor::TARGET_BINDING_COUNT];
+        descriptorWrites[VulkanDescriptor::UBUFFER_BINDING_COUNT + VulkanDescriptor::SAMPLER_BINDING_COUNT + VulkanDescriptor::TARGET_BINDING_COUNT + VulkanDescriptor::STORAGE_BINDING_COUNT];
 
     uint32_t nwrites = 0;
     VkWriteDescriptorSet *writes = descriptorWrites;
@@ -247,15 +260,36 @@ void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
         writeInfo.dstSet = descriptors[2];
         writeInfo.dstBinding = binding;
     }
+    for (uint32_t binding = 0; binding < VulkanDescriptor::STORAGE_BINDING_COUNT; binding++) {
+        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
+        if (key.storageBuffers[binding]) {
+            VkDescriptorBufferInfo &bufferInfo = descriptorStorageBuffers[binding];
+            bufferInfo.buffer = key.storageBuffers[binding];
+            bufferInfo.offset = 0;
+            bufferInfo.range = key.storageBufferSizes[binding];
+            writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writeInfo.pNext = nullptr;
+            writeInfo.dstArrayElement = 0;
+            writeInfo.descriptorCount = 1;
+            writeInfo.pImageInfo = nullptr;
+            writeInfo.pBufferInfo = &bufferInfo;
+            writeInfo.pTexelBufferView = nullptr;
+        } else {
+            writeInfo = dummyBufferWriteInfo;
+        }
+        writeInfo.dstSet = descriptors[3];
+        writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writeInfo.dstBinding = binding;
+    }
     vkUpdateDescriptorSets(device.device, nwrites, writes, 0, nullptr);
     descriptorSets.add(key, descriptors);
 }
 
 void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanDescriptor &key) {
-    std::array<VkDescriptorSet, 3> descriptors;
+    std::array<VkDescriptorSet, 4> descriptors;
     getOrCreateDescriptors(key, descriptors);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout.pipelineLayout,
-                            0, 3, descriptors.data(), 0, nullptr);
+                            0, 4, descriptors.data(), 0, nullptr);
 }
 
 VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key) {

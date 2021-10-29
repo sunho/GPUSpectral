@@ -11,6 +11,7 @@ struct VulkanBufferObject : public HwBufferObject {
     explicit VulkanBufferObject(VulkanDevice &device, uint32_t size, BufferUsage usage);
     ~VulkanBufferObject();
     void upload(const BufferDescriptor &descriptor);
+    std::vector<char> download();
     vk::Buffer buffer;
 
   private:

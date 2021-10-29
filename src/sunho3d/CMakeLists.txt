@@ -22,10 +22,14 @@ set(SOURCE_LIST
     backend/vulkan/VulkanPipelineCache.cpp
     backend/vulkan/VulkanTexture.h
     backend/vulkan/VulkanTexture.cpp
+    backend/vulkan/VulkanRays.h
+    backend/vulkan/VulkanRays.cpp
     framegraph/shaders/ForwardPhong.frag
     framegraph/shaders/ForwardPhong.vert
     framegraph/shaders/DisplayTexture.frag
     framegraph/shaders/DisplayTexture.vert
+    framegraph/shaders/ForwardRT.frag
+    framegraph/shaders/ForwardRT.vert
     framegraph/FrameGraph.h
     framegraph/FrameGraph.cpp
     framegraph/RenderPass.h
@@ -58,8 +62,8 @@ set(SOURCE_LIST
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
-add_library(sunho3d ${SOURCE_LIST})
-target_link_libraries(sunho3d PUBLIC  VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader)
+add_library(sunho3d ${SOURCE_LIST}) 
+target_link_libraries(sunho3d PUBLIC VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader radeonrays)
 target_include_directories(sunho3d PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 add_executable(embedfile utils/EmbedFile.c)
@@ -101,3 +105,6 @@ add_shader(sunho3d ForwardPhongFrag ForwardPhong.frag)
 
 add_shader(sunho3d DisplayTextureVert DisplayTexture.vert)
 add_shader(sunho3d DisplayTextureFrag DisplayTexture.frag)
+
+add_shader(sunho3d ForwardRTVert ForwardRT.vert)
+add_shader(sunho3d ForwardRTFrag ForwardRT.frag)

@@ -10,11 +10,7 @@ add_subdirectory(glm)
 add_subdirectory(vk-bootstrap)
 add_subdirectory(VulkanMemoryAllocator)
 
-add_subdirectory(spdlog EXCLUDE_FROM_ALL)
-set(spdlog_DIR ${CMAKE_CURRENT_SOURCE_DIR}/spdlog/include)
-set(ENABLE_VULKAN on)
-set(ENABLE_TESTING off)
-add_subdirectory(RadeonRays)
+add_subdirectory(spdlog)
 
 find_package(Vulkan)
 add_library(Vulkan INTERFACE)
@@ -26,3 +22,9 @@ target_include_directories(tinygltf INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinygl
 
 add_library(tinyobjloader INTERFACE)
 target_include_directories(tinyobjloader INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinyobjloader)
+
+set(ENABLE_VULKAN ON CACHE BOOL "" FORCE)
+set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(EMBEDDED_KERNELS ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(RadeonRays)

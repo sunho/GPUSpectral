@@ -1,12 +1,64 @@
 #include "Scene.h"
-
+#include "backend/vulkan/VulkanDriver.h"
+#include "Renderer.h"
 using namespace sunho3d;
 
+
+GVetexBufferContainer::GVetexBufferContainer(VulkanDriver& driver) : driver(driver) {
+    gpuBuffer = driver.createBufferObject(maxSize, BufferUsage::STORAGE);
+}
+
+GVetexBufferContainer::~GVetexBufferContainer() {
+    if (gpuBuffer) {
+        driver.destroyBufferObject(gpuBuffer);
+    }
+}
+
+uint32_t GVetexBufferContainer::getVertexStart(const Primitive& primitive) {
+    const uint32_t handle = primitive.hwInstance.getId();
+    return vertexStarts.at(handle);
+}
+
+void GVetexBufferContainer::registerPrimitiveIfNeccesary(const Primitive& primitive) {
+    const uint32_t handle = primitive.hwInstance.getId();
+    const size_t psize = primitive.vertices.size() * sizeof(Vertex);;
+    auto it = vertexStarts.find(handle);
+    if (it == vertexStarts.end()) {
+        buffer.insert(buffer.end(), primitive.vertices.begin(), primitive.vertices.end());
+        vertexStarts.emplace(handle, currentSize / sizeof(Vertex));
+        currentSize += psize;
+        if (maxSize < currentSize) {
+            growBuffer();
+        }
+        uploadBuffer();
+    }
+}
+
+Handle<HwBufferObject> GVetexBufferContainer::getGPUBuffer() const {
+    return gpuBuffer;
+}
+
+void GVetexBufferContainer::growBuffer() {
+    maxSize = currentSize * 2;
+    driver.destroyBufferObject(gpuBuffer);
+    gpuBuffer = driver.createBufferObject(maxSize, BufferUsage::STORAGE);
+}
+
+void GVetexBufferContainer::uploadBuffer() {
+    BufferDescriptor desc = {};
+    desc.data = (uint32_t*)buffer.data();
+    desc.size = currentSize;
+    driver.updateBufferObject(gpuBuffer, desc, 0);
+}
+
 Scene::Scene(Renderer* renderer)
-    : renderer(renderer) {
+    : renderer(renderer), globalVertexBufferContainer(renderer->getDriver()) {
 }
 
 void Scene::addEntity(Entity* entity) {
+    for (auto& p : entity->getPrimitives()) {
+        globalVertexBufferContainer.registerPrimitiveIfNeccesary(p);
+    }
     entities.push_back(entity);
 }
 
@@ -14,6 +66,7 @@ void Scene::prepare() {
     sceneData.geometries.clear();
     sceneData.worldTransforms.clear();
     sceneData.lightBuffer.lightNum = 0;
+    sceneData.globalVertexBuffer = globalVertexBufferContainer.getGPUBuffer();
 
     for (auto& entity : entities) {
         visitEntity(entity, glm::identity<glm::mat4>());
@@ -36,7 +89,9 @@ void Scene::visitEntity(Entity* entity, const glm::mat4& currentTransform) {
     glm::mat4 nextTransform = entity->getTransform().toMatrix() * currentTransform;
     for (auto& prim : entity->getPrimitives()) {
         sceneData.geometries.push_back({
-            .material = prim.material, .primitive = prim.hwInstance,
+            .material = prim.material, 
+            .primitive = prim.hwInstance, 
+            .vertexStart = globalVertexBufferContainer.getVertexStart(prim)
                                          });
         sceneData.worldTransforms.push_back(nextTransform);
     }

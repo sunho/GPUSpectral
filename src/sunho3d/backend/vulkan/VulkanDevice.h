@@ -55,6 +55,7 @@ public:
     vk::Device device{};
     vk::PhysicalDevice physicalDevice{};
     vk::Queue graphicsQueue{};
+    uint32_t queueFamily{};
     vk::CommandPool commandPool{};
     std::unique_ptr<VulkanWSI> wsi{};
     std::unique_ptr<VulkanPipelineCache> cache{};

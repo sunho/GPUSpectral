@@ -4,9 +4,17 @@
 
 VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     // Init vulkan instance
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{};
+    physicalDeviceDescriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+    physicalDeviceDescriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
+    physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray                     = VK_TRUE;
+    physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount   = VK_TRUE;
+   
     vkb::InstanceBuilder builder;
     auto instRet = builder.set_app_name("Example Vulkan Application")
+                    .require_api_version(VK_API_VERSION_1_2)
                       .request_validation_layers ()
+                    .enable_extension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)
                       .use_default_debug_messenger ()
                       .build ();
     if (!instRet) {
@@ -21,6 +29,13 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     // Init vulkan device
     vkb::PhysicalDeviceSelector selector{ vkbInstance };
     auto physRet = selector.set_surface(wsi->surface)
+                    .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
+                    .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
+                    .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
+                    .add_required_extension(VK_AMD_SHADER_BALLOT_EXTENSION_NAME)
+                    .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
+                    .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
+
                        .select ();
     if (!physRet) {
        throw std::runtime_error("error get physical device");
@@ -28,7 +43,8 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
 
     vkb::DeviceBuilder device_builder{ physRet.value () };
 
-    auto devRet = device_builder.build();
+    auto devRet = device_builder
+        .build();
     if (!devRet) {
        throw std::runtime_error("error building device");
     }
@@ -47,6 +63,8 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     wsi->initSwapchain();
 
     // Init upload context:
+    queueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
     auto fi = vk::FenceCreateInfo();
     auto ci = vk::CommandPoolCreateInfo()
         .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)

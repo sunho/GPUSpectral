@@ -84,7 +84,7 @@ static TextureUsage operator|(TextureUsage lhs, TextureUsage rhs) {
     return static_cast<TextureUsage>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
 }
 
-static TextureUsage operator&(TextureUsage lhs, TextureUsage rhs) {
+static uint8_t operator&(TextureUsage lhs, TextureUsage rhs) {
     return static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs);
 }
 
@@ -95,19 +95,19 @@ enum class PrimitiveMode {
 };
 
 enum class BufferUsage : uint8_t {
-    VERTEX = 0x0,
     INDEX = 0x1,
     UNIFORM = 0x2,
     TRANSFER_SRC = 0x4,
     TRANSFER_DST = 0x8,
-    STORAGE = 0x10
+    STORAGE = 0x10,
+    VERTEX = 0x40
 };
 
 static BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {
-    return static_cast<TextureUsage>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+    return static_cast<BufferUsage>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
 }
 
-static BufferUsage operator&(BufferUsage lhs, BufferUsage rhs) {
+static uint8_t operator&(BufferUsage lhs, BufferUsage rhs) {
     return static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs);
 }
 
@@ -134,6 +134,7 @@ using AttributeArray = std::array<Attribute, MAX_VERTEX_ATTRIBUTE_COUNT>;
 
 struct BufferDescriptor {
     uint32_t* data;
+    size_t size{};
 };
 
 struct Viewport {
@@ -188,6 +189,8 @@ struct Ray {
     glm::vec3 dir;
     float maxTime;
 };
+
+static_assert(sizeof(Ray) == 32, "size mistmatch");
 
 struct RayHit {
     glm::vec2 uv;

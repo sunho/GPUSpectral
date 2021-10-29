@@ -25,7 +25,7 @@ struct VulkanVertexBuffer : public HwVertexBuffer {
 struct VulkanIndexBuffer : public HwIndexBuffer {
     explicit VulkanIndexBuffer(VulkanDevice &device, uint32_t count)
         : HwIndexBuffer(count) {
-        buffer = new VulkanBufferObject(device, count * 2, BufferUsage::INDEX);
+        buffer = new VulkanBufferObject(device, count * 4, BufferUsage::INDEX | BufferUsage::STORAGE);
     }
 
     ~VulkanIndexBuffer() {

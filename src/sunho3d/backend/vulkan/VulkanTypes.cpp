@@ -175,14 +175,24 @@ vk::CompareOp translateCompareOp(CompareOp op) {
 }
 
 vk::BufferUsageFlags translateBufferUsage(BufferUsage usage) {
-    switch (usage) {
-        case BufferUsage::TRANSFER_SRC:
-            return vk::BufferUsageFlagBits::eTransferSrc;
-        case BufferUsage::VERTEX:
-            return vk::BufferUsageFlagBits::eVertexBuffer;
-        case BufferUsage::INDEX:
-            return vk::BufferUsageFlagBits::eIndexBuffer;
-        case BufferUsage::UNIFORM:
-            return vk::BufferUsageFlagBits::eUniformBuffer;
+    vk::BufferUsageFlags out = {};
+    if (usage & BufferUsage::TRANSFER_SRC) {
+        out |= vk::BufferUsageFlagBits::eTransferSrc;
     }
+    if (usage & BufferUsage::VERTEX) {
+        out |= vk::BufferUsageFlagBits::eVertexBuffer;
+    }
+    if (usage & BufferUsage::UNIFORM) {
+        out |= vk::BufferUsageFlagBits::eUniformBuffer;
+    }
+    if (usage & BufferUsage::INDEX) {
+        out |= vk::BufferUsageFlagBits::eIndexBuffer;
+    }
+    if (usage & BufferUsage::STORAGE) {
+        out |= vk::BufferUsageFlagBits::eStorageBuffer;
+    }
+    if (usage & BufferUsage::TRANSFER_DST) {
+        out |= vk::BufferUsageFlagBits::eTransferDst;
+    }
+    return out;
 }

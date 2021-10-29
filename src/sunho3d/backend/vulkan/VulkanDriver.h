@@ -15,17 +15,23 @@
 #include "VulkanHandles.h"
 #include "VulkanPipelineCache.h"
 #include "VulkanTexture.h"
+#include "VulkanRays.h"
 
 namespace sunho3d {
 using HandleData = std::vector<char>;
 
 struct VulkanInflight : public HwInflight {
     VulkanInflight() = delete;
-    VulkanInflight(VulkanDevice& device) : device(device) {
+    static vk::CommandBuffer createCommandBuffer(VulkanDevice& device) {
         auto cmdInfo = vk::CommandBufferAllocateInfo()
             .setCommandBufferCount(1)
             .setCommandPool(device.commandPool);
-        cmd = device.device.allocateCommandBuffers(cmdInfo).front();
+        return device.device.allocateCommandBuffers(cmdInfo).front();
+    }
+    VulkanInflight(VulkanDevice& device, VulkanRayTracer& tracer) : 
+            device(device), 
+            cmd(createCommandBuffer(device)), 
+            rayFrameContext(tracer, device, cmd) {
         imageSemaphore = device.semaphorePool.acquire();
         renderSemaphore = device.semaphorePool.acquire();
     }
@@ -37,8 +43,9 @@ struct VulkanInflight : public HwInflight {
     vk::Fence inflightFence{};
     vk::Semaphore imageSemaphore{};
     vk::Semaphore renderSemaphore{};
-    vk::CommandBuffer cmd{};
     VulkanDevice& device;
+    vk::CommandBuffer cmd{};
+    VulkanRayFrameContext rayFrameContext;
 };
 
 struct DriverContext { 
@@ -67,6 +74,16 @@ class VulkanDriver {
 
 #undef DECL_VOIDCOMMAND
 #undef DECL_COMMAND
+  template <typename Dp, typename B>
+    Dp *handle_cast(Handle<B> handle) noexcept {
+        if (!handle)
+            return nullptr;
+        auto iter = handles.find(handle.getId());
+        assert(iter != handles.end());
+        HandleData &data = iter->second;
+        return reinterpret_cast<Dp *>(data.data());
+    }
+
   private:
     void setupDebugMessenger();
 
@@ -82,7 +99,7 @@ class VulkanDriver {
         handles[nextId] = HandleData(sizeof(Dp));
         return Handle<B>(nextId++);
     }
-
+/*
     template <typename Dp, typename B>
     Dp *handle_cast(Handle<B> handle) noexcept {
         if (!handle)
@@ -92,7 +109,7 @@ class VulkanDriver {
         HandleData &data = iter->second;
         return reinterpret_cast<Dp *>(data.data());
     }
-
+*/
     template <typename Dp, typename B>
     const Dp *handle_const_cast(const Handle<B> &handle) noexcept {
         if (!handle)
@@ -125,6 +142,7 @@ class VulkanDriver {
     HandleBase::HandleId nextId{ 0 };
 
     std::unique_ptr<VulkanDevice> device;
+    std::unique_ptr<VulkanRayTracer> rayTracer;
     DriverContext context;
 };
 

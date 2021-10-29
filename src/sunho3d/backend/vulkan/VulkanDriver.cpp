@@ -33,6 +33,7 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
 
 VulkanDriver::VulkanDriver(Window *window) {
     device = std::make_unique<VulkanDevice>(window);
+    rayTracer = std::make_unique<VulkanRayTracer>(*device);
     setupDebugMessenger();
 }
 
@@ -43,7 +44,7 @@ VulkanDriver::~VulkanDriver() {
 InflightHandle VulkanDriver::beginFrame(FenceHandle handle) {
     VulkanFence* fence = handle_cast<VulkanFence>(handle);
     Handle<HwInflight> inflightHandle = alloc_handle<VulkanInflight, HwInflight>();
-    construct_handle<VulkanInflight>(inflightHandle, *device);
+    construct_handle<VulkanInflight>(inflightHandle, *device, *rayTracer);
     auto inflight = handle_cast<VulkanInflight>(inflightHandle);
     context.inflight = inflight;
     inflight->inflightFence = fence->fence;
@@ -66,6 +67,16 @@ void VulkanDriver::endFrame(int) {
     device->graphicsQueue.submit(1, &info, context.inflight->inflightFence);
     device->wsi->endFrame(context.inflight->renderSemaphore);
     device->cache->tick();
+}
+
+void VulkanDriver::bindStorageBuffer(uint32_t binding, Handle<HwBufferObject> handle) {
+        auto& cmd = context.inflight->cmd;
+
+    VulkanBufferObject *sbo = handle_cast<VulkanBufferObject>(handle);
+    context.currentBinding.storageBuffers[binding] = sbo->buffer;
+    context.currentBinding.storageBufferSizes[binding] = sbo->size;
+
+    device->cache->bindDescriptor(cmd, context.currentBinding);
 }
 
 void VulkanDriver::releaseInflight(InflightHandle handle) {
@@ -146,6 +157,11 @@ void VulkanDriver::updateIndexBuffer(IndexBufferHandle handle, BufferDescriptor 
 void VulkanDriver::updateBufferObject(BufferObjectHandle handle, BufferDescriptor data,
                                       uint32_t offset) {
     handle_cast<VulkanBufferObject>(handle)->upload(data);
+}
+
+Extent2D VulkanDriver::getFrameSize(int dummy) {
+    auto e = device->wsi->getExtent();
+    return {e.width, e.height};
 }
 
 void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassParams params) {
@@ -302,6 +318,51 @@ void VulkanDriver::endRenderPass(int dummy) {
     auto& cmd = context.inflight->cmd;
     vkCmdEndRenderPass(cmd);
     context.currentBinding = {};
+}
+
+Handle<HwBLAS> VulkanDriver::createBLAS(int dummy) {
+    Handle<HwBLAS> handle = alloc_handle<VulkanBLAS, HwBLAS>();
+    construct_handle<VulkanBLAS>(handle);
+    return handle;
+}
+
+Handle<HwTLAS> VulkanDriver::createTLAS(int dummy) {
+    Handle<HwTLAS> handle = alloc_handle<VulkanTLAS, HwTLAS>();
+    construct_handle<VulkanTLAS>(handle);
+    return handle;
+}
+
+void VulkanDriver::buildBLAS(Handle<HwBLAS> handle, Handle<HwPrimitive> primitiveHandle) {
+    VulkanBLAS* blas = handle_cast<VulkanBLAS>(handle);
+    VulkanPrimitive* primitive = handle_cast<VulkanPrimitive>(primitiveHandle);
+    rayTracer->buildBLAS(context.inflight->rayFrameContext, blas, primitive);
+}
+
+void VulkanDriver::buildTLAS(Handle<HwTLAS> handle, RTSceneDescriptor descriptor) {
+    VulkanTLAS* tlas = handle_cast<VulkanTLAS>(handle);
+    VulkanRTSceneDescriptor desc = {};
+    for (size_t i = 0; i < descriptor.count; ++i) {
+        VulkanRTInstance instance = {};
+        instance.blas = handle_cast<VulkanBLAS>(descriptor.instances[i].blas);
+        instance.transfom = descriptor.instances[i].transfom;
+        desc.instances.push_back(instance);
+    }
+    rayTracer->buildTLAS(context.inflight->rayFrameContext, tlas, desc);
+}
+
+void VulkanDriver::intersectRays(Handle<HwTLAS> tlasHandle, uint32_t rayCount, Handle<HwBufferObject> raysHandle, Handle<HwBufferObject> hitsHandle) {
+    VulkanTLAS* tlas = handle_cast<VulkanTLAS>(tlasHandle);
+    VulkanBufferObject* rays = handle_cast<VulkanBufferObject>(raysHandle);
+    VulkanBufferObject* hits = handle_cast<VulkanBufferObject>(hitsHandle);
+    rayTracer->intersectRays(context.inflight->rayFrameContext, tlas, rayCount, rays, hits);
+}
+
+void VulkanDriver::destroyBLAS(Handle<HwBLAS> handle) {
+    destruct_handle<VulkanBLAS>(handle);
+}
+
+void VulkanDriver::destroyTLAS(Handle<HwTLAS> handle) {
+    destruct_handle<VulkanTLAS>(handle);
 }
 
 VkBool32 VulkanDriver::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

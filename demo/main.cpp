@@ -3,7 +3,7 @@
 #include <sunho3d/Light.h>
 
 #include <Windows.h>
-#include <filesystem>>
+#include <filesystem>
 
 std::filesystem::path basePath() {
     char path[1024];

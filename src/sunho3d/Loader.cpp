@@ -100,22 +100,33 @@ Entity *Loader::loadObj(const std::string &path) {
         }
 
         Primitive primitive;
-        std::vector<float> v;
-        std::vector<float> vn;
-        std::vector<float> vt;
-        std::vector<uint16_t> indices;
         primitive.material = material;
+        std::vector<float> v;
+        std::vector<float> vt;
+        std::vector<float> vn;
         for (size_t f = 0; f < shapes[s].mesh.indices.size(); ++f) {
-            indices.push_back(f);
+            primitive.indices.push_back(f);
             auto i0 = shapes[s].mesh.indices[f];
-            v.push_back(attrib.vertices[3 * i0.vertex_index]);
-            v.push_back(attrib.vertices[3 * i0.vertex_index + 1]);
-            v.push_back(attrib.vertices[3 * i0.vertex_index + 2]);
-            vt.push_back(attrib.texcoords[2 * i0.texcoord_index]);
-            vt.push_back(attrib.texcoords[2 * i0.texcoord_index + 1]);
-            vn.push_back(attrib.normals[3 * i0.normal_index]);
-            vn.push_back(attrib.normals[3 * i0.normal_index + 1]);
-            vn.push_back(attrib.normals[3 * i0.normal_index + 2]);
+            glm::vec3 pos;
+            pos.x = attrib.vertices[3 * i0.vertex_index];
+            pos.y = attrib.vertices[3 * i0.vertex_index + 1];
+            pos.z = attrib.vertices[3 * i0.vertex_index + 2];
+            v.push_back(pos.x);
+            v.push_back(pos.y);
+            v.push_back(pos.z);
+            glm::vec2 uv;
+            uv.x = attrib.texcoords[2 * i0.texcoord_index];
+            uv.y = attrib.texcoords[2 * i0.texcoord_index + 1];
+            vt.push_back(uv.x);
+            vt.push_back(uv.y);
+            glm::vec3 normal;
+            normal.x = attrib.normals[3 * i0.normal_index];
+            normal.y = attrib.normals[3 * i0.normal_index + 1];
+            normal.z = attrib.normals[3 * i0.normal_index + 2];
+            vn.push_back(normal.x);
+            vn.push_back(normal.y);
+            vn.push_back(normal.z);
+            primitive.vertices.push_back({pos, normal, uv});
         }
         primitive.attibutes[0] = {
             .name = "position",
@@ -134,11 +145,11 @@ Entity *Loader::loadObj(const std::string &path) {
             .stride = 8,
             .type = ElementType::FLOAT2,
         };
-        auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX);
+        auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
         driver.updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);
-        auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX);
+        auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
         driver.updateBufferObject(buffer1, { .data = (uint32_t *)vn.data() }, 0);
-        auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX);
+        auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
         driver.updateBufferObject(buffer2, { .data = (uint32_t *)vt.data() }, 0);
 
         auto vbo = driver.createVertexBuffer(3, v.size() / 3, 3, primitive.attibutes);
@@ -146,8 +157,8 @@ Entity *Loader::loadObj(const std::string &path) {
         driver.setVertexBuffer(vbo, 1, buffer1);
         driver.setVertexBuffer(vbo, 2, buffer2);
 
-        auto ibo = driver.createIndexBuffer(indices.size());
-        driver.updateIndexBuffer(ibo, { .data = (uint32_t *)indices.data() }, 0);
+        auto ibo = driver.createIndexBuffer(primitive.indices.size());
+        driver.updateIndexBuffer(ibo, { .data = (uint32_t *)primitive.indices.data() }, 0);
         primitive.indexBuffer = ibo;
         primitive.vertexBuffer = vbo;
         primitive.hwInstance = driver.createPrimitive(PrimitiveMode::TRIANGLES);

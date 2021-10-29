@@ -4,6 +4,8 @@
 #include <sunho3d/framegraph/shaders/DisplayTextureVert.h>
 #include <sunho3d/framegraph/shaders/ForwardPhongFrag.h>
 #include <sunho3d/framegraph/shaders/ForwardPhongVert.h>
+#include <sunho3d/framegraph/shaders/ForwardRTFrag.h>
+#include <sunho3d/framegraph/shaders/ForwardRTVert.h>
 #include <tiny_gltf.h>
 
 #include "Entity.h"
@@ -50,6 +52,9 @@ Renderer::Renderer(Window* window)
 
     Program prog2(DisplayTextureVert, DisplayTextureVertSize, DisplayTextureFrag, DisplayTextureFragSize);
     blitProgram = driver.createProgram(prog2);
+
+    Program prog3(ForwardRTVert, ForwardRTVertSize, ForwardRTFrag, ForwardRTFragSize);
+    forwardRTProgram = driver.createProgram(prog3);
 
     Primitive primitive;
     std::vector<float> v = {
@@ -254,16 +259,20 @@ void Renderer::rtSuite(Scene* scene) {
     auto tlasRef = renderGraph.declareResource<Handle<HwTLAS>>("TLAS");
     auto hitBufferRef = renderGraph.declareResource<Handle<HwBufferObject>>("Hit Buffer");
     auto renderedRef = renderGraph.declareResource<Handle<HwTexture>>("Rendered texture");
-
-    renderGraph.addRenderPass("build tlas", { }, { tlasRef }, [this, tlasRef, &inflight, &sceneData, &renderGraph](FrameGraph& fg) {
+    auto sceneBufferRef = renderGraph.declareResource<Handle<HwUniformBuffer>>("RT Scene buffer");
+    renderGraph.addRenderPass("build tlas and scene buffer", { }, { tlasRef, sceneBufferRef }, [this, sceneBufferRef, tlasRef, &inflight, &sceneData, &renderGraph](FrameGraph& fg) {
+        ForwardRTSceneBuffer sceneBuffer = {};
+        auto f = driver.getFrameSize();
+        sceneBuffer.frameSize = glm::uvec2(f.width, f.height);
+        sceneBuffer.instanceNum = sceneData.geometries.size();
         for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
             auto& geom = sceneData.geometries[i];
             auto& model = sceneData.worldTransforms[i];
-            Handle<HwBLAS> blas;
-            auto it = this->blasMap.find(geom.primitive);
+            Handle<HwBLAS> blas = driver.createBLAS();
+            auto it = this->blasMap.find(geom.primitive.getId());
             if (it == this->blasMap.end()) {
-                blas = driver.buildBLAS(geom.primitive);
-                this->blasMap.emplace(geom.primitive, blas);
+                driver.buildBLAS(blas, geom.primitive);
+                this->blasMap.emplace(geom.primitive.getId(), blas);
             } else {
                 blas = it->second;
             }
@@ -273,28 +282,50 @@ void Renderer::rtSuite(Scene* scene) {
             t[0] = model[0];
             t[1] = model[1];
             t[2] = model[2];
+            t[3] = model[3];
             instance.transfom = t;
             inflight.instances.push_back(instance); 
+            Instance ginstance = {};
+            ginstance.vertexStart = geom.vertexStart;
+            ginstance.transform = t;
+            sceneBuffer.instances[i] = ginstance;
         }
         RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
-        auto tlas = driver.buildTLAS(desc);
+        auto tlas = driver.createTLAS();
+        driver.buildTLAS(tlas, desc);
         renderGraph.defineResource(tlasRef, tlas);
+
+        auto sb = renderGraph.createUniformBufferSC(sizeof(ForwardRTSceneBuffer));
+        driver.updateUniformBuffer(sb, { (uint32_t*)&sceneBuffer }, 0 );
+        renderGraph.defineResource(sceneBufferRef, sb);
     });
 
-    renderGraph.addRenderPass("intersect", { tlasRef }, { hitBufferRef }, [this, hitBufferRef, tlasRef, &renderGraph](FrameGraph& fg) {
+    renderGraph.addRenderPass("intersect", { tlasRef }, { hitBufferRef }, [this, hitBufferRef, tlasRef, scene, &sceneData, &renderGraph](FrameGraph& fg) {
         Handle<HwTLAS> tlas = fg.getResource<Handle<HwTLAS>>(tlasRef);
         auto f = driver.getFrameSize();
         std::vector<Ray> rays;
         rays.resize(f.width * f.height);
-        auto rayBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(Ray), BufferUsage::TRANSFER_SRC | BufferUsage::STORAGE);
+        for (size_t i = 0; i < f.height; ++i) {
+            for (size_t j = 0; j < f.width; ++j) {
+                Ray& ray = rays[i * f.width + j];
+                auto dir = scene->getCamera().rayDir(glm::vec2(f.width, f.height), glm::vec2(j,i));
+                dir.y *= -1.0f;
+                ray.origin = scene->getCamera().pos();
+                ray.dir = dir;
+                ray.minTime = 0.001f;
+                ray.maxTime = 100000.0f;
+            }
+        }
+        auto rayBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(Ray), BufferUsage::STORAGE);
         driver.updateBufferObject(rayBuffer, { reinterpret_cast<uint32_t*>(rays.data()) }, 0);
         auto hitBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(RayHit), BufferUsage::TRANSFER_DST | BufferUsage::STORAGE);
-        driver.intersectRays(tlas, rayBuffer, hitBuffer);
+        driver.intersectRays(tlas, f.width * f.height, rayBuffer, hitBuffer);
         renderGraph.defineResource(hitBufferRef, hitBuffer);
     });
 
-    renderGraph.addRenderPass("render", { hitBufferRef }, { renderedRef }, [this, renderedRef, hitBufferRef, &renderGraph](FrameGraph& fg) {
+    renderGraph.addRenderPass("render", { hitBufferRef, sceneBufferRef }, { renderedRef }, [this, &sceneData, renderedRef, sceneBufferRef, hitBufferRef, &renderGraph](FrameGraph& fg) {
         Handle<HwBufferObject> hitBuffer = fg.getResource<Handle<HwBufferObject>>(hitBufferRef);
+        Handle<HwUniformBuffer> sceneBuffer = fg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
         auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
         ColorAttachment att = {};
         att.colors[0] = {
@@ -303,11 +334,15 @@ void Renderer::rtSuite(Scene* scene) {
         att.targetNum = 1;
         auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ });
         driver.beginRenderPass(renderTarget, {});
-        driver.bindStorageBuffer(0, hitBuffer);
+        //driver.bindStorageBuffer(0, sceneData.globalVertexBuffer);
+        driver.bindStorageBuffer(1, hitBuffer);
+        driver.bindUniformBuffer(0, sceneBuffer);
         
         PipelineState pipe = {};
-        pipe.program = this->rayRenderProgram;
+        pipe.program = this->forwardRTProgram;
         driver.draw(pipe, this->quadPrimitive);
+        driver.endRenderPass();
+        renderGraph.defineResource(renderedRef, color);
 
     });
 
@@ -322,4 +357,6 @@ void Renderer::rtSuite(Scene* scene) {
         driver.draw(pipe, this->quadPrimitive);
         driver.endRenderPass();
     });
+    renderGraph.submit();
+    driver.endFrame();
 }

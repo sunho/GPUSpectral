@@ -93,6 +93,7 @@ class Renderer : public IdResource {
     Handle<HwUniformBuffer> createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model);
 
     Handle<HwProgram> fowradPassProgram;
+    Handle<HwProgram> forwardRTProgram;
     Handle<HwProgram> quadDrawProgram;
     Handle<HwProgram> blitProgram;
     Handle<HwRenderTarget> surfaceRenderTarget;
@@ -100,7 +101,7 @@ class Renderer : public IdResource {
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
     
-    std::unordered_map< Handle<HwPrimitive>, Handle<HwBLAS> > blasMap;
+    std::unordered_map<uint32_t, Handle<HwBLAS> > blasMap;
     VulkanDriver driver;
     Window* window;
 

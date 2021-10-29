@@ -81,6 +81,8 @@ struct VulkanDescriptor {
     std::array<VkBuffer, UBUFFER_BINDING_COUNT> uniformBuffers;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
     std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
+    std::array<VkBuffer, STORAGE_BINDING_COUNT> storageBuffers;
+    std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> storageBufferSizes;
 
     bool operator==(const VulkanDescriptor &other) const = default;
 };
@@ -98,13 +100,13 @@ class VulkanPipelineCache {
 
   private:
     struct PipelineLayout {
-		std::array<VkDescriptorSetLayout, 3> descriptorSetLayout;
+		std::array<VkDescriptorSetLayout, 4> descriptorSetLayout;
 		vk::PipelineLayout pipelineLayout;
     };
 
     void setupLayouts(VulkanPipelineCache::PipelineLayout& layout, bool compute);
     void getOrCreateDescriptors(const VulkanDescriptor &key,
-                                std::array<VkDescriptorSet, 3> &descripotrs);
+                                std::array<VkDescriptorSet, 4> &descripotrs);
 
 
     struct VulkanPipelineKeyHasher
@@ -132,7 +134,7 @@ class VulkanPipelineCache {
     GCPool<VulkanPipelineKey, VkPipeline, VulkanPipelineKeyHasher> pipelines;
     GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, FrameBufferKeyHasher> framebuffers;
     GCPool<VulkanAttachments, VkRenderPass, RenderPassKeyHasher> renderpasses;
-    GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 3>, DescriptorKeyHasher> descriptorSets;
+    GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 4>, DescriptorKeyHasher> descriptorSets;
 	VkDescriptorPool descriptorPool;
 
     std::unique_ptr<VulkanTexture> dummyImage;

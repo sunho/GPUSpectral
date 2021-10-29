@@ -1,18 +1,21 @@
 #pragma once
 
 #include <vector>
+#include <unordered_map>
 
 #include "Camera.h"
 #include "Entity.h"
 #include "Light.h"
 #include "utils/ResourceList.h"
+#include <sunho3d/backend/DriverBase.h>
 
 namespace sunho3d {
 class Entity;
-
+class VulkanDriver;
 struct Geometry {
     Material* material;
     Handle<HwPrimitive> primitive;
+    uint32_t vertexStart;
 };
 
 struct LightData {
@@ -30,6 +33,21 @@ struct TransformBuffer {
 
 static constexpr const size_t MAX_LIGHTS = 64;
 
+struct Instance {
+    glm::mat4x3 transform;
+    uint32_t vertexStart;
+    glm::vec3 pad;
+};
+
+static constexpr const size_t MAX_INSTANCES = 64;
+
+struct ForwardRTSceneBuffer {
+    glm::uvec2 frameSize;
+    uint32_t instanceNum;
+    uint32_t pad;
+    std::array<Instance, MAX_INSTANCES> instances;
+};
+
 struct LightBuffer {
     std::array<LightData, MAX_LIGHTS> lights;
     std::array<glm::mat4, MAX_LIGHTS> lightVP;
@@ -41,9 +59,32 @@ struct SceneData {
     std::vector<glm::mat4> worldTransforms;
     std::vector<Geometry> geometries;
     LightBuffer lightBuffer;
+    Handle<HwBufferObject> globalVertexBuffer;
 };
 
 class Renderer;
+class Scene;
+
+class GVetexBufferContainer {
+public:
+    GVetexBufferContainer(VulkanDriver& driver);
+    ~GVetexBufferContainer();
+
+    uint32_t getVertexStart(const Primitive& primitive);
+    void registerPrimitiveIfNeccesary(const Primitive& primitive);
+
+    Handle<HwBufferObject> getGPUBuffer() const;
+private:
+    void growBuffer();
+    void uploadBuffer();
+
+    std::unordered_map<uint32_t, uint32_t> vertexStarts;
+    Handle<HwBufferObject> gpuBuffer;
+    std::vector<Vertex> buffer;
+    size_t currentSize{};
+    size_t maxSize{256};
+    VulkanDriver& driver;
+};
 
 class Scene : public IdResource {
   public:
@@ -66,6 +107,8 @@ class Scene : public IdResource {
     Camera camera;
     SceneData sceneData;
     Renderer* renderer;
+    GVetexBufferContainer globalVertexBufferContainer; 
+
 };
 
 }  // namespace sunho3d

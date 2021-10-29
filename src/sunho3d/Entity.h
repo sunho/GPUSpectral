@@ -3,6 +3,7 @@
 #include <sunho3d/backend/DriverBase.h>
 #include <sunho3d/backend/DriverTypes.h>
 #include <sunho3d/backend/Handles.h>
+#include <list>
 
 #include <string>
 #include <vector>
@@ -12,9 +13,18 @@
 #include "utils/ResourceList.h"
 
 namespace sunho3d {
+
+struct Vertex {
+    glm::vec3 pos;
+    glm::vec3 normal;
+    glm::vec2 uv;
+};
+
 struct Primitive {
     Handle<HwIndexBuffer> indexBuffer;
     Handle<HwVertexBuffer> vertexBuffer;
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
     AttributeArray attibutes;
     uint32_t elementCount;
     uint32_t attributeCount;
@@ -33,7 +43,7 @@ class Entity : public IdResource {
     const std::vector<Entity *> &getNodes() {
         return nodes;
     }
-    const std::vector<Primitive> &getPrimitives() {
+    const std::list<Primitive> &getPrimitives() {
         return primitives;
     }
 
@@ -47,7 +57,7 @@ class Entity : public IdResource {
   private:
     Transform transform;
     std::vector<Entity *> nodes;
-    std::vector<Primitive> primitives;
+    std::list<Primitive> primitives;
 };
 
 }  // namespace sunho3d

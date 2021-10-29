@@ -21,7 +21,7 @@
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 [submodule "external/RadeonRays"]
 	path = external/RadeonRays
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/RadeonRays_SDK.git
+url=git@github.com:sunho/RadeonRays_SDK.git
 [submodule "external/spdlog"]
 	path = external/spdlog
 	url = https://github.com/gabime/spdlog.git
