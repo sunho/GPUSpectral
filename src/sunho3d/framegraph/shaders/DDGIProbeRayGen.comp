@@ -1,0 +1,35 @@
+#version 450
+
+#define RAYS_PER_PROBE 64
+
+layout (local_size_x = 64) in;
+#extension GL_GOOGLE_include_directive : require
+
+#include "common.glsl"
+
+#include "probe.glsl"
+
+layout(std140, binding = 0) uniform SceneBuffer {
+    uvec2 frameSize;
+    uint instanceNum;
+    Instance instances[MAX_INSTANCES];
+    uvec3 gridNum;
+    vec3 sceneSize;
+} sceneBuffer;
+
+layout( push_constant ) uniform PushConstants {
+    uint globalRngState;
+} constants;
+
+layout(std140, set=3, binding = 0) buffer RayBuffer {
+    Ray rays[];
+} rayBuffer;
+
+void main() {
+    uint gID = gl_GlobalInvocationID.x;
+    uint probeID = gID / RAYS_PER_PROBE;
+    uint rayID = gID % RAYS_PER_PROBE;
+    vec3 pos = probeIDToPos(probeID, sceneBuffer.gridNum, sceneBuffer.sceneSize);
+    rngState = pcgHash(constants.globalRngState + gID);
+    rayBuffer.rays[gID] = Ray(pos, 0.001, randDirSphere(), 10000.0);
+}

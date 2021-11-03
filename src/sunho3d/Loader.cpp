@@ -126,7 +126,7 @@ Entity *Loader::loadObj(const std::string &path) {
             vn.push_back(normal.x);
             vn.push_back(normal.y);
             vn.push_back(normal.z);
-            primitive.vertices.push_back({pos, normal, uv});
+            primitive.vertices.push_back({.pos = pos, .normal = normal, .uv = uv});
         }
         primitive.attibutes[0] = {
             .name = "position",

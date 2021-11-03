@@ -15,8 +15,8 @@ struct RayHit {
 };
 
 struct Instance {
-    mat4x3 transform;
-    uint vertexStart;
+    mat4 transform;
+    int vertexStart;
 };
 
 layout(std140, binding = 0) uniform SceneBuffer {
@@ -42,6 +42,15 @@ void main() {
     if (hit.instId == 0xFFFFFFFF) {
         outColor = vec4(1.0,0.0,0.0,1.0);
     } else {
-        outColor = vec4(hit.bary,1.0-(hit.bary.x+hit.bary.y), 1.0);
+        Instance instance = sceneBuffer.instances[hit.instId];
+        Vertex v0 = vertexBuffer.vertices[instance.vertexStart + hit.primId * 3];
+        Vertex v1 = vertexBuffer.vertices[instance.vertexStart + hit.primId * 3 + 1];
+        Vertex v2 = vertexBuffer.vertices[instance.vertexStart + hit.primId * 3 + 2];
+        vec3 n0 = vec3(instance.transform * vec4(v0.normal, 0.0));
+        vec3 n1 = vec3(instance.transform * vec4(v1.normal, 0.0));
+        vec3 n2 = vec3(instance.transform * vec4(v2.normal, 0.0));
+        vec3 bary = vec3(hit.bary,1.0-(hit.bary.x+hit.bary.y));
+        vec3 nor = normalize(bary.x * n1 + bary.y * n2 + bary.z * n0);
+        outColor = vec4(nor, 1.0);
     }
 }

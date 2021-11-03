@@ -34,9 +34,9 @@ struct TransformBuffer {
 static constexpr const size_t MAX_LIGHTS = 64;
 
 struct Instance {
-    glm::mat4x3 transform;
+    glm::mat4 transform;
     uint32_t vertexStart;
-    glm::vec3 pad;
+    float pad[3];
 };
 
 static constexpr const size_t MAX_INSTANCES = 64;

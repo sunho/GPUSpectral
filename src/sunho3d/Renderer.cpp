@@ -287,7 +287,7 @@ void Renderer::rtSuite(Scene* scene) {
             inflight.instances.push_back(instance); 
             Instance ginstance = {};
             ginstance.vertexStart = geom.vertexStart;
-            ginstance.transform = t;
+            ginstance.transform = model;
             sceneBuffer.instances[i] = ginstance;
         }
         RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
@@ -334,7 +334,7 @@ void Renderer::rtSuite(Scene* scene) {
         att.targetNum = 1;
         auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ });
         driver.beginRenderPass(renderTarget, {});
-        //driver.bindStorageBuffer(0, sceneData.globalVertexBuffer);
+        driver.bindStorageBuffer(0, sceneData.globalVertexBuffer);
         driver.bindStorageBuffer(1, hitBuffer);
         driver.bindUniformBuffer(0, sceneBuffer);
         
@@ -357,6 +357,60 @@ void Renderer::rtSuite(Scene* scene) {
         driver.draw(pipe, this->quadPrimitive);
         driver.endRenderPass();
     });
+    renderGraph.submit();
+    driver.endFrame();
+}
+
+void Renderer::ddigSuite(Scene* scene) {
+    InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
+    driver.waitFence(inflight.fence);
+    if (inflight.handle) {
+        driver.releaseInflight(inflight.handle);
+    }
+    Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
+    inflight.handle = handle;
+
+    RenderGraph& renderGraph = *inflight.rg;
+    renderGraph.reset();
+
+    scene->prepare();
+    SceneData& sceneData = scene->getSceneData();
+    // 1. Generate random rays at selected probe
+    // 2. For each octahedron dirs:
+    //  newIrradiance[texDir] = lerp(oldIrradiance[texDir], sum(max(0,dot(texDir,rayDir)*rayRadiance)), hysteresis)
+    //  newDistance[probe] = lerp(oldDistance[probe], mean(rayDistance), hysteresis) 
+    // 3. Shade based on probes
+    //  trilinear interpolation
+    //  + weight based on distance
+    // vec2 temp = texture(L.meanDistProbeGrid, vec3(octDir, p)).rg;
+    // float mean = temp.x;
+    // float variance = abs(temp.y - (mean * mean));
+
+    // float t_sub_mean = distToProbe - mean;
+    // float chebychev = variance / (variance + (t_sub_mean * t_sub_mean));
+    // weight *= ((distToProbe <= mean) ? 1.0 : max(chebychev, 0.0));
+    // Avoid zero weight
+    //weight = max(0.0002, weight);
+
+
+    // n rays per probe
+    // m probe
+    // 16 * 8 * 16
+    // 32
+    // Prepare probe update rays
+    
+
+    // First pass: shadow map for direct lighting (raster)
+
+    // Second pass: probe ray tracing (rt backend)
+    
+    // Third pass: probe ray shading (compute)
+
+    // Third pass: probe update (compute)
+
+    // Fourth pass: shading (raster)
+    
+
     renderGraph.submit();
     driver.endFrame();
 }

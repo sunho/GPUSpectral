@@ -30,6 +30,12 @@ set(SOURCE_LIST
     framegraph/shaders/DisplayTexture.vert
     framegraph/shaders/ForwardRT.frag
     framegraph/shaders/ForwardRT.vert
+    framegraph/shaders/common.glsl
+    framegraph/shaders/DDGIProbeRayGen.comp
+    framegraph/shaders/DDGIProbeRayShade.comp
+    framegraph/shaders/DDGIProbeUpdate.comp
+    framegraph/shaders/DDGIShade.vert
+    framegraph/shaders/DDGIShade.frag
     framegraph/FrameGraph.h
     framegraph/FrameGraph.cpp
     framegraph/RenderPass.h
@@ -108,3 +114,9 @@ add_shader(sunho3d DisplayTextureFrag DisplayTexture.frag)
 
 add_shader(sunho3d ForwardRTVert ForwardRT.vert)
 add_shader(sunho3d ForwardRTFrag ForwardRT.frag)
+
+add_shader(sunho3d DDGIProbeRayGen DDGIProbeRayGen.comp)
+add_shader(sunho3d DDGIProbeRayShade DDGIProbeRayShade.comp)
+add_shader(sunho3d DDGIProbeUpdate DDGIProbeUpdate.comp)
+add_shader(sunho3d DDGIShadeVert DDGIShade.vert)
+add_shader(sunho3d DDGIShadeFrag DDGIShade.frag)

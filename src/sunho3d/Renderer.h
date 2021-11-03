@@ -71,7 +71,20 @@ struct InflightData {
     Handle<HwFence> fence;
     Handle<HwInflight> handle{};
     std::unique_ptr<RenderGraph> rg;
+
     std::vector<RTInstance> instances;
+
+    //ddgi
+
+};
+
+struct DDGIPassContext {
+    Handle<HwTexture> probeIrradiance;
+    Handle<HwTexture> probeMeanDistance;
+    int gridSize{ 32 };
+    float sceneSize;
+    float hysteresis{ 0.75 };
+    
 };
 
 constexpr static size_t MAX_INFLIGHTS = 2; 
@@ -89,6 +102,7 @@ class Renderer : public IdResource {
   private:
     void rasterSuite(Scene* scene);
     void rtSuite(Scene* scene);
+    void ddigSuite(Scene* scene);
 
     Handle<HwUniformBuffer> createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model);
 
@@ -102,6 +116,9 @@ class Renderer : public IdResource {
     std::array<InflightData, MAX_INFLIGHTS> inflights;
     
     std::unordered_map<uint32_t, Handle<HwBLAS> > blasMap;
+
+    DDGIPassContext ddgiContext;
+
     VulkanDriver driver;
     Window* window;
 

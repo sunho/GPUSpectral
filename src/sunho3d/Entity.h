@@ -16,8 +16,11 @@ namespace sunho3d {
 
 struct Vertex {
     glm::vec3 pos;
+    float _pad0;
     glm::vec3 normal;
+    float _pad1;
     glm::vec2 uv;
+    glm::vec2 _pad2;
 };
 
 struct Primitive {
