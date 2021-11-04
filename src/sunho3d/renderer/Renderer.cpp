@@ -6,6 +6,11 @@
 #include <sunho3d/renderer/shaders/ForwardPhongVert.h>
 #include <sunho3d/renderer/shaders/ForwardRTFrag.h>
 #include <sunho3d/renderer/shaders/ForwardRTVert.h>
+#include <sunho3d/renderer/shaders/DDGIProbeRayGen.h>
+#include <sunho3d/renderer/shaders/DDGIProbeRayShade.h>
+#include <sunho3d/renderer/shaders/DDGIProbeUpdate.h>
+#include <sunho3d/renderer/shaders/DDGIShadeVert.h>
+#include <sunho3d/renderer/shaders/DDGIShadeFrag.h>
 #include <tiny_gltf.h>
 
 #include "../Entity.h"
@@ -20,27 +25,6 @@ Renderer::Renderer(Window* window)
         inflights[i].fence = driver.createFence();
         inflights[i].rg = std::make_unique<FrameGraph>(*this);
     }
-
-    Program prog(ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag,ForwardPhongFragSize);
-    prog.parameterLayout
-        .addUniformBuffer(0, 0)
-        .addUniformBuffer(0, 2)
-        .addUniformBuffer(0, 2)
-        .addTexture(1, 0)
-        .addTexture(1, 1);
-    fowradPassProgram = driver.createProgram(prog);
-
-    Program prog2(DisplayTextureVert, DisplayTextureVertSize, DisplayTextureFrag, DisplayTextureFragSize);
-    prog2.parameterLayout
-        .addTexture(1, 0);
-    blitProgram = driver.createProgram(prog2);
-
-    Program prog3(ForwardRTVert, ForwardRTVertSize, ForwardRTFrag, ForwardRTFragSize);
-    prog3.parameterLayout
-        .addStorageBuffer(2, 0)
-        .addStorageBuffer(2, 1)
-        .addUniformBuffer(0, 0);
-    forwardRTProgram = driver.createProgram(prog3);
 
     Primitive primitive;
     std::vector<float> v = {
@@ -57,7 +41,7 @@ Renderer::Renderer(Window* window)
         -1,
         -1,
     };
-    std::vector<uint16_t> indices = { 0, 1, 2, 3, 4, 5 };
+    std::vector<uint32_t> indices = { 0, 1, 2, 3, 4, 5 };
     primitive.attibutes[0] = {
         .name = "position",
         .index = 0,
@@ -78,6 +62,33 @@ Renderer::Renderer(Window* window)
     driver.setPrimitiveBuffer(quadPrimitive, vbo, ibo);
 
     surfaceRenderTarget = driver.createDefaultRenderTarget();
+    
+    registerPrograms();
+}
+
+void Renderer::registerPrograms() {
+    Program prog = { ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag, ForwardPhongFragSize };
+    prog.parameterLayout
+        .addUniformBuffer(0, 0)
+        .addUniformBuffer(0, 2)
+        .addUniformBuffer(0, 2)
+        .addTexture(1, 0)
+        .addTexture(1, 1);
+    fowradPassProgram = driver.createProgram(prog);
+
+    prog = { DisplayTextureVert, DisplayTextureVertSize, DisplayTextureFrag, DisplayTextureFragSize };
+    prog.parameterLayout
+        .addTexture(1, 0);
+    blitProgram = driver.createProgram(prog);
+
+    prog = { ForwardRTVert, ForwardRTVertSize, ForwardRTFrag, ForwardRTFragSize };
+    prog.parameterLayout
+        .addStorageBuffer(2, 0)
+        .addStorageBuffer(2, 1)
+        .addUniformBuffer(0, 0);
+    forwardRTProgram = driver.createProgram(prog);
+
+    prog = { DDGIProbeRayGen, DDGIProbeRayGenSize };
 }
 
 Renderer::~Renderer() {

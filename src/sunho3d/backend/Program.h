@@ -81,14 +81,14 @@ struct ProgramParameter {
 };
 
 struct Program {
-    explicit Program(const char* vertCode, size_t vertSize, const char* fragCode, size_t fragSize)
+    Program(const char* vertCode, size_t vertSize, const char* fragCode, size_t fragSize)
         : type(ProgramType::PIPELINE) {
         codes[0] = std::vector(vertCode, vertCode + vertSize);
 		codes[1] = std::vector(fragCode, fragCode + fragSize);
         _hash = hashBuffer<char>(codes[0].data(), codes[0].size()) ^ hashBuffer<char>(codes[1].data(), codes[1].size());
     }
 
-    explicit Program(const char* compCode, size_t compSize)
+    Program(const char* compCode, size_t compSize)
         : type(ProgramType::COMPUTE) {
         codes[0] = std::vector(compCode, compCode + compSize);
         _hash = hashBuffer<char>(codes[0].data(), codes[0].size());

@@ -51,7 +51,6 @@ struct VulkanInflight : public HwInflight {
 struct DriverContext { 
     vk::RenderPass currentRenderPass{};
     Viewport viewport{};
-    VulkanPipeline currentPipeline{};
     VulkanInflight* inflight{};
 };
 
@@ -72,15 +71,7 @@ class VulkanDriver {
 
 #undef DECL_VOIDCOMMAND
 #undef DECL_COMMAND
-  template <typename Dp, typename B>
-    Dp *handle_cast(Handle<B> handle) noexcept {
-        if (!handle)
-            return nullptr;
-        auto iter = handles.find(handle.getId());
-        assert(iter != handles.end());
-        HandleData &data = iter->second;
-        return reinterpret_cast<Dp *>(data.data());
-    }
+
 
   private:
     void setupDebugMessenger();
@@ -99,7 +90,7 @@ class VulkanDriver {
         handles[nextId] = HandleData(sizeof(Dp));
         return Handle<B>(nextId++);
     }
-/*
+
     template <typename Dp, typename B>
     Dp *handle_cast(Handle<B> handle) noexcept {
         if (!handle)
@@ -109,7 +100,7 @@ class VulkanDriver {
         HandleData &data = iter->second;
         return reinterpret_cast<Dp *>(data.data());
     }
-*/
+
     template <typename Dp, typename B>
     const Dp *handle_const_cast(const Handle<B> &handle) noexcept {
         if (!handle)

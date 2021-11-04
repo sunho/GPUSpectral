@@ -74,6 +74,7 @@ class Renderer : public IdResource {
     void run(Scene* scene);
 
   private:
+    void registerPrograms();
     void rasterSuite(Scene* scene);
     void rtSuite(Scene* scene);
     void ddgiSuite(Scene* scene);
@@ -82,8 +83,9 @@ class Renderer : public IdResource {
 
     Handle<HwProgram> fowradPassProgram;
     Handle<HwProgram> forwardRTProgram;
-    Handle<HwProgram> quadDrawProgram;
     Handle<HwProgram> blitProgram;
+    Handle<HwProgram> ddgiProbeRayGenProgram;
+
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
 

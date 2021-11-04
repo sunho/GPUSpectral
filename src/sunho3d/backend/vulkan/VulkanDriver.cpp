@@ -225,8 +225,8 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     auto& cmd = context.inflight->cmd;
 
     const uint32_t bufferCount = prim->vertex->attributeCount;
-    VkBuffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
-    VkDeviceSize offsets[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
+    vk::Buffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
+    vk::DeviceSize offsets[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
 
     for (uint32_t i = 0; i < bufferCount; ++i) {
         Attribute attrib = prim->vertex->attributes[i];
@@ -245,20 +245,26 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         .depthTest = pipeline.depthTest
     };
 
-    VkPipeline pl = device->cache->getOrCreateGraphicsPipeline(state);
+    VulkanPipeline vkpipe = device->cache->getOrCreateGraphicsPipeline(state);
     device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl);
-    vkCmdBindVertexBuffers(cmd, 0, bufferCount, buffers, offsets);
-    vkCmdBindIndexBuffer(cmd, prim->index->buffer->buffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(cmd, prim->index->count, 1, 0, 0, 0);
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkpipe.pipeline);
+    if (!pipeline.pushConstants.empty()) {
+        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eAll, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data()); 
+    } 
+    cmd.bindVertexBuffers(0, bufferCount, buffers, offsets);
+    cmd.bindIndexBuffer(prim->index->buffer->buffer, 0, vk::IndexType::eUint32);
+    cmd.drawIndexed(prim->index->count, 1, 0, 0, 0);
 }
 
 void VulkanDriver::dispatch(PipelineState pipeline, size_t groupCountX, size_t groupCountY, size_t groupCountZ) {
     auto& cmd = context.inflight->cmd;
     VulkanProgram* program = handle_cast<VulkanProgram>(pipeline.program);
-    VkPipeline pl = device->cache->getOrCreateComputePipeline(*program);
+    VulkanPipeline vkpipe = device->cache->getOrCreateComputePipeline(*program);
     device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
-    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pl);
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, vkpipe.pipeline);
+    if (!pipeline.pushConstants.empty()) {
+        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eAll, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data());
+    }
     cmd.dispatch(groupCountX, groupCountY, groupCountZ);
 }
 

@@ -117,11 +117,16 @@ class VulkanDescriptorAllocator {
     std::vector<vk::DescriptorPool> freePools;
 };
 
+struct VulkanPipeline {
+    vk::Pipeline pipeline;
+    vk::PipelineLayout layout;
+};
+
 class VulkanPipelineCache {
   public:
     VulkanPipelineCache(VulkanDevice &device);
-    VkPipeline getOrCreateGraphicsPipeline(const VulkanPipelineState &state);
-    VkPipeline getOrCreateComputePipeline(const VulkanProgram &program);
+    VulkanPipeline getOrCreateGraphicsPipeline(const VulkanPipelineState &state);
+    VulkanPipeline getOrCreateComputePipeline(const VulkanProgram &program);
 
     vk::Framebuffer getOrCreateFrameBuffer(vk::RenderPass renderPass,
                                          VulkanSwapChain swapchain, 
