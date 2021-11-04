@@ -1,324 +1,220 @@
 #include "VulkanPipelineCache.h"
 #include <iostream>
 
+void VulkanDescriptorAllocator::init(vk::Device newDevice) {
+    device = newDevice;
+}
+
+void VulkanDescriptorAllocator::cleanup() {
+    for (auto p : freePools) {
+        vkDestroyDescriptorPool(device, p, nullptr);
+    }
+    for (auto p : usedPools) {
+        vkDestroyDescriptorPool(device, p, nullptr);
+    }
+}
+
+vk::DescriptorPool createPool(vk::Device device, const VulkanDescriptorAllocator::PoolSizes &poolSizes, int count, vk::DescriptorPoolCreateFlags flags) {
+    std::vector<vk::DescriptorPoolSize> sizes;
+    sizes.reserve(poolSizes.sizes.size());
+    for (auto sz : poolSizes.sizes) {
+        sizes.push_back({ sz.first, uint32_t(sz.second * count) });
+    }
+    vk::DescriptorPoolCreateInfo pi = {};
+    pi.flags = flags;
+    pi.maxSets = count;
+    pi.poolSizeCount = (uint32_t)sizes.size();
+    pi.pPoolSizes = sizes.data();
+
+    return device.createDescriptorPool(pi, nullptr);
+}
+
+vk::DescriptorPool VulkanDescriptorAllocator::grabPool() {
+    if (freePools.size() > 0) {
+        VkDescriptorPool pool = freePools.back();
+        freePools.pop_back();
+        return pool;
+    } else {
+        return createPool(device, descriptorSizes, 1024, {});
+    }
+}
+
+vk::DescriptorSet VulkanDescriptorAllocator::allocate(vk::DescriptorSetLayout layout) {
+    if (!currentPool) {
+        currentPool = grabPool();
+        usedPools.push_back(currentPool);
+    }
+
+    vk::DescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.pSetLayouts = &layout;
+    allocInfo.descriptorPool = currentPool;
+    allocInfo.descriptorSetCount = 1;
+
+    //try to allocate the descriptor set
+    vk::DescriptorSet descriptorSet;
+    vk::Result res = device.allocateDescriptorSets(&allocInfo, &descriptorSet);
+    switch (res) {
+        case vk::Result::eSuccess:
+            //all good, return
+            return descriptorSet;
+        case vk::Result::eErrorFragmentedPool:
+        case vk::Result::eErrorOutOfPoolMemory:
+            break;
+        default:
+            throw std::runtime_error("pool allocation error");
+    }
+    //allocate a new pool and retry
+    currentPool = grabPool();
+    usedPools.push_back(currentPool);
+    res = device.allocateDescriptorSets(&allocInfo, &descriptorSet);
+    if (res != vk::Result::eSuccess) {
+        throw std::runtime_error("pool allocation error");
+    }
+    return descriptorSet;
+}
+
+void VulkanDescriptorAllocator::resetPools() {
+    //reset all used pools and add them to the free pools
+    for (auto p : usedPools) {
+        device.resetDescriptorPool(p);
+        freePools.push_back(p);
+    }
+
+    //clear the used pools, since we've put them all in the free pools
+    usedPools.clear();
+
+    //reset the current pool handle back to null
+    currentPool = nullptr;
+}
+
 
 VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) {
-    dummyImage = std::make_unique<VulkanTexture>(device, SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::INPUT_ATTACHMENT, 1, TextureFormat::RGBA8, 1,1);
-    
-    VkBufferCreateInfo bufferInfo{
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = 16,
-        .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-    };
-    dummyBuffer = new VulkanBufferObject(device, 16, BufferUsage::UNIFORM | BufferUsage::STORAGE);
-    dummyBufferInfo.buffer = dummyBuffer->buffer;
-    dummyBufferInfo.range = bufferInfo.size;
-
-    dummyBufferWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    dummyBufferWriteInfo.pNext = nullptr;
-    dummyBufferWriteInfo.dstArrayElement = 0;
-    dummyBufferWriteInfo.descriptorCount = 1;
-    dummyBufferWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    dummyBufferWriteInfo.pImageInfo = nullptr;
-    dummyBufferWriteInfo.pBufferInfo = &dummyBufferInfo;
-    dummyBufferWriteInfo.pTexelBufferView = nullptr;
-
-    dummySamplerInfo.imageView = dummyImage->view;
-    dummySamplerInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    VkSamplerCreateInfo samplerInfo{ .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                                        .magFilter = VK_FILTER_NEAREST,
-                                        .minFilter = VK_FILTER_NEAREST,
-                                        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-                                        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                        .anisotropyEnable = VK_FALSE,
-                                        .maxAnisotropy = 1,
-                                        .compareEnable = VK_FALSE,
-                                        .compareOp = VK_COMPARE_OP_ALWAYS,
-                                        .minLod = 0.0f,
-                                        .maxLod = 1.0f,
-                                        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-                                        .unnormalizedCoordinates = VK_FALSE };
-    vkCreateSampler(device.device, &samplerInfo, nullptr, &dummySamplerInfo.sampler);
-
-    dummySamplerWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    dummySamplerWriteInfo.pNext = nullptr;
-    dummySamplerWriteInfo.dstArrayElement = 0;
-    dummySamplerWriteInfo.descriptorCount = 1;
-    dummySamplerWriteInfo.pImageInfo = &dummySamplerInfo;
-    dummySamplerWriteInfo.pBufferInfo = nullptr;
-    dummySamplerWriteInfo.pTexelBufferView = nullptr;
-    dummySamplerWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-   
-    dummyTargetInfo.imageView = dummyImage->view;
-    dummyTargetInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    dummyTargetWriteInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    dummyTargetWriteInfo.pNext = nullptr;
-    dummyTargetWriteInfo.dstArrayElement = 0;
-    dummyTargetWriteInfo.descriptorCount = 1;
-    dummyTargetWriteInfo.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    dummyTargetWriteInfo.pImageInfo = &dummyTargetInfo;
-    dummyTargetWriteInfo.pBufferInfo = nullptr;
-    dummyTargetWriteInfo.pTexelBufferView = nullptr;
-    setupLayouts(graphicsLayout, false);
-
-    
     pipelines.setDestroyer([=](VkPipeline pipeline) {
         vkDestroyPipeline(this->device.device, pipeline, nullptr);
     });
     framebuffers.setDestroyer([=](VkFramebuffer framebuffer) {
         vkDestroyFramebuffer(this->device.device, framebuffer, nullptr);
     });
-    descriptorSets.setDestroyer([=](std::array<VkDescriptorSet, 4> descriptors) {
-        vkFreeDescriptorSets(this->device.device, descriptorPool, 4, descriptors.data());
-    });
     renderpasses.setDestroyer([=](VkRenderPass renderPass) {
         vkDestroyRenderPass(this->device.device, renderPass, nullptr);
     });
+    for (auto& alloc : descriptorAllocators) {
+        alloc.init(device.device);
+    }
 }
 
 void VulkanPipelineCache::tick() {
     pipelines.tick();
     framebuffers.tick();
-    descriptorSets.tick();
     renderpasses.tick();
+    ++currentFrame;
+    descriptorAllocators[currentFrame % 3].resetPools();
 }
 
-void VulkanPipelineCache::setupLayouts(PipelineLayout& layout, bool compute) {
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-
-    pipelineLayoutInfo.pushConstantRangeCount = 0;     // Optional
-    pipelineLayoutInfo.pPushConstantRanges = nullptr;  // Optional
-
-    VkDescriptorSetLayoutBinding binding = {};
-    binding.descriptorCount = 1;
-    binding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
-
-    std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::UBUFFER_BINDING_COUNT> ubindings;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    for (uint32_t i = 0; i < VulkanDescriptor::UBUFFER_BINDING_COUNT; i++) {
-        binding.binding = i;
-        ubindings[i] = binding;
-    }
-    VkDescriptorSetLayoutCreateInfo dlinfo = {};
-    dlinfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    dlinfo.bindingCount = ubindings.size();
-    dlinfo.pBindings = ubindings.data();
-    vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[0]);
-
-    std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::SAMPLER_BINDING_COUNT> sbindings;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    for (uint32_t i = 0; i < VulkanDescriptor::SAMPLER_BINDING_COUNT; i++) {
-        binding.binding = i;
-        sbindings[i] = binding;
-    }
-    dlinfo.bindingCount = sbindings.size();
-    dlinfo.pBindings = sbindings.data();
-    vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[1]);
-    
-    if (compute) {
-        std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        for (uint32_t i = 0; i < VulkanDescriptor::TARGET_BINDING_COUNT; i++) {
-            binding.binding = i;
-            bindings[i] = binding;
-        }
-        dlinfo.bindingCount = bindings.size();
-        dlinfo.pBindings = bindings.data();
-        vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
-    } else {
-        std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::STORAGE_BINDING_COUNT> bindings2;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        for (uint32_t i = 0; i < VulkanDescriptor::STORAGE_BINDING_COUNT; i++) {
-            binding.binding = i;
-            bindings2[i] = binding;
-        }
-        dlinfo.bindingCount = bindings2.size();
-        dlinfo.pBindings = bindings2.data();
-        vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[3]);
-
-        std::array<VkDescriptorSetLayoutBinding, VulkanDescriptor::TARGET_BINDING_COUNT> bindings;
-        binding.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-        binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        for (uint32_t i = 0; i < VulkanDescriptor::TARGET_BINDING_COUNT; i++) {
-            binding.binding = i;
-            bindings[i] = binding;
-        }
-        dlinfo.bindingCount = bindings.size();
-        dlinfo.pBindings = bindings.data();
-        vkCreateDescriptorSetLayout(device.device, &dlinfo, nullptr, &layout.descriptorSetLayout[2]);
-    }
-
-    pipelineLayoutInfo.setLayoutCount = 4;
-    pipelineLayoutInfo.pSetLayouts = layout.descriptorSetLayout.data();
-
-    layout.pipelineLayout = device.device.createPipelineLayout(pipelineLayoutInfo, nullptr);
-    VkDescriptorPoolSize poolSizes[4] = {};
-    VkDescriptorPoolCreateInfo poolInfo{ .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-                                         .pNext = nullptr,
-                                         .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
-                                         .maxSets = 1024 * 3,
-                                         .poolSizeCount = 3,
-                                         .pPoolSizes = poolSizes };
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = poolInfo.maxSets * VulkanDescriptor::UBUFFER_BINDING_COUNT;
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = poolInfo.maxSets * VulkanDescriptor::SAMPLER_BINDING_COUNT;
-    poolSizes[2].type = compute ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER : VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-    poolSizes[2].descriptorCount = poolInfo.maxSets * VulkanDescriptor::TARGET_BINDING_COUNT;
-    poolSizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    poolSizes[3].descriptorCount = poolInfo.maxSets * VulkanDescriptor::STORAGE_BINDING_COUNT;
-    if (vkCreateDescriptorPool(device.device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool!");
-    }
-}
-
-void VulkanPipelineCache::getOrCreateDescriptors(const VulkanDescriptor &key,
-                                                 std::array<VkDescriptorSet, 4> &descriptors) {
-    auto it = descriptorSets.get(key);
+VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute) {
+    auto it = pipelineLayouts.get(layout);
     if (it) {
-        descriptors = *it;
-        return;
+        return *it;
     }
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = 4;
-    allocInfo.pSetLayouts = graphicsLayout.descriptorSetLayout.data();
-    if (vkAllocateDescriptorSets(device.device, &allocInfo, descriptors.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
-    }
+    
+    VulkanPipelineCache::PipelineLayout pipelineLayout{};
+    vk::PipelineLayoutCreateInfo createInfo{};
+    vk::PushConstantRange pushConstants{};
+    pushConstants.offset = 0;
+    pushConstants.size = MAX_PUSH_CONSTANT_SIZE;
+    pushConstants.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment;
+    createInfo.pPushConstantRanges = &pushConstants;
+    createInfo.pushConstantRangeCount = 1;
 
-    VkDescriptorBufferInfo descriptorBuffers[VulkanDescriptor::UBUFFER_BINDING_COUNT];
-    VkDescriptorImageInfo descriptorSamplers[VulkanDescriptor::SAMPLER_BINDING_COUNT];
-    VkDescriptorImageInfo descriptorInputAttachments[VulkanDescriptor::TARGET_BINDING_COUNT];
-    VkDescriptorBufferInfo descriptorStorageBuffers[VulkanDescriptor::STORAGE_BINDING_COUNT];
-    VkWriteDescriptorSet
-        descriptorWrites[VulkanDescriptor::UBUFFER_BINDING_COUNT + VulkanDescriptor::SAMPLER_BINDING_COUNT + VulkanDescriptor::TARGET_BINDING_COUNT + VulkanDescriptor::STORAGE_BINDING_COUNT];
 
-    uint32_t nwrites = 0;
-    VkWriteDescriptorSet *writes = descriptorWrites;
-    nwrites = 0;
-    for (uint32_t binding = 0; binding < VulkanDescriptor::UBUFFER_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
-        if (key.uniformBuffers[binding]) {
-            VkDescriptorBufferInfo &bufferInfo = descriptorBuffers[binding];
-            bufferInfo.buffer = key.uniformBuffers[binding];
-            bufferInfo.offset = key.uniformBufferOffsets[binding];
-            bufferInfo.range = key.uniformBufferSizes[binding];
-            writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeInfo.pNext = nullptr;
-            writeInfo.dstArrayElement = 0;
-            writeInfo.descriptorCount = 1;
-            writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            writeInfo.pImageInfo = nullptr;
-            writeInfo.pBufferInfo = &bufferInfo;
-            writeInfo.pTexelBufferView = nullptr;
-        } else {
-            writeInfo = dummyBufferWriteInfo;
+    for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
+        std::vector<vk::DescriptorSetLayoutBinding> bindings;
+        for (size_t j = 0; j < ProgramParameterLayout::MAX_BINDINGS; ++j) {
+            auto &field = layout.fields[i * ProgramParameterLayout::MAX_BINDINGS + j];
+            if (field) {
+                vk::DescriptorSetLayoutBinding binding{};
+                binding.descriptorType = translateDescriptorType(field.type());
+                binding.binding = j;
+                binding.descriptorCount = field.arraySize();
+                binding.stageFlags = vk::ShaderStageFlagBits::eAll;
+                bindings.push_back(binding);
+            }
         }
-        writeInfo.dstSet = descriptors[0];
-        writeInfo.dstBinding = binding;
+        vk::DescriptorSetLayoutCreateInfo di{};
+        di.setBindings(bindings);
+        pipelineLayout.descriptorSetLayout[i] = device.device.createDescriptorSetLayout(di);
     }
-    for (uint32_t binding = 0; binding < VulkanDescriptor::SAMPLER_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
-        if (key.samplers[binding].sampler) {
-            VkDescriptorImageInfo &imageInfo = descriptorSamplers[binding];
-            imageInfo = key.samplers[binding];
-            writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeInfo.pNext = nullptr;
-            writeInfo.dstArrayElement = 0;
-            writeInfo.descriptorCount = 1;
-            writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writeInfo.pImageInfo = &imageInfo;
-            writeInfo.pBufferInfo = nullptr;
-            writeInfo.pTexelBufferView = nullptr;
-        } else {
-            writeInfo = dummySamplerWriteInfo;
-        }
-        writeInfo.dstSet = descriptors[1];
-        writeInfo.dstBinding = binding;
-    }
-    for (uint32_t binding = 0; binding < VulkanDescriptor::TARGET_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
-        if (key.inputAttachments[binding].imageView) {
-            VkDescriptorImageInfo &imageInfo = descriptorInputAttachments[binding];
-            imageInfo = key.inputAttachments[binding];
-            writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeInfo.pNext = nullptr;
-            writeInfo.dstArrayElement = 0;
-            writeInfo.descriptorCount = 1;
-            writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
-            writeInfo.pImageInfo = &imageInfo;
-            writeInfo.pBufferInfo = nullptr;
-            writeInfo.pTexelBufferView = nullptr;
-        } else {
-            writeInfo = dummyTargetWriteInfo;
-        }
-        writeInfo.dstSet = descriptors[2];
-        writeInfo.dstBinding = binding;
-    }
-    for (uint32_t binding = 0; binding < VulkanDescriptor::STORAGE_BINDING_COUNT; binding++) {
-        VkWriteDescriptorSet &writeInfo = writes[nwrites++];
-        if (key.storageBuffers[binding]) {
-            VkDescriptorBufferInfo &bufferInfo = descriptorStorageBuffers[binding];
-            bufferInfo.buffer = key.storageBuffers[binding];
-            bufferInfo.offset = 0;
-            bufferInfo.range = key.storageBufferSizes[binding];
-            writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            writeInfo.pNext = nullptr;
-            writeInfo.dstArrayElement = 0;
-            writeInfo.descriptorCount = 1;
-            writeInfo.pImageInfo = nullptr;
-            writeInfo.pBufferInfo = &bufferInfo;
-            writeInfo.pTexelBufferView = nullptr;
-        } else {
-            writeInfo = dummyBufferWriteInfo;
-        }
-        writeInfo.dstSet = descriptors[3];
-        writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        writeInfo.dstBinding = binding;
-    }
-    vkUpdateDescriptorSets(device.device, nwrites, writes, 0, nullptr);
-    descriptorSets.add(key, descriptors);
+    createInfo.setLayoutCount = 3;
+    createInfo.pSetLayouts = pipelineLayout.descriptorSetLayout.data();
+    pipelineLayout.pipelineLayout = device.device.createPipelineLayout(createInfo);
+
+    pipelineLayouts.add(layout, pipelineLayout);
+    return pipelineLayout;
 }
 
-void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanDescriptor &key) {
-    std::array<VkDescriptorSet, 4> descriptors;
-    getOrCreateDescriptors(key, descriptors);
-    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsLayout.pipelineLayout,
-                            0, 4, descriptors.data(), 0, nullptr);
+void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanPipelineState &state, const VulkanBindings& bindings) {
+    const bool compute = state.program->program.type == ProgramType::COMPUTE;
+    auto pipelineLayout = getOrCreatePipelineLayout(state.program->program.parameterLayout, state.program->program.type == ProgramType::COMPUTE);
+    DescriptorSets descriptorSets{};
+    for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
+        descriptorSets[i] = currentDescriptorAllocator().allocate(pipelineLayout.descriptorSetLayout[i]);
+    }
+
+    std::vector<vk::WriteDescriptorSet> writes;
+    writes.reserve(bindings.size());
+    for (auto &binding : bindings) {
+        vk::WriteDescriptorSet write{};
+        write.dstBinding = binding.binding;
+        write.dstSet = descriptorSets[binding.set];
+        write.dstArrayElement = 0;
+        write.descriptorCount = binding.arraySize;
+        write.descriptorType = binding.type;
+        write.pBufferInfo = binding.bufferInfo.data();
+        write.pImageInfo = binding.imageInfo.data();
+        writes.push_back(write);
+    }
+    device.device.updateDescriptorSets(writes.size(), writes.data(), 0, nullptr);
+    cmd.bindDescriptorSets(compute ? vk::PipelineBindPoint::eCompute : vk::PipelineBindPoint::eGraphics, pipelineLayout.pipelineLayout, 0, ProgramParameterLayout::MAX_SET, descriptorSets.data(), 0, nullptr);
 }
 
-VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key) {
+VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineState &key) {
     auto it = pipelines.get(key);
     if (it) {
         return *it;
     }
+    VkPipeline out;
+    if (!key.program->compute) {
+        out = createGraphicsPipeline(key);
+    } else {
+        out = createComputePipeline(key);
+    }
 
+    pipelines.add(key, out);
+    return out;
+}
+
+VkPipeline VulkanPipelineCache::createGraphicsPipeline(const VulkanPipelineState& state) {
     VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertShaderStageInfo.module = key.program->vertex;
+    vertShaderStageInfo.module = state.program->vertex;
     vertShaderStageInfo.pName = "main";
 
     VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
     fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragShaderStageInfo.module = key.program->fragment;
+    fragShaderStageInfo.module = state.program->fragment;
     fragShaderStageInfo.pName = "main";
     VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexBindingDescriptionCount = key.attributeCount;
-    std::vector<VkVertexInputAttributeDescription> attributes(key.attributeCount);
-    std::vector<VkVertexInputBindingDescription> bindings(key.attributeCount);
+    vertexInputInfo.vertexBindingDescriptionCount = state.attributeCount;
+    std::vector<VkVertexInputAttributeDescription> attributes(state.attributeCount);
+    std::vector<VkVertexInputBindingDescription> bindings(state.attributeCount);
 
-    for (uint32_t i = 0; i < key.attributeCount; ++i) {
-        Attribute attrib = key.attributes[i];
+    for (uint32_t i = 0; i < state.attributeCount; ++i) {
+        Attribute attrib = state.attributes[i];
         attributes[i] = { .location = i,
                           .binding = i,
                           .format = (VkFormat)translateElementFormat(attrib.type,
@@ -330,7 +226,7 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
     }
 
     vertexInputInfo.pVertexBindingDescriptions = bindings.data();
-    vertexInputInfo.vertexAttributeDescriptionCount = key.attributeCount;
+    vertexInputInfo.vertexAttributeDescriptionCount = state.attributeCount;
     vertexInputInfo.pVertexAttributeDescriptions = attributes.data();
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -339,10 +235,10 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport{};
-    viewport.x = (float)key.viewport.left;
-    viewport.y = (float)key.viewport.top;
-    viewport.width = (float)key.viewport.width;
-    viewport.height = (float)key.viewport.height;
+    viewport.x = (float)state.viewport.left;
+    viewport.y = (float)state.viewport.top;
+    viewport.width = (float)state.viewport.width;
+    viewport.height = (float)state.viewport.height;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -359,9 +255,9 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = key.depthTest.enabled ? VK_TRUE : VK_FALSE;
-    depthStencil.depthWriteEnable = key.depthTest.write ? VK_TRUE : VK_FALSE;
-    depthStencil.depthCompareOp = (VkCompareOp)translateCompareOp(key.depthTest.compareOp);
+    depthStencil.depthTestEnable = state.depthTest.enabled ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable = state.depthTest.write ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp = (VkCompareOp)translateCompareOp(state.depthTest.compareOp);
     depthStencil.depthBoundsTestEnable = VK_FALSE;
     depthStencil.minDepthBounds = 0.0f;  // Optional
     depthStencil.maxDepthBounds = 1.0f;  // Optional
@@ -428,6 +324,8 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
     dynamicState.dynamicStateCount = 2;
     dynamicState.pDynamicStates = dynamicStates;
 
+
+    auto pipelineLayout = getOrCreatePipelineLayout(state.program->program.parameterLayout, false);
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.stageCount = 2;
@@ -440,19 +338,26 @@ VkPipeline VulkanPipelineCache::getOrCreatePipeline(const VulkanPipelineKey &key
     pipelineInfo.pDepthStencilState = &depthStencil;  // Optional
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDynamicState = nullptr;  // Optional
-    pipelineInfo.layout = graphicsLayout.pipelineLayout;
-    pipelineInfo.renderPass = key.renderPass;
+    pipelineInfo.layout = pipelineLayout.pipelineLayout;
+    pipelineInfo.renderPass = state.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;  // Optional
     pipelineInfo.basePipelineIndex = -1;               // Optional
+
     VkPipeline out;
     if (vkCreateGraphicsPipelines(device.device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr,
                                   &out) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline!");
     }
-
-    pipelines.add(key, out);
     return out;
+}
+
+VkPipeline VulkanPipelineCache::createComputePipeline(const VulkanPipelineState &state) {
+    vk::ComputePipelineCreateInfo createInfo;
+    auto pipelineLayout = getOrCreatePipelineLayout(state.program->program.parameterLayout, true);
+    createInfo.layout = pipelineLayout.pipelineLayout;
+    vk::Pipeline pipeline = device.device.createComputePipeline(nullptr, createInfo, nullptr);
+    return pipeline;
 }
 
 VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget) {

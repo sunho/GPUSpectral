@@ -196,3 +196,17 @@ vk::BufferUsageFlags translateBufferUsage(BufferUsage usage) {
     }
     return out;
 }
+
+vk::DescriptorType translateDescriptorType(ProgramParameterType type) {
+    switch (type) {
+        case ProgramParameterType::UNIFORM:
+            return vk::DescriptorType::eUniformBuffer;
+        case ProgramParameterType::STORAGE:
+            return vk::DescriptorType::eStorageBuffer;
+        case ProgramParameterType::TEXTURE:
+            return vk::DescriptorType::eCombinedImageSampler;
+        case ProgramParameterType::ATTACHMENT:
+            return vk::DescriptorType::eInputAttachment;
+    }
+    return vk::DescriptorType();
+}

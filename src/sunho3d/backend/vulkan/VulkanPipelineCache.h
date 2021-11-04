@@ -27,7 +27,7 @@ inline uint64_t hashStruct<VulkanAttachments>(const VulkanAttachments& attachmen
     return hashBase(seed);
 }
 
-struct VulkanPipelineKey {
+struct VulkanPipelineState {
     AttributeArray attributes;
     size_t attributeCount;
     VulkanProgram *program;
@@ -35,7 +35,7 @@ struct VulkanPipelineKey {
     VkRenderPass renderPass;
     DepthTest depthTest;
 
-    bool operator==(const VulkanPipelineKey &other) const {
+    bool operator==(const VulkanPipelineState &other) const {
         return attributes == other.attributes && attributeCount == other.attributeCount && program == other.program
         &&viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
@@ -53,7 +53,7 @@ inline uint64_t hashStruct<Attribute>(const Attribute& attribute) {
 }
 
 template <>
-inline uint64_t hashStruct<VulkanPipelineKey>(const VulkanPipelineKey& pipelineKey) {
+inline uint64_t hashStruct<VulkanPipelineState>(const VulkanPipelineState &pipelineKey) {
     uint64_t seed = hashStruct(pipelineKey.attributeCount);
 
     for (size_t i = 0; i < MAX_VERTEX_ATTRIBUTE_COUNT; ++i) {
@@ -70,71 +70,103 @@ static bool operator==(const VkDescriptorImageInfo &lhs, const VkDescriptorImage
     return lhs.imageLayout == rhs.imageLayout && lhs.imageView == rhs.imageView && lhs.sampler == rhs.sampler;
 };
 
-struct VulkanDescriptor {
-    static constexpr uint32_t UBUFFER_BINDING_COUNT = 8;
-    static constexpr uint32_t SAMPLER_BINDING_COUNT = 8;
-    static constexpr uint32_t TARGET_BINDING_COUNT = 8;
-    static constexpr uint32_t STORAGE_BINDING_COUNT = 8;
+struct VulkanBinding {
+    vk::DescriptorType type;
+    uint32_t set;
+    uint32_t binding;
+    uint32_t arraySize;
+    std::vector<vk::DescriptorBufferInfo> bufferInfo;
+    std::vector<vk::DescriptorImageInfo> imageInfo;
+};
 
-    std::array<VkDescriptorImageInfo, SAMPLER_BINDING_COUNT> samplers;
-    std::array<VkDescriptorImageInfo, TARGET_BINDING_COUNT> inputAttachments;
-    std::array<VkBuffer, UBUFFER_BINDING_COUNT> uniformBuffers;
-    std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferOffsets;
-    std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> uniformBufferSizes;
-    std::array<VkBuffer, STORAGE_BINDING_COUNT> storageBuffers;
-    std::array<VkDeviceSize, UBUFFER_BINDING_COUNT> storageBufferSizes;
+using VulkanBindings = std::vector<VulkanBinding>;
 
-    bool operator==(const VulkanDescriptor &other) const = default;
+class VulkanDescriptorAllocator {
+  public:
+    struct PoolSizes {
+        std::vector<std::pair<vk::DescriptorType, float>> sizes = {
+            { vk::DescriptorType::eSampler, 0.5f },
+            { vk::DescriptorType::eCombinedImageSampler, 4.f },
+            { vk::DescriptorType::eSampledImage, 4.f },
+            { vk::DescriptorType::eStorageImage, 1.f },
+            { vk::DescriptorType::eUniformTexelBuffer, 1.f },
+            { vk::DescriptorType::eStorageTexelBuffer, 1.f },
+            { vk::DescriptorType::eUniformBuffer, 2.f },
+            { vk::DescriptorType::eStorageBuffer, 2.f },
+            { vk::DescriptorType::eUniformBufferDynamic, 1.f },
+            { vk::DescriptorType::eStorageBufferDynamic, 1.f },
+            { vk::DescriptorType::eInputAttachment, 0.5f }
+        };
+    };
+
+    void resetPools();
+    vk::DescriptorSet allocate(vk::DescriptorSetLayout layout);
+
+    void init(vk::Device newDevice);
+
+    void cleanup();
+
+    vk::Device device;
+
+  private:
+    vk::DescriptorPool grabPool();
+
+    vk::DescriptorPool currentPool{ nullptr };
+    PoolSizes descriptorSizes;
+    std::vector<vk::DescriptorPool> usedPools;
+    std::vector<vk::DescriptorPool> freePools;
 };
 
 class VulkanPipelineCache {
   public:
     VulkanPipelineCache(VulkanDevice &device);
-    VkPipeline getOrCreatePipeline(const VulkanPipelineKey &key);
+    VkPipeline getOrCreatePipeline(const VulkanPipelineState &state);
     vk::Framebuffer getOrCreateFrameBuffer(vk::RenderPass renderPass,
                                          VulkanSwapChain swapchain, 
                                          VulkanRenderTarget *renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
-    void bindDescriptor(vk::CommandBuffer cmd, const VulkanDescriptor &key);
+    void bindDescriptor(vk::CommandBuffer cmd, const VulkanPipelineState &state, const VulkanBindings& bindings);
     void tick();
 
   private:
     struct PipelineLayout {
-		std::array<VkDescriptorSetLayout, 4> descriptorSetLayout;
-		vk::PipelineLayout pipelineLayout;
+        std::array<vk::DescriptorSetLayout, ProgramParameterLayout::MAX_SET> descriptorSetLayout;
+        vk::PipelineLayout pipelineLayout;
     };
 
-    void setupLayouts(VulkanPipelineCache::PipelineLayout& layout, bool compute);
-    void getOrCreateDescriptors(const VulkanDescriptor &key,
-                                std::array<VkDescriptorSet, 4> &descripotrs);
+    using DescriptorSets = std::array<vk::DescriptorSet, ProgramParameterLayout::MAX_SET>;
 
+    VulkanDescriptorAllocator &currentDescriptorAllocator() {
+        return descriptorAllocators[currentFrame % 3];
+    }
+    PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute);
+    VkPipeline createGraphicsPipeline(const VulkanPipelineState &key);
+    VkPipeline createComputePipeline(const VulkanPipelineState &key);
 
-    struct VulkanPipelineKeyHasher
-    {
-        std::size_t operator()(const VulkanPipelineKey& k) const {
-            return hashStruct(k);
-        }
-    };
-    struct FrameBufferKeyHasher {
-        std::size_t operator()(const std::pair<VkRenderPass, VkImageView>& k) const {
-            return hashStruct(k.first) ^ hashStruct(k.second);
-        }
-    };
-    struct RenderPassKeyHasher {
-        std::size_t operator()(const VulkanAttachments& k) const
-        {
+    struct KeyHasher {
+        std::size_t operator()(const VulkanAttachments& k) const {
             return hashStruct<VulkanAttachments>(k);
         }
-    };
-    struct DescriptorKeyHasher {
-        std::size_t operator()(const VulkanDescriptor& k) const {
+        std::size_t operator()(const std::pair<VkRenderPass, VkImageView> &k) const {
+            return hashStruct(k.first) ^ hashStruct(k.second);
+        }
+        std::size_t operator()(const VulkanPipelineState &k) const {
+            return hashStruct(k);
+        }
+        std::size_t operator()(const ProgramParameterLayout &k) const {
+            return hashStruct(k);
+        }
+        std::size_t operator()(const BindingMap &k) const {
             return hashStruct(k);
         }
     };
-    GCPool<VulkanPipelineKey, VkPipeline, VulkanPipelineKeyHasher> pipelines;
-    GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, FrameBufferKeyHasher> framebuffers;
-    GCPool<VulkanAttachments, VkRenderPass, RenderPassKeyHasher> renderpasses;
-    GCPool<VulkanDescriptor, std::array<VkDescriptorSet, 4>, DescriptorKeyHasher> descriptorSets;
+
+    GCPool<VulkanPipelineState, VkPipeline, KeyHasher> pipelines;
+    GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, KeyHasher> framebuffers;
+    GCPool<VulkanAttachments, VkRenderPass, KeyHasher> renderpasses;
+    GCPool<ProgramParameterLayout, PipelineLayout, KeyHasher> pipelineLayouts;
+    std::array<VulkanDescriptorAllocator, 3> descriptorAllocators;
+    size_t currentFrame{0};
 	VkDescriptorPool descriptorPool;
 
     std::unique_ptr<VulkanTexture> dummyImage;
@@ -147,7 +179,4 @@ class VulkanPipelineCache {
 
     VulkanDevice& device;
     VulkanBufferObject *dummyBuffer;
-
-    PipelineLayout graphicsLayout;
-    PipelineLayout computeLayout;
 };

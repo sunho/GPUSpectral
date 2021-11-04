@@ -49,12 +49,10 @@ struct VulkanInflight : public HwInflight {
 };
 
 struct DriverContext { 
-    VulkanDescriptor currentBinding{};
     vk::RenderPass currentRenderPass{};
-    VulkanPipeline currentPipeline{};
-    vk::DescriptorSet currentDescriptorSet{};
-    VulkanInflight* inflight{};
     Viewport viewport{};
+    VulkanPipeline currentPipeline{};
+    VulkanInflight* inflight{};
 };
 
 class VulkanDriver {
@@ -86,6 +84,7 @@ class VulkanDriver {
 
   private:
     void setupDebugMessenger();
+    
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL
     debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

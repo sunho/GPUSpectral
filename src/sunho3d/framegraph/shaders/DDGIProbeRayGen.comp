@@ -1,8 +1,8 @@
 #version 450
 
-#define RAYS_PER_PROBE 64
+#define RAYS_PER_PROBE 32
 
-layout (local_size_x = 64) in;
+layout (local_size_x = 32) in;
 #extension GL_GOOGLE_include_directive : require
 
 #include "common.glsl"

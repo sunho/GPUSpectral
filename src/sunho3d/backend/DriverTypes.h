@@ -202,3 +202,5 @@ struct Extent2D {
     uint32_t width{};
     uint32_t height{};
 };
+
+constexpr static size_t MAX_PUSH_CONSTANT_SIZE = 128;

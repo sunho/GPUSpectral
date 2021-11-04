@@ -102,7 +102,7 @@ class Renderer : public IdResource {
   private:
     void rasterSuite(Scene* scene);
     void rtSuite(Scene* scene);
-    void ddigSuite(Scene* scene);
+    void ddgiSuite(Scene* scene);
 
     Handle<HwUniformBuffer> createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model);
 

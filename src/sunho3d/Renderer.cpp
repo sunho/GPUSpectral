@@ -48,12 +48,24 @@ Renderer::Renderer(Window* window)
     }
 
     Program prog(ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag,ForwardPhongFragSize);
+    prog.parameterLayout
+        .addUniformBuffer(0, 0)
+        .addUniformBuffer(0, 2)
+        .addUniformBuffer(0, 2)
+        .addTexture(1, 0)
+        .addTexture(1, 1);
     fowradPassProgram = driver.createProgram(prog);
 
     Program prog2(DisplayTextureVert, DisplayTextureVertSize, DisplayTextureFrag, DisplayTextureFragSize);
+    prog2.parameterLayout
+        .addTexture(1, 0);
     blitProgram = driver.createProgram(prog2);
 
     Program prog3(ForwardRTVert, ForwardRTVertSize, ForwardRTFrag, ForwardRTFragSize);
+    prog3.parameterLayout
+        .addStorageBuffer(2, 0)
+        .addStorageBuffer(2, 1)
+        .addUniformBuffer(0, 0);
     forwardRTProgram = driver.createProgram(prog3);
 
     Primitive primitive;
@@ -165,10 +177,10 @@ void Renderer::rasterSuite(Scene* scene) {
         for (size_t i = 0; i < sceneData->geometries.size(); ++i) {
             auto& geom = sceneData->geometries[i];
             auto& model = sceneData->worldTransforms[i];
-            driver.bindUniformBuffer(0, this->createTransformBuffer(renderGraph, camera, model));
-            driver.bindUniformBuffer(1, lightUB);
-            driver.bindUniformBuffer(2, getOrCreateMaterialBuffer(geom.material));
-            driver.bindTexture(0, geom.material->diffuseMap);
+            pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(renderGraph, camera, model));
+            pipe.bindUniformBuffer(0, 1, lightUB);
+            pipe.bindUniformBuffer(0, 2, getOrCreateMaterialBuffer(geom.material));
+            pipe.bindTexture(1, 0, geom.material->diffuseMap);
             driver.draw(pipe, geom.primitive);
         }
         driver.endRenderPass();
@@ -200,11 +212,11 @@ void Renderer::rasterSuite(Scene* scene) {
         for (size_t i = 0; i < sceneData->geometries.size(); ++i) {
             auto& geom = sceneData->geometries[i];
             auto& model = sceneData->worldTransforms[i];
-            driver.bindUniformBuffer(0, this->createTransformBuffer(renderGraph, scene->getCamera(), model));
-            driver.bindUniformBuffer(1, lightUB);
-            driver.bindUniformBuffer(2, getOrCreateMaterialBuffer(geom.material));
-            driver.bindTexture(0, geom.material->diffuseMap);
-            driver.bindTexture(1, shadowMap);
+            pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(renderGraph, camera, model));
+            pipe.bindUniformBuffer(0, 1, lightUB);
+            pipe.bindUniformBuffer(0, 2, getOrCreateMaterialBuffer(geom.material));
+            pipe.bindTexture(1, 0, geom.material->diffuseMap);
+            pipe.bindTexture(1, 1, shadowMap);
             driver.draw(pipe, geom.primitive);
         }
         driver.endRenderPass();
@@ -217,7 +229,7 @@ void Renderer::rasterSuite(Scene* scene) {
         pipe.program = this->blitProgram;
         RenderPassParams params;
         driver.beginRenderPass(this->surfaceRenderTarget, params);
-        driver.bindTexture(0, forwardMap);
+        pipe.bindTexture(1, 0, forwardMap);
         driver.draw(pipe, this->quadPrimitive);
         driver.endRenderPass();
     });
@@ -332,14 +344,15 @@ void Renderer::rtSuite(Scene* scene) {
             .handle = color
         };
         att.targetNum = 1;
-        auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ });
-        driver.beginRenderPass(renderTarget, {});
-        driver.bindStorageBuffer(0, sceneData.globalVertexBuffer);
-        driver.bindStorageBuffer(1, hitBuffer);
-        driver.bindUniformBuffer(0, sceneBuffer);
-        
+         
         PipelineState pipe = {};
         pipe.program = this->forwardRTProgram;
+        auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att, TextureAttachment{ });
+        driver.beginRenderPass(renderTarget, {});
+        pipe.bindStorageBuffer(2, 0, sceneData.globalVertexBuffer);
+        pipe.bindStorageBuffer(2, 1, hitBuffer);
+        pipe.bindUniformBuffer(0, 0, sceneBuffer);
+       
         driver.draw(pipe, this->quadPrimitive);
         driver.endRenderPass();
         renderGraph.defineResource(renderedRef, color);
@@ -353,7 +366,7 @@ void Renderer::rtSuite(Scene* scene) {
         pipe.program = this->blitProgram;
         RenderPassParams params;
         driver.beginRenderPass(this->surfaceRenderTarget, params);
-        driver.bindTexture(0, rendered);
+        pipe.bindTexture(1,0, rendered);
         driver.draw(pipe, this->quadPrimitive);
         driver.endRenderPass();
     });
@@ -361,7 +374,7 @@ void Renderer::rtSuite(Scene* scene) {
     driver.endFrame();
 }
 
-void Renderer::ddigSuite(Scene* scene) {
+void Renderer::ddgiSuite(Scene* scene) {
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
     if (inflight.handle) {

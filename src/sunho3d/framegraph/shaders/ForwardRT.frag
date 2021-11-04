@@ -25,11 +25,11 @@ layout(std140, binding = 0) uniform SceneBuffer {
     Instance instances[MAX_INSTANCES];
 } sceneBuffer;
 
-layout(std140,set=3,binding = 0) readonly buffer VertexBuffer {
+layout(std140,set=2,binding = 0) readonly buffer VertexBuffer {
     Vertex vertices[];
 } vertexBuffer;
 
-layout(std140,set=3,binding = 1) readonly buffer RayHitBuffer {
+layout(std140,set=2,binding = 1) readonly buffer RayHitBuffer {
     RayHit hits[];
 } rayHitBuffer;
 
