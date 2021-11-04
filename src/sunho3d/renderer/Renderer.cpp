@@ -1,50 +1,24 @@
 #include "Renderer.h"
 
-#include <sunho3d/framegraph/shaders/DisplayTextureFrag.h>
-#include <sunho3d/framegraph/shaders/DisplayTextureVert.h>
-#include <sunho3d/framegraph/shaders/ForwardPhongFrag.h>
-#include <sunho3d/framegraph/shaders/ForwardPhongVert.h>
-#include <sunho3d/framegraph/shaders/ForwardRTFrag.h>
-#include <sunho3d/framegraph/shaders/ForwardRTVert.h>
+#include <sunho3d/renderer/shaders/DisplayTextureFrag.h>
+#include <sunho3d/renderer/shaders/DisplayTextureVert.h>
+#include <sunho3d/renderer/shaders/ForwardPhongFrag.h>
+#include <sunho3d/renderer/shaders/ForwardPhongVert.h>
+#include <sunho3d/renderer/shaders/ForwardRTFrag.h>
+#include <sunho3d/renderer/shaders/ForwardRTVert.h>
 #include <tiny_gltf.h>
 
-#include "Entity.h"
-#include "Scene.h"
+#include "../Entity.h"
+#include "../Scene.h"
 
 #include <iostream>
 using namespace sunho3d;
-
-RenderGraph::RenderGraph(Renderer& renderer)
-    : parent(renderer), driver(renderer.getDriver()) {
-}
-
-RenderGraph::~RenderGraph() {
-    for (auto d : destroyers) {
-        d();
-    }
-}
-void RenderGraph::reset() {
-    for (auto d : destroyers) {
-        d();
-    }
-    destroyers.clear();
-    fg = FrameGraph();
-}
-
-void RenderGraph::addRenderPass(const std::string& name, std::vector<FGResource> inputs, std::vector<FGResource> outputs, RenderPass::RenderPassFunc func) {
-    fg.addRenderPass(RenderPass(name, inputs, outputs, func));
-}
-
-void RenderGraph::submit() {
-    fg.compile();
-    fg.run();
-}
 
 Renderer::Renderer(Window* window)
     : window(window), driver(window) {
     for (size_t i = 0; i < MAX_INFLIGHTS; ++i) {
         inflights[i].fence = driver.createFence();
-        inflights[i].rg = std::make_unique<RenderGraph>(*this);
+        inflights[i].rg = std::make_unique<FrameGraph>(*this);
     }
 
     Program prog(ForwardPhongVert, ForwardPhongVertSize, ForwardPhongFrag,ForwardPhongFragSize);
@@ -118,7 +92,7 @@ void Renderer::rasterSuite(Scene* scene) {
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
 
-    RenderGraph& renderGraph = *inflight.rg;
+    FrameGraph& renderGraph = *inflight.rg;
     renderGraph.reset();
 
     scene->prepare();
@@ -237,7 +211,7 @@ void Renderer::rasterSuite(Scene* scene) {
     driver.endFrame();
 }
 
-Handle<HwUniformBuffer> Renderer::createTransformBuffer(RenderGraph& rg, const Camera& camera, const glm::mat4& model) {
+Handle<HwUniformBuffer> Renderer::createTransformBuffer(FrameGraph& rg, const Camera& camera, const glm::mat4& model) {
     auto tb = rg.createUniformBufferSC(sizeof(TransformBuffer));
     TransformBuffer transformBuffer;
     transformBuffer.MVP = camera.proj * camera.view * model;
@@ -261,7 +235,7 @@ void Renderer::rtSuite(Scene* scene) {
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
 
-    RenderGraph& renderGraph = *inflight.rg;
+    FrameGraph& renderGraph = *inflight.rg;
     renderGraph.reset();
     inflight.instances.clear();
 
@@ -383,7 +357,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
 
-    RenderGraph& renderGraph = *inflight.rg;
+    FrameGraph& renderGraph = *inflight.rg;
     renderGraph.reset();
 
     scene->prepare();

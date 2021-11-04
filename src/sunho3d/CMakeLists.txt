@@ -24,24 +24,25 @@ set(SOURCE_LIST
     backend/vulkan/VulkanTexture.cpp
     backend/vulkan/VulkanRays.h
     backend/vulkan/VulkanRays.cpp
-    framegraph/shaders/ForwardPhong.frag
-    framegraph/shaders/ForwardPhong.vert
-    framegraph/shaders/DisplayTexture.frag
-    framegraph/shaders/DisplayTexture.vert
-    framegraph/shaders/ForwardRT.frag
-    framegraph/shaders/ForwardRT.vert
-    framegraph/shaders/common.glsl
-    framegraph/shaders/DDGIProbeRayGen.comp
-    framegraph/shaders/DDGIProbeRayShade.comp
-    framegraph/shaders/DDGIProbeUpdate.comp
-    framegraph/shaders/DDGIShade.vert
-    framegraph/shaders/DDGIShade.frag
-    framegraph/FrameGraph.h
-    framegraph/FrameGraph.cpp
-    framegraph/RenderPass.h
-    framegraph/RenderPass.cpp
-    framegraph/Resource.h
-    framegraph/renderpasses/ForwardRenderPass.h
+    renderer/shaders/ForwardPhong.frag
+    renderer/shaders/ForwardPhong.vert
+    renderer/shaders/DisplayTexture.frag
+    renderer/shaders/DisplayTexture.vert
+    renderer/shaders/ForwardRT.frag
+    renderer/shaders/ForwardRT.vert
+    renderer/shaders/common.glsl
+    renderer/shaders/DDGIProbeRayGen.comp
+    renderer/shaders/DDGIProbeRayShade.comp
+    renderer/shaders/DDGIProbeUpdate.comp
+    renderer/shaders/DDGIShade.vert
+    renderer/shaders/DDGIShade.frag
+    renderer/framegraph/FrameGraph.h
+    renderer/framegraph/FrameGraph.cpp
+    renderer/framegraph/RenderPass.h
+    renderer/framegraph/RenderPass.cpp
+    renderer/framegraph/Resource.h
+    renderer/Renderer.h
+    renderer/Renderer.cpp
     utils/ResourceList.h
     utils/FixedVector.h
     utils/Hash.h
@@ -53,8 +54,6 @@ set(SOURCE_LIST
     Entity.h
     Entity.cpp
     Transform.h
-    Renderer.h
-    Renderer.cpp
     Light.h
     Light.cpp
     Camera.h
@@ -77,8 +76,8 @@ add_executable(embedfile utils/EmbedFile.c)
 function(add_shader TARGET SHADENAME SHADER)
     find_program(GLSLC glslc)
 
-	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/framegraph/shaders/${SHADER})
-    set(current-output-path ${CMAKE_BINARY_DIR}/framegraph/shaders/${SHADER}.spv)
+	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/renderer/shaders/${SHADER})
+    set(current-output-path ${CMAKE_BINARY_DIR}/renderer/shaders/${SHADER}.spv)
 
 	# Add a custom command to compile GLSL to SPIR-V.
 	get_filename_component(current-output-dir ${current-output-path} DIRECTORY)
@@ -94,14 +93,14 @@ function(add_shader TARGET SHADENAME SHADER)
 	set_source_files_properties(${current-output-path} PROPERTIES GENERATED TRUE)
 
     set(COUT ${CMAKE_CURRENT_BINARY_DIR}/${SHADENAME}.c)
-    set(CHEAD ${CMAKE_CURRENT_BINARY_DIR}/framegraph/shaders/${SHADENAME}.h)
+    set(CHEAD ${CMAKE_CURRENT_BINARY_DIR}/renderer/shaders/${SHADENAME}.h)
     add_custom_command(
         OUTPUT ${COUT}
         COMMAND embedfile ${SHADENAME} ${current-output-path}
         DEPENDS ${current-output-path})
     target_sources(${TARGET} PRIVATE ${COUT})
 
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/framegraph/shaders)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/renderer/shaders)
     file(WRITE ${CHEAD} "#pragma once\nextern \"C\" const char ${SHADENAME}[]; extern \"C\" const size_t ${SHADENAME}Size;")
 
 endfunction(add_shader)

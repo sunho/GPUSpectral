@@ -1,8 +1,36 @@
 #include "FrameGraph.h"
-
+#include "../Renderer.h"
 #include <stack>
 
+
+FrameGraph::FrameGraph(sunho3d::Renderer& renderer)
+    : parent(renderer), driver(renderer.getDriver()) {
+}
+
+void FrameGraph::reset() {
+    for (auto d : destroyers) {
+        d();
+    }
+    destroyers.clear();
+    resources.clear();
+    renderPasses.clear();
+    runOrder.clear();
+}
+
+void FrameGraph::addRenderPass(const std::string& name, std::vector<FGResource> inputs, std::vector<FGResource> outputs, RenderPass::RenderPassFunc func) {
+    addRenderPass(RenderPass(name, inputs, outputs, func));
+}
+
+void FrameGraph::submit() {
+    compile();
+    run();
+}
+
+
 FrameGraph::~FrameGraph() {
+    for (auto d : destroyers) {
+        d();
+    }
 }
 
 void FrameGraph::addRenderPass(const RenderPass& pass) {

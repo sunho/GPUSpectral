@@ -71,6 +71,7 @@ VOIDCOMMAND(setPrimitiveBuffer, PrimitiveHandle, handle, VertexBufferHandle, ver
 VOIDCOMMAND(beginRenderPass, RenderTargetHandle, renderTarget, RenderPassParams, params)
 VOIDCOMMAND0(endRenderPass)
 VOIDCOMMAND(draw, PipelineState, pipeline, PrimitiveHandle, primitive)
+VOIDCOMMAND(dispatch, PipelineState, pipeline, size_t, groupCountX, size_t, groupCountY, size_t, groupCountZ)
 COMMAND0(Extent2D, getFrameSize)
 COMMAND0(BLASHandle, createBLAS)
 COMMAND0(TLASHandle, createTLAS)

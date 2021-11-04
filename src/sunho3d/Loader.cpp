@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "Engine.h"
-#include "Renderer.h"
+#include "renderer/Renderer.h"
 #include "Scene.h"
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION

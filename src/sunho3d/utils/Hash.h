@@ -49,3 +49,21 @@ inline uint64_t hashStruct(const T& value) {
 
     return hashStructBase<T, uint8_t>(value);
 }
+
+template <typename T, typename = std::enable_if_t<std::is_integral<T>::value>>
+static inline uint64_t hashBuffer(const T* buffer, size_t size) {
+    uint64_t result = fnvSeed;
+    const uint8_t* bits = reinterpret_cast<const uint8_t*>(buffer);
+
+    for (uint64_t n = 0; n < (size / sizeof(uint64_t)); ++n) {
+        uint64_t val{};
+        std::memcpy(&val, bits + (n * sizeof(uint64_t)), sizeof(uint64_t));
+        result = hash64(result, val);
+    }
+
+    for (size_t i = 0; i < size % sizeof(uint64_t); ++i) {
+        result = hash64(result, bits[(size / sizeof(uint64_t)) + i]);
+    }
+
+    return result;
+}

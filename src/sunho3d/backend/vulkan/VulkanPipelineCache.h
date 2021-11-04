@@ -36,8 +36,8 @@ struct VulkanPipelineState {
     DepthTest depthTest;
 
     bool operator==(const VulkanPipelineState &other) const {
-        return attributes == other.attributes && attributeCount == other.attributeCount && program == other.program
-        &&viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
+        return attributes == other.attributes && attributeCount == other.attributeCount && program->program.hash() == other.program->program.hash()
+        && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
 };
 
@@ -120,12 +120,14 @@ class VulkanDescriptorAllocator {
 class VulkanPipelineCache {
   public:
     VulkanPipelineCache(VulkanDevice &device);
-    VkPipeline getOrCreatePipeline(const VulkanPipelineState &state);
+    VkPipeline getOrCreateGraphicsPipeline(const VulkanPipelineState &state);
+    VkPipeline getOrCreateComputePipeline(const VulkanProgram &program);
+
     vk::Framebuffer getOrCreateFrameBuffer(vk::RenderPass renderPass,
                                          VulkanSwapChain swapchain, 
                                          VulkanRenderTarget *renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
-    void bindDescriptor(vk::CommandBuffer cmd, const VulkanPipelineState &state, const VulkanBindings& bindings);
+    void bindDescriptor(vk::CommandBuffer cmd, const VulkanProgram &program, const VulkanBindings& bindings);
     void tick();
 
   private:
@@ -140,9 +142,7 @@ class VulkanPipelineCache {
         return descriptorAllocators[currentFrame % 3];
     }
     PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute);
-    VkPipeline createGraphicsPipeline(const VulkanPipelineState &key);
-    VkPipeline createComputePipeline(const VulkanPipelineState &key);
-
+   
     struct KeyHasher {
         std::size_t operator()(const VulkanAttachments& k) const {
             return hashStruct<VulkanAttachments>(k);
@@ -159,9 +159,14 @@ class VulkanPipelineCache {
         std::size_t operator()(const BindingMap &k) const {
             return hashStruct(k);
         }
+        std::size_t operator()(const ProgramHash &k) const {
+            return k;
+        }
+        
     };
 
-    GCPool<VulkanPipelineState, VkPipeline, KeyHasher> pipelines;
+    GCPool<ProgramHash, VkPipeline, KeyHasher> computePipelines;
+    GCPool<VulkanPipelineState, VkPipeline, KeyHasher> graphicsPipelines;
     GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, KeyHasher> framebuffers;
     GCPool<VulkanAttachments, VkRenderPass, KeyHasher> renderpasses;
     GCPool<ProgramParameterLayout, PipelineLayout, KeyHasher> pipelineLayouts;

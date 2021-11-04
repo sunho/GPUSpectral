@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <sunho3d/utils/Hash.h>
 
 using ProgramCode = std::vector<char>;
 
@@ -70,6 +71,8 @@ struct ProgramParameterLayout {
     std::array<LayoutField, TABLE_SIZE> fields{};
 };
 
+using ProgramHash = uint64_t;
+
 struct ProgramParameter {
     uint32_t set{};
     uint32_t binding{};
@@ -82,6 +85,13 @@ struct Program {
         : type(ProgramType::PIPELINE) {
         codes[0] = std::vector(vertCode, vertCode + vertSize);
 		codes[1] = std::vector(fragCode, fragCode + fragSize);
+        _hash = hashBuffer<char>(codes[0].data(), codes[0].size()) ^ hashBuffer<char>(codes[1].data(), codes[1].size());
+    }
+
+    explicit Program(const char* compCode, size_t compSize)
+        : type(ProgramType::COMPUTE) {
+        codes[0] = std::vector(compCode, compCode + compSize);
+        _hash = hashBuffer<char>(codes[0].data(), codes[0].size());
     }
 
     const ProgramCode& vertex() const {
@@ -96,11 +106,14 @@ struct Program {
         return codes[0];
     }
 
+    ProgramHash hash() const {
+        return _hash;
+    }
+
     ProgramParameterLayout parameterLayout;
     ProgramType type;
-
-
   private:
+    ProgramHash _hash;
     std::array<ProgramCode, 2> codes;
 };
 

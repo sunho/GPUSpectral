@@ -1,3 +1,7 @@
 /build
 /out
 /.vs
+
+/comp.spv
+/frag.spv
+/vert.spv

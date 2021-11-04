@@ -236,51 +236,6 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
 
     VulkanProgram *program = handle_cast<VulkanProgram>(pipeline.program);
 
-    VulkanBindings bindings;
-    for (auto [key, binding] : pipeline.bindings) {
-        VulkanBinding vb = {};
-        vb.arraySize = binding.handles.size();
-        vb.binding = key.binding;
-        vb.set = key.set;
-        vb.type = translateDescriptorType(binding.type);
-        switch (binding.type) {
-            case ProgramParameterType::UNIFORM: {
-                for (auto handle : binding.handles) {
-                    auto ub = handle_cast<VulkanUniformBuffer>(handle.uniformBuffer);
-                    vk::DescriptorBufferInfo bufferInfo{};
-                    bufferInfo.offset = 0;
-                    bufferInfo.buffer = ub->buffer->buffer;
-                    bufferInfo.range = ub->buffer->size;
-                    vb.bufferInfo.push_back(bufferInfo);
-                }
-                break;
-            }
-            case ProgramParameterType::STORAGE: {
-                for (auto handle : binding.handles) {
-                    auto sb = handle_cast<VulkanBufferObject>(handle.buffer);
-                    vk::DescriptorBufferInfo bufferInfo{};
-                    bufferInfo.offset = 0;
-                    bufferInfo.buffer = sb->buffer;
-                    bufferInfo.range = sb->size;
-                    vb.bufferInfo.push_back(bufferInfo);
-                }
-                break;
-            }
-            case ProgramParameterType::TEXTURE: {
-                for (auto handle : binding.handles) {
-                    auto tex = handle_cast<VulkanTexture>(handle.texture);
-                    vk::DescriptorImageInfo imageInfo{};
-                    imageInfo.imageLayout = tex->imageLayout;
-                    imageInfo.imageView = tex->view;
-                    imageInfo.sampler = tex->sampler;
-                    vb.imageInfo.push_back(imageInfo);
-                }
-                break;
-            }
-        }
-        bindings.push_back(vb);
-    }
-
     VulkanPipelineState state = {
         .attributes = prim->vertex->attributes, 
         .attributeCount = prim->vertex->attributeCount, 
@@ -290,12 +245,21 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         .depthTest = pipeline.depthTest
     };
 
-    VkPipeline pl = device->cache->getOrCreatePipeline(state);
-    device->cache->bindDescriptor(cmd, state, bindings);
+    VkPipeline pl = device->cache->getOrCreateGraphicsPipeline(state);
+    device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pl);
     vkCmdBindVertexBuffers(cmd, 0, bufferCount, buffers, offsets);
     vkCmdBindIndexBuffer(cmd, prim->index->buffer->buffer, 0, VK_INDEX_TYPE_UINT16);
     vkCmdDrawIndexed(cmd, prim->index->count, 1, 0, 0, 0);
+}
+
+void VulkanDriver::dispatch(PipelineState pipeline, size_t groupCountX, size_t groupCountY, size_t groupCountZ) {
+    auto& cmd = context.inflight->cmd;
+    VulkanProgram* program = handle_cast<VulkanProgram>(pipeline.program);
+    VkPipeline pl = device->cache->getOrCreateComputePipeline(*program);
+    device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, pl);
+    cmd.dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
 void VulkanDriver::destroyVertexBuffer(VertexBufferHandle handle) {
@@ -401,4 +365,53 @@ void VulkanDriver::setupDebugMessenger() {
         VK_SUCCESS) {
         throw std::runtime_error("failed to set up debug messenger!");
     }
+}
+
+VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
+    VulkanBindings bindings;
+    for (auto [key, binding] : binds) {
+        VulkanBinding vb = {};
+        vb.arraySize = binding.handles.size();
+        vb.binding = key.binding;
+        vb.set = key.set;
+        vb.type = translateDescriptorType(binding.type);
+        switch (binding.type) {
+            case ProgramParameterType::UNIFORM: {
+                for (auto handle : binding.handles) {
+                    auto ub = handle_cast<VulkanUniformBuffer>(handle.uniformBuffer);
+                    vk::DescriptorBufferInfo bufferInfo{};
+                    bufferInfo.offset = 0;
+                    bufferInfo.buffer = ub->buffer->buffer;
+                    bufferInfo.range = ub->buffer->size;
+                    vb.bufferInfo.push_back(bufferInfo);
+                }
+                break;
+            }
+            case ProgramParameterType::STORAGE: {
+                for (auto handle : binding.handles) {
+                    auto sb = handle_cast<VulkanBufferObject>(handle.buffer);
+                    vk::DescriptorBufferInfo bufferInfo{};
+                    bufferInfo.offset = 0;
+                    bufferInfo.buffer = sb->buffer;
+                    bufferInfo.range = sb->size;
+                    vb.bufferInfo.push_back(bufferInfo);
+                }
+                break;
+            }
+            case ProgramParameterType::TEXTURE: {
+                for (auto handle : binding.handles) {
+                    auto tex = handle_cast<VulkanTexture>(handle.texture);
+                    vk::DescriptorImageInfo imageInfo{};
+                    imageInfo.imageLayout = tex->imageLayout;
+                    imageInfo.imageView = tex->view;
+                    imageInfo.sampler = tex->sampler;
+                    vb.imageInfo.push_back(imageInfo);
+                }
+                break;
+            }
+        }
+        bindings.push_back(vb);
+    }
+
+    return bindings;
 }

@@ -84,6 +84,7 @@ class VulkanDriver {
 
   private:
     void setupDebugMessenger();
+    VulkanBindings translateBindingMap(const BindingMap& binds);
     
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL

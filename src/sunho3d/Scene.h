@@ -24,29 +24,7 @@ struct LightData {
     glm::vec4 RI;
 };
 
-struct TransformBuffer {
-    glm::mat4 MVP;
-    glm::mat4 model;
-    glm::mat4 invModelT;
-    glm::vec4 cameraPos;
-};
-
 static constexpr const size_t MAX_LIGHTS = 64;
-
-struct Instance {
-    glm::mat4 transform;
-    uint32_t vertexStart;
-    float pad[3];
-};
-
-static constexpr const size_t MAX_INSTANCES = 64;
-
-struct ForwardRTSceneBuffer {
-    glm::uvec2 frameSize;
-    uint32_t instanceNum;
-    uint32_t pad;
-    std::array<Instance, MAX_INSTANCES> instances;
-};
 
 struct LightBuffer {
     std::array<LightData, MAX_LIGHTS> lights;

@@ -6,7 +6,7 @@
 #include <memory>
 
 #include "Entity.h"
-#include "Renderer.h"
+#include "renderer/Renderer.h"
 #include "Scene.h"
 #include "Window.h"
 #include "utils/ResourceList.h"
