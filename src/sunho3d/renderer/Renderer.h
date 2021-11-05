@@ -29,13 +29,28 @@ struct Instance {
     float pad[3];
 };
 
-static constexpr const size_t MAX_INSTANCES = 64;
+static constexpr const size_t MAX_INSTANCES = 32;
 
 struct ForwardRTSceneBuffer {
     glm::uvec2 frameSize;
     uint32_t instanceNum;
     uint32_t pad;
     std::array<Instance, MAX_INSTANCES> instances;
+};
+
+struct DDGIPushConstants {
+    uint32_t globalRngState;
+};
+
+struct DDGISceneBuffer {
+    glm::uvec2 frameSize;
+    uint32_t instanceNum;
+    uint32_t pad;
+    std::array<Instance, MAX_INSTANCES> instances;
+    glm::uvec3 gridNum;
+    float pad1;
+    glm::vec3 sceneSize;
+    float pad2;
 };
 
 class Scene;
@@ -47,7 +62,6 @@ struct InflightData {
     std::unique_ptr<FrameGraph> rg;
 
     std::vector<RTInstance> instances;
-
     //ddgi
 
 };
@@ -55,10 +69,28 @@ struct InflightData {
 struct DDGIPassContext {
     Handle<HwTexture> probeIrradiance;
     Handle<HwTexture> probeMeanDistance;
-    int gridSize{ 32 };
-    float sceneSize;
     float hysteresis{ 0.75 };
-    
+};
+
+struct GBuffer {
+    GBuffer(VulkanDriver& driver, uint32_t width, uint32_t height) {
+        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::DEPTH32F, width, height);
+        RenderAttachments atts = {};
+        atts.colors[0] = positionBuffer;
+        atts.colors[1] = normalBuffer;
+        atts.colors[2] = diffuseBuffer;
+        atts.depth = depthBuffer;
+
+        renderTarget = driver.createRenderTarget(width, height, atts);
+    }
+    Handle<HwTexture> positionBuffer;
+    Handle<HwTexture> normalBuffer;
+    Handle<HwTexture> diffuseBuffer;
+    Handle<HwTexture> depthBuffer;
+    Handle<HwRenderTarget> renderTarget;
 };
 
 constexpr static size_t MAX_INFLIGHTS = 2; 
@@ -76,6 +108,7 @@ class Renderer : public IdResource {
   private:
     void registerPrograms();
     void rasterSuite(Scene* scene);
+    void deferSuite(Scene* scene);
     void rtSuite(Scene* scene);
     void ddgiSuite(Scene* scene);
 
@@ -84,7 +117,9 @@ class Renderer : public IdResource {
     Handle<HwProgram> fowradPassProgram;
     Handle<HwProgram> forwardRTProgram;
     Handle<HwProgram> blitProgram;
+    Handle<HwProgram> gbufferGenProgram;
     Handle<HwProgram> ddgiProbeRayGenProgram;
+    Handle<HwProgram> deferredRenderProgram;
 
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
@@ -94,6 +129,7 @@ class Renderer : public IdResource {
     std::unordered_map<uint32_t, Handle<HwBLAS> > blasMap;
 
     DDGIPassContext ddgiContext;
+    std::unique_ptr<GBuffer> gbuffer;
 
     VulkanDriver driver;
     Window* window;

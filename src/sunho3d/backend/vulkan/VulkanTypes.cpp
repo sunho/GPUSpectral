@@ -50,6 +50,8 @@ vk::Format translateTextureFormat(TextureFormat format) {
             return vk::Format::eD24UnormS8Uint;
         case TextureFormat::DEPTH32F_STENCIL8:
             return vk::Format::eD32SfloatS8Uint;
+        case TextureFormat::RGBA16F:
+            return vk::Format::eR16G16B16A16Sfloat;
         default: {
             assert(false);
         }

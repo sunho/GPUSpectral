@@ -57,6 +57,7 @@ enum class TextureFormat : uint16_t {
     R32UI,
     R32I,
     RG16F,
+    RGBA16F,
     RG16UI,
     RG16I,
     R11F_G11F_B10F,
@@ -161,15 +162,10 @@ struct RenderPassParams {
     Viewport viewport{};
 };
 
-struct TextureAttachment {
-    Handle<HwTexture> handle;
-    uint32_t layer{};
-    uint32_t level{};
-};
-
-struct ColorAttachment {
+struct RenderAttachments {
     static constexpr size_t MAX_MRT_NUM = 8;
-    std::array<TextureAttachment, MAX_MRT_NUM> colors;
+    std::array<Handle<HwTexture>, MAX_MRT_NUM> colors;
+    Handle<HwTexture> depth{};
     uint32_t targetNum{};
 };
 

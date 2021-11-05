@@ -21,7 +21,7 @@ inline uint64_t hashStruct<VulkanAttachment>(const VulkanAttachment& attachment)
 template <>
 inline uint64_t hashStruct<VulkanAttachments>(const VulkanAttachments& attachment) {
     uint64_t seed = hashStruct(attachment.depth);
-    for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+    for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
 			seed ^= hashStruct(attachment.colors[i]);
     }
     return hashBase(seed);
@@ -33,10 +33,11 @@ struct VulkanPipelineState {
     VulkanProgram *program;
     Viewport viewport;
     VkRenderPass renderPass;
+    size_t attachmentCount;
     DepthTest depthTest;
 
     bool operator==(const VulkanPipelineState &other) const {
-        return attributes == other.attributes && attributeCount == other.attributeCount && program->program.hash() == other.program->program.hash()
+        return attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && program->program.hash() == other.program->program.hash()
         && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
 };
@@ -62,6 +63,7 @@ inline uint64_t hashStruct<VulkanPipelineState>(const VulkanPipelineState &pipel
     seed ^= hashStruct(pipelineKey.program);
     seed ^= hashStruct(pipelineKey.renderPass);
     seed ^= hashStruct(pipelineKey.viewport);
+    seed ^= hashStruct(pipelineKey.attachmentCount);
     seed ^= hashStruct(pipelineKey.depthTest);
     return hashBase(seed);
 }

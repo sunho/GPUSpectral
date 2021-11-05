@@ -49,6 +49,7 @@ struct VulkanInflight : public HwInflight {
 };
 
 struct DriverContext { 
+    VulkanRenderTarget *currentRenderTarget{};
     vk::RenderPass currentRenderPass{};
     Viewport viewport{};
     VulkanInflight* inflight{};

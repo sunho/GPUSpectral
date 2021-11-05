@@ -79,14 +79,16 @@ RenderTargetHandle VulkanDriver::createDefaultRenderTarget(int dummy) {
     return handle;
 }
 
-RenderTargetHandle VulkanDriver::createRenderTarget(uint32_t width, uint32_t height, ColorAttachment color, TextureAttachment depth) {
+RenderTargetHandle VulkanDriver::createRenderTarget(uint32_t width, uint32_t height, RenderAttachments renderAttachments) {
     VulkanAttachments attachments = {};
-    std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> colorTargets = {};
-    for (size_t i = 0; i < color.targetNum; ++i) {
-        attachments.colors[i] = VulkanAttachment(handle_cast<VulkanTexture>(color.colors[i].handle));
+    std::array<VulkanAttachment, RenderAttachments::MAX_MRT_NUM> colorTargets = {};
+    for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
+        if (renderAttachments.colors[i]) {
+            attachments.colors[i] = VulkanAttachment(handle_cast<VulkanTexture>(renderAttachments.colors[i]));
+        }
     }
-    if (depth.handle) {
-        attachments.depth = VulkanAttachment(handle_cast<VulkanTexture>(depth.handle));
+    if (renderAttachments.depth) {
+        attachments.depth = VulkanAttachment(handle_cast<VulkanTexture>(renderAttachments.depth));
     }
     Handle<HwRenderTarget> handle = alloc_handle<VulkanRenderTarget, HwRenderTarget>();
     construct_handle<VulkanRenderTarget>(handle, width, height, attachments);
@@ -167,7 +169,9 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
     renderPassInfo.renderArea.offset = { .x = 0, .y= 0 };
     renderPassInfo.renderArea.extent = rt->getExtent(*device);
     std::vector<vk::ClearValue> clearValues{};
-    clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 1.0f}));
+    for (size_t i = 0; i < rt->attachmentCount; ++i) {
+        clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f })); 
+    }
     if (rt->attachments.depth.valid) {
         clearValues.push_back(vk::ClearDepthStencilValue().setDepth(1.0f));
     }
@@ -181,6 +185,7 @@ void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassPa
         params.viewport.height = extent.height;
     }
     context.viewport = params.viewport;
+    context.currentRenderTarget = rt;
     context.currentRenderPass = renderPass;
 }
 
@@ -237,11 +242,12 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     VulkanProgram *program = handle_cast<VulkanProgram>(pipeline.program);
 
     VulkanPipelineState state = {
-        .attributes = prim->vertex->attributes, 
-        .attributeCount = prim->vertex->attributeCount, 
-        .program = program, 
-        .viewport = context.viewport, 
+        .attributes = prim->vertex->attributes,
+        .attributeCount = prim->vertex->attributeCount,
+        .program = program,
+        .viewport = context.viewport,
         .renderPass = context.currentRenderPass,
+        .attachmentCount = context.currentRenderTarget->attachmentCount,
         .depthTest = pipeline.depthTest
     };
 
@@ -249,7 +255,7 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
-        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eAll, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data()); 
+        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data()); 
     } 
     cmd.bindVertexBuffers(0, bufferCount, buffers, offsets);
     cmd.bindIndexBuffer(prim->index->buffer->buffer, 0, vk::IndexType::eUint32);
@@ -263,7 +269,7 @@ void VulkanDriver::dispatch(PipelineState pipeline, size_t groupCountX, size_t g
     device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
-        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eAll, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data());
+        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data());
     }
     cmd.dispatch(groupCountX, groupCountY, groupCountZ);
 }

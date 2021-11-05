@@ -271,7 +271,9 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
     multisampling.alphaToCoverageEnable = false;  // Optional
     multisampling.alphaToOneEnable = false;          // Optional
 
+    std::vector<vk::PipelineColorBlendAttachmentState> attachments{};
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+    
     colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
     colorBlendAttachment.blendEnable = false;
     colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
@@ -289,11 +291,14 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
     colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eZero;
     colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
 
+    for (size_t i = 0; i < state.attachmentCount; ++i) {
+        attachments.push_back(colorBlendAttachment);
+    }
     vk::PipelineColorBlendStateCreateInfo colorBlending{};
     colorBlending.logicOpEnable = false;
     colorBlending.logicOp = vk::LogicOp::eCopy;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.attachmentCount = state.attachmentCount;
+    colorBlending.pAttachments = attachments.data();
     colorBlending.blendConstants[0] = 0.0f;  // Optional
     colorBlending.blendConstants[1] = 0.0f;  // Optional
     colorBlending.blendConstants[2] = 0.0f;  // Optional
@@ -372,7 +377,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
         colorAttachmentRef.push_back({ .attachment = 0,
                                        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
     } else {
-        for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+        for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
             auto &color = renderTarget->attachments.colors[i];
             if (color.valid) {
                 attachments.push_back({ .format = color.format,
@@ -438,7 +443,7 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
     if (renderTarget->surface) {
         attachments.push_back(swapchain.view);
     } else {
-        for (size_t i = 0; i < ColorAttachment::MAX_MRT_NUM; ++i) {
+        for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
             auto &color = renderTarget->attachments.colors[i];
             if (color.valid) {
                 attachments.push_back(color.view);

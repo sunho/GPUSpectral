@@ -76,17 +76,21 @@ struct VulkanAttachment {
 };
 
 struct VulkanAttachments {
-    std::array<VulkanAttachment, ColorAttachment::MAX_MRT_NUM> colors;
+    std::array<VulkanAttachment, RenderAttachments::MAX_MRT_NUM> colors;
     VulkanAttachment depth{};
     bool operator==(const VulkanAttachments &other) const = default;
 };
 
 struct VulkanRenderTarget : public HwRenderTarget {
     VulkanRenderTarget()
-        : HwRenderTarget(0, 0), surface(true) {
+        : HwRenderTarget(0, 0), surface(true), attachmentCount(1) {
     }
     explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachments attachments)
         : HwRenderTarget(w, h), attachments(attachments), surface(false) {
+        for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
+            if (attachments.colors[i].valid)
+                ++attachmentCount;
+        }
     }
     vk::Extent2D getExtent(VulkanDevice& device) {
         if (surface) {
@@ -108,6 +112,7 @@ struct VulkanRenderTarget : public HwRenderTarget {
 
     bool surface;
     VulkanAttachments attachments;
+    size_t attachmentCount;
 };
 
 struct VulkanPrimitive : public HwPrimitive {

@@ -64,6 +64,11 @@ private:
     VulkanDriver& driver;
 };
 
+struct DDGIConfig {
+    glm::uvec3 gridNum{};
+    glm::vec3 worldSize{};
+};
+
 class Scene : public IdResource {
   public:
     Scene(Renderer* renderer);
@@ -76,7 +81,7 @@ class Scene : public IdResource {
         return camera;
     }
     void prepare();
-
+    DDGIConfig ddgi;
   private:
     void visitEntity(Entity* entity, const glm::mat4& currentTransform);
 

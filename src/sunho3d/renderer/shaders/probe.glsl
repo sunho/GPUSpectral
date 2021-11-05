@@ -5,7 +5,7 @@
 // pos = (x - max_x/2)
 
 uvec3 probIDToGrid(uint id, uvec3 gridNum) {
-    uint z = id / gridNum.x * gridNum.y;
+    uint z = id / (gridNum.x * gridNum.y);
     uint y = (id % (gridNum.x * gridNum.y)) / gridNum.x;
     uint x = id % gridNum.x;
     return uvec3(x,y,z);

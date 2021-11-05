@@ -60,6 +60,7 @@ struct PipelineState {
     PipelineState& copyPushConstants(void* buf, size_t size) {
         pushConstants.resize(size);
         memcpy(pushConstants.data(), buf, size);
+        return *this;
     }
 
     PipelineState& bindUniformBuffer(uint32_t set, uint32_t binding, Handle<HwUniformBuffer> buffer) {

@@ -21,9 +21,10 @@ layout( push_constant ) uniform PushConstants {
     uint globalRngState;
 } constants;
 
-layout(std140, set=3, binding = 0) buffer RayBuffer {
+layout(std140, set=1, binding = 0) buffer RayBuffer {
     Ray rays[];
 } rayBuffer;
+
 
 void main() {
     uint gID = gl_GlobalInvocationID.x;
