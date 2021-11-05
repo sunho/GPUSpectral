@@ -71,10 +71,28 @@ struct PipelineState {
         return *this;
     }
 
+    PipelineState& bindTextureArray(uint32_t set, uint32_t binding, Handle<HwTexture>* texture, size_t size) {
+        Binding b = {};
+        b.type = ProgramParameterType::TEXTURE;
+        for (size_t i = 0; i < size; ++i) {
+            b.handles.push_back({ .texture = texture[i] });
+        }
+        bindings[{ set, binding }] = b;
+        return *this;
+    }
+
     PipelineState& bindTexture(uint32_t set, uint32_t binding, Handle<HwTexture> texture) {
         Binding b = {};
         b.type = ProgramParameterType::TEXTURE;
-        b.handles.push_back({.texture=texture});
+        b.handles.push_back({ .texture = texture });
+        bindings[{ set, binding }] = b;
+        return *this;
+    }
+
+     PipelineState& bindStorageImage(uint32_t set, uint32_t binding, Handle<HwTexture> texture) {
+        Binding b = {};
+        b.type = ProgramParameterType::IMAGE;
+        b.handles.push_back({ .texture = texture });
         bindings[{ set, binding }] = b;
         return *this;
     }

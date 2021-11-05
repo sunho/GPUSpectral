@@ -16,6 +16,7 @@ struct RayHit {
 struct Instance {
     mat4 transform;
     int vertexStart;
+    int diffuseMapIndex;
 };
 
 struct Ray {

@@ -201,6 +201,8 @@ vk::BufferUsageFlags translateBufferUsage(BufferUsage usage) {
 
 vk::DescriptorType translateDescriptorType(ProgramParameterType type) {
     switch (type) {
+        case ProgramParameterType::IMAGE:
+            return vk::DescriptorType::eStorageImage;
         case ProgramParameterType::UNIFORM:
             return vk::DescriptorType::eUniformBuffer;
         case ProgramParameterType::STORAGE:

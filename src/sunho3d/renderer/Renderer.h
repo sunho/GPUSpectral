@@ -26,10 +26,12 @@ struct TransformBuffer {
 struct Instance {
     glm::mat4 transform;
     uint32_t vertexStart;
-    float pad[3];
+    uint32_t diffuseMapIndex;
+    float pad[2];
 };
 
 static constexpr const size_t MAX_INSTANCES = 32;
+static constexpr const size_t RAYS_PER_PROBE = 256;
 
 struct ForwardRTSceneBuffer {
     glm::uvec2 frameSize;
@@ -119,6 +121,7 @@ class Renderer : public IdResource {
     Handle<HwProgram> blitProgram;
     Handle<HwProgram> gbufferGenProgram;
     Handle<HwProgram> ddgiProbeRayGenProgram;
+    Handle<HwProgram> ddgiProbeRayShadeProgram;
     Handle<HwProgram> deferredRenderProgram;
 
     Handle<HwRenderTarget> surfaceRenderTarget;
@@ -130,6 +133,7 @@ class Renderer : public IdResource {
 
     DDGIPassContext ddgiContext;
     std::unique_ptr<GBuffer> gbuffer;
+    std::unique_ptr<GBuffer> rayGbuffer;
 
     VulkanDriver driver;
     Window* window;

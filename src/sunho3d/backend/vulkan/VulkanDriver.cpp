@@ -410,6 +410,7 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
                 }
                 break;
             }
+            case ProgramParameterType::IMAGE:
             case ProgramParameterType::TEXTURE: {
                 for (auto handle : binding.handles) {
                     auto tex = handle_cast<VulkanTexture>(handle.texture);

@@ -98,6 +98,18 @@ void Renderer::registerPrograms() {
         .addStorageBuffer(1, 0);
     ddgiProbeRayGenProgram = driver.createProgram(prog);
 
+    prog = { DDGIProbeRayShade, DDGIProbeRayShadeSize };
+    prog.parameterLayout
+        .addStorageImage(2, 0)
+        .addStorageImage(2, 1)
+        .addStorageImage(2, 2)
+        .addStorageImage(2, 3)
+        .addTextureArray(2, 4, 32)
+        .addStorageBuffer(1, 0)
+        .addStorageBuffer(1, 1)
+        .addUniformBuffer(0, 0);
+    ddgiProbeRayShadeProgram = driver.createProgram(prog);
+
     prog = { GBufferGenVert, GBufferGenVertSize, GBufferGenFrag, GBufferGenFragSize };
     prog.parameterLayout
         .addUniformBuffer(0, 0)
@@ -342,7 +354,7 @@ Handle<HwUniformBuffer> Renderer::createTransformBuffer(FrameGraph& rg, const Ca
 }
 
 void Renderer::run(Scene* scene) {
-    deferSuite(scene);
+    ddgiSuite(scene);
 }
 
 void Renderer::rtSuite(Scene* scene) {
@@ -471,6 +483,12 @@ void Renderer::ddgiSuite(Scene* scene) {
     }
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
+    glm::uvec3 gridNum = scene->ddgi.gridNum;
+    size_t probeNum = gridNum.x * gridNum.y * gridNum.z;
+        
+    if (!rayGbuffer) {
+        rayGbuffer = std::make_unique<GBuffer>(driver, RAYS_PER_PROBE, probeNum);
+    }
 
     FrameGraph& renderGraph = *inflight.rg;
     renderGraph.reset();
@@ -498,13 +516,16 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto rayBufferRef = renderGraph.declareResource<Handle<HwBufferObject>>("Ray Buffer");
     auto hitBufferRef = renderGraph.declareResource<Handle<HwBufferObject>>("Hit Buffer");
     auto sceneBufferRef = renderGraph.declareResource<Handle<HwUniformBuffer>>("RT Scene buffer");
-    renderGraph.addRenderPass("build tlas and scene buffer", {}, { tlasRef, sceneBufferRef }, [this, sceneBufferRef, tlasRef, &inflight, scene, &sceneData](FrameGraph& rg) {
+    auto diffuseMapRef = renderGraph.declareResource<FixedVector<Handle<HwTexture>> >("Diffuse map");
+    renderGraph.addRenderPass("build tlas and scene buffer", {}, { tlasRef, sceneBufferRef, diffuseMapRef }, [this, diffuseMapRef, sceneBufferRef, tlasRef, &inflight, scene, &sceneData](FrameGraph& rg) {
         DDGISceneBuffer sceneBuffer = {};
         auto f = driver.getFrameSize();
         sceneBuffer.frameSize = glm::uvec2(f.width, f.height);
         sceneBuffer.instanceNum = sceneData.geometries.size();
         sceneBuffer.gridNum = scene->ddgi.gridNum;
         sceneBuffer.sceneSize = scene->ddgi.worldSize;
+        FixedVector<TextureHandle> diffuseMap(sceneBuffer.instanceNum);
+
         for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
             auto& geom = sceneData.geometries[i];
             auto& model = sceneData.worldTransforms[i];
@@ -528,7 +549,9 @@ void Renderer::ddgiSuite(Scene* scene) {
             Instance ginstance = {};
             ginstance.vertexStart = geom.vertexStart;
             ginstance.transform = model;
+            ginstance.diffuseMapIndex = i;
             sceneBuffer.instances[i] = ginstance;
+            diffuseMap[i] = geom.material->diffuseMap;
         }
         RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
         auto tlas = driver.createTLAS();
@@ -538,6 +561,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         auto sb = rg.createUniformBufferSC(sizeof(DDGISceneBuffer));
         driver.updateUniformBuffer(sb, { (uint32_t*)&sceneBuffer }, 0);
         rg.defineResource(sceneBufferRef, sb);
+        rg.defineResource(diffuseMapRef, diffuseMap);
     });
     // First pass: shadow map for direct lighting (raster)
 
@@ -546,7 +570,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         Handle<HwUniformBuffer> sceneBuffer = rg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
         glm::uvec3 gridNum = scene->ddgi.gridNum;
         size_t probeNum = gridNum.x * gridNum.y * gridNum.z;
-        auto rayBuffer = rg.createBufferObjectSC(sizeof(Ray) * probeNum * 32, BufferUsage::TRANSFER_SRC | BufferUsage::STORAGE);
+        auto rayBuffer = rg.createBufferObjectSC(sizeof(Ray) * probeNum * RAYS_PER_PROBE, BufferUsage::TRANSFER_SRC | BufferUsage::STORAGE);
         
         DDGIPushConstants constants = {};
         constants.globalRngState = rand();
@@ -555,7 +579,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         pipe.bindStorageBuffer(1, 0, rayBuffer);
         pipe.copyPushConstants(&constants, sizeof(constants));
         pipe.program = ddgiProbeRayGenProgram;
-        driver.dispatch(pipe, probeNum * 32, 1, 1);
+        driver.dispatch(pipe, probeNum * RAYS_PER_PROBE, 1, 1);
         rg.defineResource(rayBufferRef, rayBuffer);
     });
     renderGraph.addRenderPass("intersect", { tlasRef, rayBufferRef }, { hitBufferRef }, [this, rayBufferRef, hitBufferRef, tlasRef, scene, &sceneData, &renderGraph](FrameGraph& rg) {
@@ -564,12 +588,32 @@ void Renderer::ddgiSuite(Scene* scene) {
         glm::uvec3 gridNum = scene->ddgi.gridNum;
         size_t probeNum = gridNum.x * gridNum.y * gridNum.z;
        
-        auto hitBuffer = renderGraph.createBufferObjectSC(sizeof(RayHit) * probeNum*32, BufferUsage::TRANSFER_DST | BufferUsage::STORAGE);
-        driver.intersectRays(tlas, probeNum*32, rayBuffer, hitBuffer);
+        auto hitBuffer = renderGraph.createBufferObjectSC(sizeof(RayHit) * probeNum * RAYS_PER_PROBE, BufferUsage::TRANSFER_DST | BufferUsage::STORAGE);
+        driver.intersectRays(tlas, probeNum * RAYS_PER_PROBE, rayBuffer, hitBuffer);
         renderGraph.defineResource(hitBufferRef, hitBuffer);
     });
     // Third pass: probe ray shading (compute)
-
+    renderGraph.addRenderPass("probe ray shade", { hitBufferRef }, {}, [this, hitBufferRef, rayBufferRef, diffuseMapRef, sceneBufferRef, probeNum, scene, &sceneData](FrameGraph& rg) {
+        Handle<HwTexture> distanceBuffer = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, RAYS_PER_PROBE, probeNum);
+        Handle<HwUniformBuffer> sceneBuffer = rg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
+        FixedVector<TextureHandle> diffuseMap = rg.getResource<FixedVector<TextureHandle>>(diffuseMapRef);
+        Handle<HwBufferObject> hitBuffer = rg.getResource<Handle<HwBufferObject>>(hitBufferRef);
+        
+        DDGIPushConstants constants = {};
+        constants.globalRngState = rand();
+        PipelineState pipe = {};
+        pipe.bindStorageImage(2, 0, rayGbuffer->positionBuffer);
+        pipe.bindStorageImage(2, 1, rayGbuffer->normalBuffer);
+        pipe.bindStorageImage(2, 2, rayGbuffer->diffuseBuffer);
+        pipe.bindStorageImage(2, 3, distanceBuffer);
+        pipe.bindTextureArray(2, 4, diffuseMap.data(), sceneData.geometries.size());
+        pipe.bindUniformBuffer(0, 0, sceneBuffer);
+        pipe.bindStorageBuffer(1, 0, sceneData.globalVertexBuffer);
+        pipe.bindStorageBuffer(1, 1, hitBuffer);
+        pipe.copyPushConstants(&constants, sizeof(constants));
+        pipe.program = ddgiProbeRayShadeProgram;
+        driver.dispatch(pipe, probeNum * RAYS_PER_PROBE, 1, 1);
+    });
     // Third pass: probe update (compute)
 
     // Fourth pass: shading (raster)
