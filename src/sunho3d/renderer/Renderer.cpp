@@ -124,6 +124,24 @@ void Renderer::registerPrograms() {
         .addTexture(1, 1)
         .addTexture(1, 2);
     deferredRenderProgram = driver.createProgram(prog);
+
+    prog = { DDGIShadeVert, DDGIShadeVertSize, DDGIShadeFrag, DDGIShadeFragSize };
+    prog.parameterLayout
+        .addUniformBuffer(0, 0)
+        .addTexture(1, 0)
+        .addTexture(1, 1)
+        .addTexture(1, 2);
+    ddgiShadeProgram = driver.createProgram(prog);
+
+    prog = { DDGIProbeUpdate, DDGIProbeUpdateSize };
+    prog.parameterLayout
+        .addStorageBuffer(0, 0)
+        .addTexture(1, 0)
+        .addTexture(1, 1)
+        .addStorageImage(2, 0)
+        .addStorageImage(2, 1)
+        .addStorageImage(2, 2);
+    ddgiProbeUpdateProgram = driver.createProgram(prog);
 }
 
 Renderer::~Renderer() {
@@ -488,7 +506,15 @@ void Renderer::ddgiSuite(Scene* scene) {
         
     if (!rayGbuffer) {
         rayGbuffer = std::make_unique<GBuffer>(driver, RAYS_PER_PROBE, probeNum);
+        probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_SIZE * IRD_MAP_PROBE_COLS, IRD_MAP_SIZE * (probeNum / IRD_MAP_PROBE_COLS));
+        probeDistTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS));
+        probeDistSquareTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS));
     }
+
+    if (!gbuffer) {
+        gbuffer = std::make_unique<GBuffer>(driver, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    }
+
 
     FrameGraph& renderGraph = *inflight.rg;
     renderGraph.reset();
@@ -517,6 +543,9 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto hitBufferRef = renderGraph.declareResource<Handle<HwBufferObject>>("Hit Buffer");
     auto sceneBufferRef = renderGraph.declareResource<Handle<HwUniformBuffer>>("RT Scene buffer");
     auto diffuseMapRef = renderGraph.declareResource<FixedVector<Handle<HwTexture>> >("Diffuse map");
+    auto distanceBufferRef = renderGraph.declareResource<Handle<HwTexture>>("Distance buffer");
+    auto positionBufferRef = renderGraph.declareResource<Handle<HwTexture>>("Position buffer");
+    auto radianceBufferRef = renderGraph.declareResource<Handle<HwTexture>>("Radiance buffer");
     renderGraph.addRenderPass("build tlas and scene buffer", {}, { tlasRef, sceneBufferRef, diffuseMapRef }, [this, diffuseMapRef, sceneBufferRef, tlasRef, &inflight, scene, &sceneData](FrameGraph& rg) {
         DDGISceneBuffer sceneBuffer = {};
         auto f = driver.getFrameSize();
@@ -579,7 +608,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         pipe.bindStorageBuffer(1, 0, rayBuffer);
         pipe.copyPushConstants(&constants, sizeof(constants));
         pipe.program = ddgiProbeRayGenProgram;
-        driver.dispatch(pipe, probeNum * RAYS_PER_PROBE, 1, 1);
+        driver.dispatch(pipe, probeNum, 1, 1);
         rg.defineResource(rayBufferRef, rayBuffer);
     });
     renderGraph.addRenderPass("intersect", { tlasRef, rayBufferRef }, { hitBufferRef }, [this, rayBufferRef, hitBufferRef, tlasRef, scene, &sceneData, &renderGraph](FrameGraph& rg) {
@@ -593,7 +622,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         renderGraph.defineResource(hitBufferRef, hitBuffer);
     });
     // Third pass: probe ray shading (compute)
-    renderGraph.addRenderPass("probe ray shade", { hitBufferRef }, {}, [this, hitBufferRef, rayBufferRef, diffuseMapRef, sceneBufferRef, probeNum, scene, &sceneData](FrameGraph& rg) {
+    renderGraph.addRenderPass("probe ray gbuffer gen", { hitBufferRef }, { positionBufferRef, distanceBufferRef }, [this, positionBufferRef, distanceBufferRef, hitBufferRef, rayBufferRef, diffuseMapRef, sceneBufferRef, probeNum, scene, &sceneData](FrameGraph& rg) {
         Handle<HwTexture> distanceBuffer = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, RAYS_PER_PROBE, probeNum);
         Handle<HwUniformBuffer> sceneBuffer = rg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
         FixedVector<TextureHandle> diffuseMap = rg.getResource<FixedVector<TextureHandle>>(diffuseMapRef);
@@ -612,12 +641,128 @@ void Renderer::ddgiSuite(Scene* scene) {
         pipe.bindStorageBuffer(1, 1, hitBuffer);
         pipe.copyPushConstants(&constants, sizeof(constants));
         pipe.program = ddgiProbeRayShadeProgram;
-        driver.dispatch(pipe, probeNum * RAYS_PER_PROBE, 1, 1);
-    });
-    // Third pass: probe update (compute)
+        driver.dispatch(pipe, probeNum, 1, 1);
 
+        rg.defineResource<Handle<HwTexture>>(positionBufferRef, rayGbuffer->positionBuffer);
+        rg.defineResource<Handle<HwTexture>>(distanceBufferRef, distanceBuffer);
+    });
+    renderGraph.addRenderPass("probe ray shade", { positionBufferRef }, { radianceBufferRef }, [this, hitBufferRef, radianceBufferRef, rayBufferRef, diffuseMapRef, sceneBufferRef, probeNum, scene, &sceneData](FrameGraph& rg) {
+        auto color = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, RAYS_PER_PROBE, probeNum);
+        RenderAttachments att = {};
+        att.colors[0] = color;
+        auto renderTarget = rg.createRenderTargetSC(RAYS_PER_PROBE, probeNum, att);
+
+        auto positionBuffer = rayGbuffer->positionBuffer;
+        auto normalBuffer = rayGbuffer->normalBuffer;
+        auto diffuseBuffer = rayGbuffer->diffuseBuffer;
+        auto& camera = scene->getCamera();
+        PipelineState pipe = {};
+        pipe.program = this->ddgiShadeProgram;
+        auto lightUB = rg.createUniformBufferSC(sizeof(LightBuffer));
+        driver.updateUniformBuffer(lightUB, { .data = (uint32_t*)&sceneData.lightBuffer }, 0);
+        pipe.bindUniformBuffer(0, 0, lightUB);
+        pipe.bindTexture(1, 0, positionBuffer);
+        pipe.bindTexture(1, 1, normalBuffer);
+        pipe.bindTexture(1, 2, diffuseBuffer);
+        pipe.bindTexture(1, 3, probeTexture);
+        RenderPassParams params;
+        driver.beginRenderPass(renderTarget, params);
+        driver.draw(pipe, quadPrimitive);
+        driver.endRenderPass();
+        rg.defineResource<Handle<HwTexture>>(radianceBufferRef, color);
+    });
+
+    auto probeTextureRef = renderGraph.declareResource<Handle<HwTexture>>("Probe texture");
+    // Third pass: probe update (compute)
+    renderGraph.addRenderPass("probe update", { rayBufferRef, radianceBufferRef, distanceBufferRef }, { probeTextureRef }, [this, probeTextureRef, radianceBufferRef, positionBufferRef, distanceBufferRef, hitBufferRef, rayBufferRef, diffuseMapRef, sceneBufferRef, probeNum, scene, &sceneData](FrameGraph& rg) {
+        Handle<HwBufferObject> rayBuffer = rg.getResource<Handle<HwBufferObject>>(rayBufferRef);
+        Handle<HwTexture> radianceBuffer = rg.getResource<Handle<HwTexture>>(radianceBufferRef);
+        Handle<HwTexture> distanceBuffer = rg.getResource<Handle<HwTexture>>(distanceBufferRef);
+
+        DDGIPushConstants constants = {};
+        constants.globalRngState = rand();
+        PipelineState pipe = {};
+        pipe.bindStorageBuffer(0, 0, rayBuffer);
+        pipe.bindTexture(1, 0, radianceBuffer);
+        pipe.bindTexture(1, 1, distanceBuffer);
+        pipe.bindStorageImage(2, 0, probeTexture);
+        pipe.bindStorageImage(2, 1, probeDistTexture);
+        pipe.bindStorageImage(2, 2, probeDistSquareTexture);
+        pipe.program = ddgiProbeUpdateProgram;
+        driver.dispatch(pipe, probeNum, IRD_MAP_SIZE, IRD_MAP_SIZE);
+        rg.defineResource<Handle<HwTexture>>(probeTextureRef, probeTexture);
+    });
     // Fourth pass: shading (raster)
-    
+
+    auto positionRef = renderGraph.declareResource<Handle<HwTexture>>("Position texture");
+    auto normalRef = renderGraph.declareResource<Handle<HwTexture>>("Normal texture");
+    auto diffuseRef = renderGraph.declareResource<Handle<HwTexture>>("Diffuse texture");
+    auto renderedRef = renderGraph.declareResource<Handle<HwTexture>>("Rendered texture");
+
+    if (!gbuffer) {
+        gbuffer = std::make_unique<GBuffer>(driver, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    }
+
+    renderGraph.addRenderPass("gbuffer generation", {}, { positionRef, normalRef, diffuseRef }, [this, scene, &sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
+        auto& camera = scene->getCamera();
+
+        PipelineState pipe = {};
+        pipe.program = this->gbufferGenProgram;
+        pipe.depthTest.enabled = 1;
+        pipe.depthTest.write = 1;
+        pipe.depthTest.compareOp = CompareOp::LESS;
+        RenderPassParams params;
+        driver.beginRenderPass(gbuffer->renderTarget, params);
+        for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
+            auto& geom = sceneData.geometries[i];
+            auto& model = sceneData.worldTransforms[i];
+            pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(rg, camera, model));
+            pipe.bindTexture(1, 0, geom.material->diffuseMap);
+            driver.draw(pipe, geom.primitive);
+        }
+        driver.endRenderPass();
+        rg.defineResource<Handle<HwTexture>>(positionRef, gbuffer->positionBuffer);
+        rg.defineResource<Handle<HwTexture>>(normalRef, gbuffer->normalBuffer);
+        rg.defineResource<Handle<HwTexture>>(diffuseRef, gbuffer->diffuseBuffer);
+    });
+    renderGraph.addRenderPass("deferred render", { probeTextureRef, positionRef, normalRef, diffuseRef }, { renderedRef }, [this, scene, renderedRef, probeTextureRef , & sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
+        auto color = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        auto depth = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+        RenderAttachments att = {};
+        att.colors[0] = color;
+        att.depth = depth;
+        auto renderTarget = rg.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att);
+        auto positionBuffer = rg.getResource<Handle<HwTexture>>(positionRef);
+        auto normalBuffer = rg.getResource<Handle<HwTexture>>(normalRef);
+        auto diffuseBuffer = rg.getResource<Handle<HwTexture>>(diffuseRef);
+        auto probeIrradianceMap = rg.getResource<Handle<HwTexture>>(probeTextureRef);
+        auto& camera = scene->getCamera();
+        PipelineState pipe = {};
+        pipe.program = this->deferredRenderProgram;
+        auto lightUB = rg.createUniformBufferSC(sizeof(LightBuffer));
+        driver.updateUniformBuffer(lightUB, { .data = (uint32_t*)&sceneData.lightBuffer }, 0);
+        pipe.bindUniformBuffer(0, 0, lightUB);
+        pipe.bindTexture(1, 0, positionBuffer);
+        pipe.bindTexture(1, 1, normalBuffer);
+        pipe.bindTexture(1, 2, diffuseBuffer);
+        pipe.bindTexture(1, 3, probeIrradianceMap);
+        RenderPassParams params;
+        driver.beginRenderPass(renderTarget, params);
+        driver.draw(pipe, quadPrimitive);
+        driver.endRenderPass();
+        rg.defineResource<Handle<HwTexture>>(renderedRef, color);
+    });
+    renderGraph.addRenderPass("blit", { renderedRef }, {}, [this, scene, renderedRef, &renderGraph](FrameGraph& fg) {
+        Handle<HwTexture> rendered = fg.getResource<Handle<HwTexture>>(renderedRef);
+
+        PipelineState pipe = {};
+        pipe.program = this->blitProgram;
+        RenderPassParams params;
+        driver.beginRenderPass(this->surfaceRenderTarget, params);
+        pipe.bindTexture(1, 0, rendered);
+        driver.draw(pipe, this->quadPrimitive);
+        driver.endRenderPass();
+    });
 
     renderGraph.submit();
     driver.endFrame();

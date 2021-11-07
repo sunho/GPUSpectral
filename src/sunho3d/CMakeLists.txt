@@ -84,7 +84,7 @@ function(add_shader TARGET SHADENAME SHADER)
 	file(MAKE_DIRECTORY ${current-output-dir})
 	add_custom_command(
 		OUTPUT ${current-output-path}
-		COMMAND ${GLSLC} -o ${current-output-path} ${current-shader-path}
+		COMMAND ${GLSLC} --target-env=vulkan1.1 -o ${current-output-path} ${current-shader-path}
 		DEPENDS ${current-shader-path}
 		IMPLICIT_DEPENDS CXX ${current-shader-path}
 		VERBATIM)

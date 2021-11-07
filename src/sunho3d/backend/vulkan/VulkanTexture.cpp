@@ -49,6 +49,9 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
     if (usage & TextureUsage::SAMPLEABLE) {
         flags |= vk::ImageUsageFlagBits::eSampled;
     }
+    if (usage & TextureUsage::STORAGE) {
+        flags |= vk::ImageUsageFlagBits::eStorage;
+    }
     if (usage & TextureUsage::DEPTH_ATTACHMENT) {
         flags |= vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled;
         flags |= blittable;
@@ -83,7 +86,7 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
     view = createImageView(device, image, vkFormat, aspect);
 
     
-    if ((usage & TextureUsage::DEPTH_ATTACHMENT) || (usage & TextureUsage::COLOR_ATTACHMENT)) {
+    //if ((usage & TextureUsage::DEPTH_ATTACHMENT) || (usage & TextureUsage::COLOR_ATTACHMENT)) {
     device.immediateSubmit([=](vk::CommandBuffer cmd) {
         vk::ImageSubresourceRange range;
 		range.baseMipLevel = 0;
@@ -101,7 +104,7 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
 		imageBarrier_toTransfer.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {}, nullptr, nullptr, imageBarrier_toTransfer);
     });
-    }
+    //}
 
     vk::SamplerCreateInfo samplerInfo{};
     samplerInfo.magFilter = vk::Filter::eLinear;

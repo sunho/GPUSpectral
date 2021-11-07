@@ -10,6 +10,9 @@
 
 namespace sunho3d {
 
+#define IRD_MAP_SIZE 8
+#define IRD_MAP_PROBE_COLS 8
+
 struct MaterialBuffer {
     glm::vec4 specular;
     float phong;
@@ -122,6 +125,8 @@ class Renderer : public IdResource {
     Handle<HwProgram> gbufferGenProgram;
     Handle<HwProgram> ddgiProbeRayGenProgram;
     Handle<HwProgram> ddgiProbeRayShadeProgram;
+    Handle<HwProgram> ddgiShadeProgram;
+    Handle<HwProgram> ddgiProbeUpdateProgram;
     Handle<HwProgram> deferredRenderProgram;
 
     Handle<HwRenderTarget> surfaceRenderTarget;
@@ -134,6 +139,9 @@ class Renderer : public IdResource {
     DDGIPassContext ddgiContext;
     std::unique_ptr<GBuffer> gbuffer;
     std::unique_ptr<GBuffer> rayGbuffer;
+    Handle<HwTexture> probeTexture;
+    Handle<HwTexture> probeDistTexture;
+    Handle<HwTexture> probeDistSquareTexture;
 
     VulkanDriver driver;
     Window* window;
