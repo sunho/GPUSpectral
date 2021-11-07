@@ -27,6 +27,7 @@ layout(std140, set=1, binding = 0) buffer RayBuffer {
 
 
 void main() {
+
     uint gID = gl_GlobalInvocationID.x;
     uint probeID = gID / RAYS_PER_PROBE;
     uint rayID = gID % RAYS_PER_PROBE;

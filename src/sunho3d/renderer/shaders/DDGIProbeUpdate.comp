@@ -20,7 +20,7 @@ layout(std140, set=0, binding = 0) buffer RayBuffer {
 
 layout(set=1,binding = 0) uniform sampler2D radianceBuffer;
 layout(set=1,binding = 1) uniform sampler2D distanceBuffer;
-layout (set=2,binding = 0, rgba16f) uniform writeonly image2D irradianceMap;
+layout (set=2,binding = 0, rgba16f) uniform image2D irradianceMap;
 layout (set=2,binding = 1, rgba16f) uniform writeonly image2D distanceMap;
 layout (set=2,binding = 2, rgba16f) uniform writeonly image2D distanceSquareMap;
 
@@ -57,12 +57,14 @@ void main() {
         atomicAdd(reducedIrradiance.z, raidancei.z);
         atomicAdd(sampleCount, validSG);
     }
+
     if (gl_LocalInvocationIndex == 0) {
         vec4 irradiance = vec4(vec3(reducedIrradiance), 0.0) / FIXED_POINT_PRECISION;
         irradiance /= sampleCount;
         irradiance *= M_PI;
         ivec2 startPos =  ivec2((probeID % IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE, (probeID/IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE);
-        imageStore(irradianceMap, startPos + iuv, irradiance);
+        vec4 bb = imageLoad(irradianceMap, startPos + iuv);
+        imageStore(irradianceMap, startPos + iuv, mix(bb, irradiance, 0.8));
     }
     if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
         float distSG = subgroupInclusiveAdd(dist);

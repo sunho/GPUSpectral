@@ -2,6 +2,8 @@
 
 #define MAX_LIGHTS 64
 #extension GL_GOOGLE_include_directive : require
+#define IRD_MAP_SIZE 8
+#define IRD_MAP_PROBE_COLS 8
 
 #include "common.glsl"
 
@@ -43,22 +45,25 @@ layout( push_constant ) uniform PushConstants {
 void main() {
     vec2 uv = inPos / 2.0 + 0.5;
 
-    vec3 normal = vec3(texture(positionBuffer, uv));
-    vec3 pos = vec3(texture(normalBuffer, uv));
+    vec3 pos = vec3(texture(positionBuffer, uv));
+    vec3 normal = vec3(texture(normalBuffer, uv));
     vec3 v = normalize(constants.cameraPos - pos);
     vec4 diffuse = texture(diffuseBuffer, uv);
-    vec4 color = diffuse * 0.35;
+    vec4 color = diffuse * 0.1;
     uvec3 grid = posToGrid(pos, sceneBuffer.gridNum, sceneBuffer.sceneSize); 
-    uint p0 = gridToProbeID(grid + uvec3(0,0,0), sceneBuffer.gridNum);
-    uint p1 = gridToProbeID(grid + uvec3(0,0,1), sceneBuffer.gridNum);
-    uint p2 = gridToProbeID(grid + uvec3(0,1,0), sceneBuffer.gridNum);
-    uint p3 = gridToProbeID(grid + uvec3(0,1,1), sceneBuffer.gridNum);
-    uint p4 = gridToProbeID(grid + uvec3(1,0,0), sceneBuffer.gridNum);
-    uint p5 = gridToProbeID(grid + uvec3(1,0,1), sceneBuffer.gridNum);
-    uint p6 = gridToProbeID(grid + uvec3(1,1,0), sceneBuffer.gridNum);
-    uint p7 = gridToProbeID(grid + uvec3(1,1,1), sceneBuffer.gridNum);
-    
-
+    for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            for (int k = 0; k < 2; ++k) {
+                uvec3 offset = uvec3(i,j,k);
+                uvec3 ogrid = grid + offset;
+                uint probeID = gridToProbeID(ogrid, sceneBuffer.gridNum);   
+                vec2 startOffset = vec2((probeID % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (probeID / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
+                vec2 uv = octahedronMap(normal);
+                vec4 irradiance = texture(probeIrradianceMap, (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0));
+                color += vec4(vec3(irradiance), 0.0);
+            }
+        }
+    }
 
     for (int i = 0; i < light.numLights; i++) {
         vec3 lightV = light.light[i].pos - pos;

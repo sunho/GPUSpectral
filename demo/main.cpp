@@ -27,12 +27,21 @@ int main() {
     scene->ddgi.gridNum = glm::uvec3(16, 8, 16);
     scene->ddgi.worldSize = glm::vec3(2.0f);
     auto cube = loader.loadObj((basePath() / "assets" / "cube.obj").string());
+    auto cube2 = loader.loadObj((basePath() / "assets" / "cube.obj").string());
     scene->addEntity(cube);
+    scene->addEntity(cube2);
     auto t2 = cube->getTransform();
     t2.z = -1.7f;
     t2.sx = 30.0f;
     t2.sy = 30.0f;
+    auto t3 = cube->getTransform();
+    t3.z = -0.0f;
+    t3.x = -1.0f;
+    t3.sx = 0.2f;
+    t3.sz = 10.0f;
+    t3.sy = 10.0f;
     cube->setTransform(t2);
+    cube2->setTransform(t3);
     auto l = new sunho3d::Light(sunho3d::Light::Type::DIRECTIONAL);
     l->setIntensity(0.6);
     l->setTransform({.x=-0.3,.y=1.3,.z=1.2});
@@ -43,6 +52,8 @@ int main() {
     //t.rz += 1.0f;
     neptune->setTransform(t);
     window->run([&](){
+        //t.x += 0.1;
+        //neptune->setTransform(t);
         renderer->run(scene);
     });
     

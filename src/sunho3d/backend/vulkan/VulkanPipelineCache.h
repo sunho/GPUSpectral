@@ -161,7 +161,7 @@ class VulkanPipelineCache {
             return hashStruct(k);
         }
         std::size_t operator()(const ProgramParameterLayout &k) const {
-            return hashStruct(k);
+            return hashStruct<ProgramParameterLayout>(k);
         }
         std::size_t operator()(const BindingMap &k) const {
             return hashStruct(k);

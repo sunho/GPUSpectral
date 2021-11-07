@@ -117,7 +117,10 @@ void VulkanPipelineCache::tick() {
 
 VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute) {
     auto it = pipelineLayouts.get(layout);
+    std::cout << hashStruct(layout) << std::endl;
+    
     if (it) {
+        std::cout << it->pipelineLayout << std::endl; 
         return *it;
     }
     

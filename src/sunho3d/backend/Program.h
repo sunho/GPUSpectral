@@ -39,6 +39,9 @@ struct ProgramParameterLayout {
         operator bool() const {
             return value != 0;
         }
+        bool operator==(const LayoutField& other) const {
+            return value == other.value;
+        }
         uint32_t value{0};
     };
 

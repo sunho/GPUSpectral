@@ -128,9 +128,11 @@ void Renderer::registerPrograms() {
     prog = { DDGIShadeVert, DDGIShadeVertSize, DDGIShadeFrag, DDGIShadeFragSize };
     prog.parameterLayout
         .addUniformBuffer(0, 0)
+        .addUniformBuffer(0,1)
         .addTexture(1, 0)
         .addTexture(1, 1)
-        .addTexture(1, 2);
+        .addTexture(1, 2)
+        .addTexture(1, 3);
     ddgiShadeProgram = driver.createProgram(prog);
 
     prog = { DDGIProbeUpdate, DDGIProbeUpdateSize };
@@ -647,6 +649,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         rg.defineResource<Handle<HwTexture>>(distanceBufferRef, distanceBuffer);
     });
     renderGraph.addRenderPass("probe ray shade", { positionBufferRef }, { radianceBufferRef }, [this, hitBufferRef, radianceBufferRef, rayBufferRef, diffuseMapRef, sceneBufferRef, probeNum, scene, &sceneData](FrameGraph& rg) {
+        Handle<HwUniformBuffer> sceneBuffer = rg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
         auto color = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, RAYS_PER_PROBE, probeNum);
         RenderAttachments att = {};
         att.colors[0] = color;
@@ -660,7 +663,8 @@ void Renderer::ddgiSuite(Scene* scene) {
         pipe.program = this->ddgiShadeProgram;
         auto lightUB = rg.createUniformBufferSC(sizeof(LightBuffer));
         driver.updateUniformBuffer(lightUB, { .data = (uint32_t*)&sceneData.lightBuffer }, 0);
-        pipe.bindUniformBuffer(0, 0, lightUB);
+        pipe.bindUniformBuffer(0, 0, sceneBuffer);
+        pipe.bindUniformBuffer(0, 1, lightUB);
         pipe.bindTexture(1, 0, positionBuffer);
         pipe.bindTexture(1, 1, normalBuffer);
         pipe.bindTexture(1, 2, diffuseBuffer);
@@ -725,7 +729,8 @@ void Renderer::ddgiSuite(Scene* scene) {
         rg.defineResource<Handle<HwTexture>>(normalRef, gbuffer->normalBuffer);
         rg.defineResource<Handle<HwTexture>>(diffuseRef, gbuffer->diffuseBuffer);
     });
-    renderGraph.addRenderPass("deferred render", { probeTextureRef, positionRef, normalRef, diffuseRef }, { renderedRef }, [this, scene, renderedRef, probeTextureRef , & sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
+    renderGraph.addRenderPass("deferred render", { probeTextureRef, positionRef, normalRef, diffuseRef }, { renderedRef }, [this, scene, sceneBufferRef, renderedRef, probeTextureRef, &sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
+        Handle<HwUniformBuffer> sceneBuffer = rg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
         auto color = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
         auto depth = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
         RenderAttachments att = {};
@@ -738,10 +743,11 @@ void Renderer::ddgiSuite(Scene* scene) {
         auto probeIrradianceMap = rg.getResource<Handle<HwTexture>>(probeTextureRef);
         auto& camera = scene->getCamera();
         PipelineState pipe = {};
-        pipe.program = this->deferredRenderProgram;
+        pipe.program = this->ddgiShadeProgram;
         auto lightUB = rg.createUniformBufferSC(sizeof(LightBuffer));
         driver.updateUniformBuffer(lightUB, { .data = (uint32_t*)&sceneData.lightBuffer }, 0);
-        pipe.bindUniformBuffer(0, 0, lightUB);
+        pipe.bindUniformBuffer(0, 0, sceneBuffer);
+        pipe.bindUniformBuffer(0, 1, lightUB);
         pipe.bindTexture(1, 0, positionBuffer);
         pipe.bindTexture(1, 1, normalBuffer);
         pipe.bindTexture(1, 2, diffuseBuffer);

@@ -28,22 +28,42 @@ vec3 probeIDToPos(uint id, uvec3 gridNum, vec3 sceneSize) {
     return ogd - sceneSize;
 }
 
+
 vec3 octahedronReverseMap(vec2 uv) {
-    vec3 position = vec3(2.0f * (uv - 0.5f), 0);                
-    vec2 absolute = abs(position.xy);
+    vec3 position = vec3(2.0 * (uv - 0.5), 0);
+    position = vec3(position.x, 0, position.y);               
+    vec2 absolute = abs(position.xz);
     // this is "true" z because
     // when it's under the bottom and needs to be flipped to
     // the other triangle by (1-x) (1-y)
     // 1 - (1-x) - (1-y)
     // x + y - 1
     // = -(1-x-y)
-    position.z = 1.0f - absolute.x - absolute.y;
+    position.y = 1.0 - absolute.x - absolute.y;
     
     // when it's bottom flip to the other triangle
-    if(position.z < 0) {
-        position.xy = sign(position.xy) 
+    if(position.y < 0) {
+        position.xz = sign(position.xz) 
                     * vec2(1.0 - absolute.y, 1.0 - absolute.x);
     }
 
     return position;
+}
+
+vec2 octahedronMap(vec3 direction) {        
+    vec3 octant = sign(direction);
+
+    // Scale the vector so |x| + |y| + |z| = 1 (surface of octahedron).
+    float sum = dot(direction, octant);        
+    vec3 octahedron = direction / sum;    
+
+    // "Untuck" the corners using the same reflection across the diagonal as before.
+    // (A reflection is its own inverse transformation).
+    if(octahedron.y < 0) {
+        vec3 absolute = abs(octahedron);
+        octahedron.xz = octant.xz
+                      * vec2(1.0 - absolute.z, 1.0 - absolute.x);
+    }
+
+    return octahedron.xz * 0.5 + 0.5;
 }
