@@ -12,6 +12,7 @@ add_subdirectory(VulkanMemoryAllocator)
 
 add_subdirectory(spdlog)
 
+
 find_package(Vulkan)
 add_library(Vulkan INTERFACE)
 target_compile_definitions(Vulkan INTERFACE -DHAVE_VULKAN)

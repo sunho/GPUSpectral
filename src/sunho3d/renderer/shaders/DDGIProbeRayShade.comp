@@ -38,10 +38,9 @@ layout (set=2,binding = 3, rgba16f) uniform writeonly image2D distanceBuffer;
 layout (set=2,binding = 4) uniform sampler2D diffuseMap[MAX_DIFFUSE_MAPS];
 
 void main() {
-    uint gID = gl_GlobalInvocationID.x;
-    uint probeID = gID / RAYS_PER_PROBE;
-    uint rayID = gID % RAYS_PER_PROBE;
-    RayHit hit = rayHitBuffer.hits[gID];
+    uint probeID = gl_WorkGroupID.x;
+    uint rayID = gl_LocalInvocationID.x;
+    RayHit hit = rayHitBuffer.hits[probeID * RAYS_PER_PROBE + rayID];
     ivec2 outCoord = ivec2(rayID,probeID);
     if (hit.instId == 0xFFFFFFFF) {
         imageStore(distanceBuffer, outCoord, vec4(0.0));

@@ -18,7 +18,7 @@ uvec3 posToGrid(vec3 pos, uvec3 gridNum, vec3 sceneSize) {
 }
 
 uint gridToProbeID(uvec3 grid, uvec3 gridNum) {
-    return grid.x + grid.y * gridNum.x + grid.z * gridNum.y * gridNum.z;
+    return grid.x + grid.y * gridNum.x + grid.z * gridNum.y * gridNum.x;
 }
 
 vec3 probeIDToPos(uint id, uvec3 gridNum, vec3 sceneSize) {

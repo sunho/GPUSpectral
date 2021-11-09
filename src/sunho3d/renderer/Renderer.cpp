@@ -27,7 +27,7 @@ Renderer::Renderer(Window* window)
     : window(window), driver(window) {
     for (size_t i = 0; i < MAX_INFLIGHTS; ++i) {
         inflights[i].fence = driver.createFence();
-        inflights[i].rg = std::make_unique<FrameGraph>(*this);
+        inflights[i].rg = std::make_unique<FrameGraph>(driver);
     }
 
     Primitive primitive;
@@ -150,6 +150,7 @@ Renderer::~Renderer() {
 }
 
 void Renderer::rasterSuite(Scene* scene) {
+    /*
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
     if (inflight.handle) {
@@ -158,14 +159,13 @@ void Renderer::rasterSuite(Scene* scene) {
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
 
+    inflight.rg.reset();
+    inflight.rg = std::make_unique<FrameGraph>(driver);
     FrameGraph& renderGraph = *inflight.rg;
-    renderGraph.reset();
-
+    
     scene->prepare();
     SceneData& sceneData = scene->getSceneData();
 
-    auto sceneDataRef = renderGraph.declareResource<SceneData*>("SceneData");
-    renderGraph.defineResource(sceneDataRef, &sceneData);
 
     auto shadowMapRef = renderGraph.declareResource<Handle<HwTexture>>("ShadowMap");
     auto forwardRef = renderGraph.declareResource<Handle<HwTexture>>("Forward");
@@ -271,6 +271,7 @@ void Renderer::rasterSuite(Scene* scene) {
     });
     renderGraph.submit();
     driver.endFrame();
+    */
 }
 
 void Renderer::deferSuite(Scene* scene) {
@@ -282,80 +283,96 @@ void Renderer::deferSuite(Scene* scene) {
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
 
+    inflight.rg.reset();
+    inflight.rg = std::make_unique<FrameGraph>(driver);
     FrameGraph& renderGraph = *inflight.rg;
-    renderGraph.reset();
     inflight.instances.clear();
 
     scene->prepare();
     SceneData& sceneData = scene->getSceneData();
 
-    auto positionRef = renderGraph.declareResource<Handle<HwTexture>>("Position texture");
-    auto normalRef = renderGraph.declareResource<Handle<HwTexture>>("Normal texture");
-    auto diffuseRef = renderGraph.declareResource<Handle<HwTexture>>("Diffuse texture");
-    auto renderedRef = renderGraph.declareResource<Handle<HwTexture>>("Rendered texture");
-    
     if (!gbuffer) {
         gbuffer = std::make_unique<GBuffer>(driver, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
     }
 
-    renderGraph.addRenderPass("gbuffer generation", {}, { positionRef, normalRef, diffuseRef }, [this, scene, &sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
-        auto& camera = scene->getCamera();
+    auto positionBuffer = renderGraph.importImage("position", gbuffer->positionBuffer);
+    auto normalBuffer = renderGraph.importImage("normal", gbuffer->normalBuffer);
+    auto diffuseBuffer = renderGraph.importImage("diffuse", gbuffer->diffuseBuffer);
 
-        PipelineState pipe = {};
-        pipe.program = this->gbufferGenProgram;
-        pipe.depthTest.enabled = 1;
-        pipe.depthTest.write = 1;
-        pipe.depthTest.compareOp = CompareOp::LESS;
-        RenderPassParams params;
-        driver.beginRenderPass(gbuffer->renderTarget, params);
-        for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
-            auto& geom = sceneData.geometries[i];
-            auto& model = sceneData.worldTransforms[i];
-            pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(rg, camera, model));
-            pipe.bindTexture(1, 0, geom.material->diffuseMap);
-            driver.draw(pipe, geom.primitive);
-        }
-        driver.endRenderPass();
-        rg.defineResource<Handle<HwTexture>>(positionRef, gbuffer->positionBuffer);
-        rg.defineResource<Handle<HwTexture>>(normalRef, gbuffer->normalBuffer);
-        rg.defineResource<Handle<HwTexture>>(diffuseRef, gbuffer->diffuseBuffer);
-    });
-    renderGraph.addRenderPass("deferred render", { positionRef, normalRef, diffuseRef }, { renderedRef }, [this, scene, renderedRef , & sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
-        auto color = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-        auto depth = rg.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-        RenderAttachments att = {};
-        att.colors[0] = color;
-        att.depth = depth;
-        auto renderTarget = rg.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att);
-        
-        auto positionBuffer = rg.getResource<Handle<HwTexture>>(positionRef);
-        auto normalBuffer = rg.getResource<Handle<HwTexture>>(normalRef);
-        auto diffuseBuffer = rg.getResource<Handle<HwTexture>>(diffuseRef);
-        auto& camera = scene->getCamera();
-        PipelineState pipe = {};
-        pipe.program = this->deferredRenderProgram;
-        auto lightUB = rg.createUniformBufferSC(sizeof(LightBuffer));
-        driver.updateUniformBuffer(lightUB, { .data = (uint32_t*)&sceneData.lightBuffer }, 0);
-        pipe.bindUniformBuffer(0, 0, lightUB);
-        pipe.bindTexture(1, 0, positionBuffer);
-        pipe.bindTexture(1, 1, normalBuffer);
-        pipe.bindTexture(1, 2, diffuseBuffer);
-        RenderPassParams params;
-        driver.beginRenderPass(renderTarget, params);
-        driver.draw(pipe, quadPrimitive);
-        driver.endRenderPass();
-        rg.defineResource<Handle<HwTexture>>(renderedRef, color);
-    });
-    renderGraph.addRenderPass("blit", { renderedRef }, {}, [this, scene, renderedRef, &renderGraph](FrameGraph& fg) {
-        Handle<HwTexture> rendered = fg.getResource<Handle<HwTexture>>(renderedRef);
+    renderGraph.addFramePass({ 
+        .name = "gbuffer generation",
+        .resources = { 
+            {positionBuffer, ResourceAccessType::ColorWrite},
+            {normalBuffer, ResourceAccessType::ColorWrite },
+            {diffuseBuffer, ResourceAccessType::ColorWrite },
+        },
+        .func = [this, scene, &sceneData](FrameGraph& rg, FrameGraphContext& ctx) {
+            auto& camera = scene->getCamera();
 
-        PipelineState pipe = {};
-        pipe.program = this->blitProgram;
-        RenderPassParams params;
-        driver.beginRenderPass(this->surfaceRenderTarget, params);
-        pipe.bindTexture(1, 0, rendered);
-        driver.draw(pipe, this->quadPrimitive);
-        driver.endRenderPass();
+            PipelineState pipe = {};
+            pipe.program = this->gbufferGenProgram;
+            pipe.depthTest.enabled = 1;
+            pipe.depthTest.write = 1;
+            pipe.depthTest.compareOp = CompareOp::LESS;
+            RenderPassParams params;
+            driver.beginRenderPass(gbuffer->renderTarget, params);
+            for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
+                auto& geom = sceneData.geometries[i];
+                auto& model = sceneData.worldTransforms[i];
+                pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(rg, camera, model));
+                pipe.bindTexture(1, 0, geom.material->diffuseMap);
+                driver.draw(pipe, geom.primitive);
+            }
+            driver.endRenderPass();
+        },
+    });
+
+    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    RenderAttachments att = {};
+    att.colors[0] = color;
+    att.depth = depth;
+    auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att);
+    auto renderedBuffer = renderGraph.importImage("rendered", color);
+
+    renderGraph.addFramePass({
+        .name = "deferred render",
+        .resources = {
+            { positionBuffer, ResourceAccessType::FragmentRead },
+            { normalBuffer, ResourceAccessType::FragmentRead },
+            { diffuseBuffer, ResourceAccessType::DepthWrite},
+        },
+        .func = [this, scene, &sceneData, renderTarget, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+            auto& camera = scene->getCamera();
+            PipelineState pipe = {};
+            pipe.program = this->deferredRenderProgram;
+            auto lightUB = rg.createUniformBufferSC(sizeof(LightBuffer));
+            driver.updateUniformBuffer(lightUB, { .data = (uint32_t*)&sceneData.lightBuffer }, 0);
+            pipe.bindUniformBuffer(0, 0, lightUB);
+            ctx.bindTextureResource(pipe, 1, 0, positionBuffer);
+            ctx.bindTextureResource(pipe, 1, 1, normalBuffer);
+            ctx.bindTextureResource(pipe, 1, 2, diffuseBuffer);
+            RenderPassParams params;
+            driver.beginRenderPass(renderTarget, params);
+            driver.draw(pipe, quadPrimitive);
+            driver.endRenderPass();
+        },
+    });
+
+    renderGraph.addFramePass({
+        .name = "blit",
+        .resources = {
+            { renderedBuffer, ResourceAccessType::FragmentRead },
+        },
+        .func = [this, scene, &sceneData, renderTarget, renderedBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+            PipelineState pipe = {};
+            pipe.program = this->blitProgram;
+            RenderPassParams params;
+            driver.beginRenderPass(this->surfaceRenderTarget, params);
+            ctx.bindTextureResource(pipe, 1, 0, renderedBuffer);
+            driver.draw(pipe, this->quadPrimitive);
+            driver.endRenderPass();
+        },
     });
 
     renderGraph.submit();
@@ -374,10 +391,11 @@ Handle<HwUniformBuffer> Renderer::createTransformBuffer(FrameGraph& rg, const Ca
 }
 
 void Renderer::run(Scene* scene) {
-    ddgiSuite(scene);
+    deferSuite(scene);
 }
 
 void Renderer::rtSuite(Scene* scene) {
+    /*
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
     if (inflight.handle) {
@@ -492,10 +510,11 @@ void Renderer::rtSuite(Scene* scene) {
         driver.endRenderPass();
     });
     renderGraph.submit();
-    driver.endFrame();
+    driver.endFrame();*/
 }
 
 void Renderer::ddgiSuite(Scene* scene) {
+    /*
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
     if (inflight.handle) {
@@ -703,10 +722,6 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto diffuseRef = renderGraph.declareResource<Handle<HwTexture>>("Diffuse texture");
     auto renderedRef = renderGraph.declareResource<Handle<HwTexture>>("Rendered texture");
 
-    if (!gbuffer) {
-        gbuffer = std::make_unique<GBuffer>(driver, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-    }
-
     renderGraph.addRenderPass("gbuffer generation", {}, { positionRef, normalRef, diffuseRef }, [this, scene, &sceneData, positionRef, normalRef, diffuseRef](FrameGraph& rg) {
         auto& camera = scene->getCamera();
 
@@ -772,4 +787,5 @@ void Renderer::ddgiSuite(Scene* scene) {
 
     renderGraph.submit();
     driver.endFrame();
+    */
 }

@@ -61,6 +61,7 @@ public:
     std::unique_ptr<VulkanPipelineCache> cache{};
     VmaAllocator allocator{};
     SemaphorePool semaphorePool;
+    vk::DispatchLoaderDynamic dld;
 
     void immediateSubmit(std::function<void(vk::CommandBuffer)> func);
     AllocatedBuffer allocateBuffer(vk::BufferCreateInfo info, VmaMemoryUsage usage);

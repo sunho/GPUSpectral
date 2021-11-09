@@ -428,3 +428,32 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
 
     return bindings;
 }
+
+void VulkanDriver::setBarrier(Barrier barrier) {
+    auto& cmd = context.inflight->cmd;
+    if (barrier.image) {
+        vk::ImageMemoryBarrier2KHR imageBarrier{};
+        imageBarrier.srcStageMask = translateStageMask(barrier.srcStage);
+        imageBarrier.dstStageMask = translateStageMask(barrier.dstStage);
+        imageBarrier.srcAccessMask = translateAccessMask(barrier.srcAccess);
+        imageBarrier.dstAccessMask = translateAccessMask(barrier.dstAccess);
+        imageBarrier.oldLayout = translateImageLayout(barrier.initialLayout);
+        imageBarrier.newLayout = translateImageLayout(barrier.finalLayout);
+
+        vk::DependencyInfoKHR info{};
+        info.imageMemoryBarrierCount = 1;
+        info.pImageMemoryBarriers = &imageBarrier;
+        cmd.pipelineBarrier2KHR(info, device->dld);
+    } else {
+        vk::MemoryBarrier2KHR memBarrier{};
+        memBarrier.srcStageMask = translateStageMask(barrier.srcStage);
+        memBarrier.dstStageMask = translateStageMask(barrier.dstStage);
+        memBarrier.srcAccessMask = translateAccessMask(barrier.srcAccess);
+        memBarrier.dstAccessMask = translateAccessMask(barrier.dstAccess);
+
+        vk::DependencyInfoKHR info{};
+        info.memoryBarrierCount = 1;
+        info.pMemoryBarriers = &memBarrier;
+        cmd.pipelineBarrier2KHR(info, device->dld);
+    }
+}

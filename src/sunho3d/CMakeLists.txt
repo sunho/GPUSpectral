@@ -38,8 +38,6 @@ set(SOURCE_LIST
     renderer/shaders/DDGIShade.frag
     renderer/framegraph/FrameGraph.h
     renderer/framegraph/FrameGraph.cpp
-    renderer/framegraph/RenderPass.h
-    renderer/framegraph/RenderPass.cpp
     renderer/framegraph/Resource.h
     renderer/Renderer.h
     renderer/Renderer.cpp

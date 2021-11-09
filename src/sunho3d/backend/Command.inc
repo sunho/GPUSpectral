@@ -69,6 +69,7 @@ VOIDCOMMAND(updateIndexBuffer, IndexBufferHandle, handle, BufferDescriptor, data
 VOIDCOMMAND(updateUniformBuffer, UniformBufferHandle, handle, BufferDescriptor, data, uint32_t, offset)
 VOIDCOMMAND(setPrimitiveBuffer, PrimitiveHandle, handle, VertexBufferHandle, vertexBuffer, IndexBufferHandle, indexBuffer)
 VOIDCOMMAND(beginRenderPass, RenderTargetHandle, renderTarget, RenderPassParams, params)
+VOIDCOMMAND(setBarrier, Barrier, barrier)
 VOIDCOMMAND0(endRenderPass)
 VOIDCOMMAND(draw, PipelineState, pipeline, PrimitiveHandle, primitive)
 VOIDCOMMAND(dispatch, PipelineState, pipeline, size_t, groupCountX, size_t, groupCountY, size_t, groupCountZ)

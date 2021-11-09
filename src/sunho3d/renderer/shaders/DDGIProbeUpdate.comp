@@ -30,12 +30,12 @@ shared int reducedDist;
 shared int reducedDistSquare;
 
 void main() {
-    uint rayID = gl_LocalInvocationIndex;
+    uint rayID = gl_LocalInvocationID.x;
     uint probeID = gl_WorkGroupID.x;
     ivec2 iuv = ivec2(gl_WorkGroupID.y, gl_WorkGroupID.z);
     vec2 uv = vec2(iuv) / IRD_MAP_SIZE;
     vec3 dir = octahedronReverseMap(uv);
-    Ray ray = rayBuffer.rays[rayID];
+    Ray ray = rayBuffer.rays[probeID*RAYS_PER_PROBE+rayID];
     
     vec4 radiance = texelFetch(radianceBuffer, ivec2(rayID, probeID), 0);
     float dist = texelFetch(distanceBuffer, ivec2(rayID, probeID), 0).x;
@@ -43,7 +43,7 @@ void main() {
     vec4 radianceSG = subgroupInclusiveAdd(weight*radiance);
     int valid = dist == 0.0 ? 0 : 1;
     int validSG = subgroupInclusiveAdd(valid);
-    if (gl_LocalInvocationIndex == 0) {
+    if (gl_LocalInvocationID.x == 0) {
         sampleCount = 0;
         reducedIrradiance = ivec4(0);
         reducedDist = 0;
@@ -57,14 +57,14 @@ void main() {
         atomicAdd(reducedIrradiance.z, raidancei.z);
         atomicAdd(sampleCount, validSG);
     }
-
-    if (gl_LocalInvocationIndex == 0) {
+    barrier();
+    if (gl_LocalInvocationID.x == 0) {
         vec4 irradiance = vec4(vec3(reducedIrradiance), 0.0) / FIXED_POINT_PRECISION;
-        irradiance /= sampleCount;
+        irradiance /= max(sampleCount, 1);
         irradiance *= M_PI;
         ivec2 startPos =  ivec2((probeID % IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE, (probeID/IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE);
         vec4 bb = imageLoad(irradianceMap, startPos + iuv);
-        imageStore(irradianceMap, startPos + iuv, mix(bb, irradiance, 0.8));
+        imageStore(irradianceMap, startPos + iuv, irradiance);
     }
     if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
         float distSG = subgroupInclusiveAdd(dist);
@@ -79,9 +79,9 @@ void main() {
         barrier();
         if (gl_LocalInvocationIndex == 0) {
             float dist = float(reducedDist) / FIXED_POINT_PRECISION;
-            dist /= sampleCount;
+            dist /= max(sampleCount,1);
             float distSquare = float(reducedDistSquare) / FIXED_POINT_PRECISION;
-            distSquare /= sampleCount;
+            distSquare /= max(sampleCount,1);
             imageStore(distanceMap, ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(dist));
             imageStore(distanceSquareMap,  ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(distSquare));
         }

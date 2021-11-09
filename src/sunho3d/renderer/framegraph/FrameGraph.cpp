@@ -1,24 +1,9 @@
 #include "FrameGraph.h"
-#include "../Renderer.h"
 #include <stack>
 
 
-FrameGraph::FrameGraph(sunho3d::Renderer& renderer)
-    : parent(renderer), driver(renderer.getDriver()) {
-}
-
-void FrameGraph::reset() {
-    for (auto d : destroyers) {
-        d();
-    }
-    destroyers.clear();
-    resources.clear();
-    renderPasses.clear();
-    runOrder.clear();
-}
-
-void FrameGraph::addRenderPass(const std::string& name, std::vector<FGResource> inputs, std::vector<FGResource> outputs, RenderPass::RenderPassFunc func) {
-    addRenderPass(RenderPass(name, inputs, outputs, func));
+FrameGraph::FrameGraph(sunho3d::VulkanDriver& driver)
+    : driver(driver) {
 }
 
 void FrameGraph::submit() {
@@ -26,15 +11,27 @@ void FrameGraph::submit() {
     run();
 }
 
+void FrameGraph::addFramePass(FramePass pass) {
+    passes.push_back(pass);
+}
+
+ResourceHandle FrameGraph::importImage(std::string name, Handle<HwTexture> image) {
+    auto handle = declareResource<Handle<HwTexture>>(name, ResourceType::Image);
+    *getResource<Handle<HwTexture>>(handle) = image;
+    return handle;
+}
+
+ResourceHandle FrameGraph::importBuffer(std::string name, Handle<HwBufferObject> buffer) {
+    auto handle = declareResource<Handle<HwBufferObject>>(name, ResourceType::Buffer);
+    *getResource<Handle<HwBufferObject>>(handle) = buffer;
+    return handle;
+}
+
 
 FrameGraph::~FrameGraph() {
     for (auto d : destroyers) {
         d();
     }
-}
-
-void FrameGraph::addRenderPass(const RenderPass& pass) {
-    renderPasses.push_back(pass);
 }
 
 static void dfs(const std::vector<std::vector<size_t>>& graph, std::vector<bool>& visited, std::vector<size_t>& runOrder, size_t i) {
@@ -48,19 +45,78 @@ static void dfs(const std::vector<std::vector<size_t>>& graph, std::vector<bool>
     runOrder.push_back(i);
 }
 
+static std::pair<BarrierStageMask, BarrierAccessFlag> convertAccessTypeToBarrierStage(const ResourceAccessType& type) {
+    switch (type) {
+        case ResourceAccessType::ColorWrite:
+            return std::make_pair(BarrierStageMask::COLOR_ATTACHMENT_OUTPUT, BarrierAccessFlag::COLOR_WRITE);
+        case ResourceAccessType::ComputeRead:
+            return std::make_pair(BarrierStageMask::COMPUTE, BarrierAccessFlag::SHADER_READ);
+        case ResourceAccessType::ComputeWrite:
+            return std::make_pair(BarrierStageMask::COMPUTE, BarrierAccessFlag::SHADER_WRITE);
+        case ResourceAccessType::FragmentRead:
+            return std::make_pair(BarrierStageMask::FRAGMENT_SHADER, BarrierAccessFlag::SHADER_READ);
+        case ResourceAccessType::DepthWrite:
+            return std::make_pair(BarrierStageMask::EARLY_FRAGMENT_TESTS | BarrierStageMask::LATE_FRAGMENT_TESTS, BarrierAccessFlag::DEPTH_STENCIL_WRITE);     
+    }
+}
+
+static Barrier generateBufferBarrier(const FramePassResource& prev, const FramePassResource& current) {
+    Barrier barrier = {};
+    auto src = convertAccessTypeToBarrierStage(prev.accessType);
+    barrier.srcStage = src.first;
+    barrier.srcAccess = src.second;
+    auto dest = convertAccessTypeToBarrierStage(current.accessType);
+    barrier.dstStage = dest.first;
+    barrier.dstAccess = dest.second;
+    return barrier;
+}
+
+static ImageLayout decideImageLayout(const ResourceAccessType& type) {
+    switch (type) {
+        case ResourceAccessType::ColorWrite:
+            return ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
+        case ResourceAccessType::ComputeRead:
+            return ImageLayout::READ_ONLY_OPTIMAL;
+        case ResourceAccessType::ComputeWrite:
+            return ImageLayout::GENERAL;
+        case ResourceAccessType::FragmentRead:
+            return ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        case ResourceAccessType::DepthWrite:
+            return ImageLayout::DEPTH_ATTACHMENT_OPTIMAL;
+    }
+}
+
+static Barrier generateImageBarrier(const FramePassResource& prev, const FramePassResource& current, Handle<HwTexture> image) {
+    Barrier barrier = {};
+    auto src = convertAccessTypeToBarrierStage(prev.accessType);
+    barrier.srcStage = src.first;
+    barrier.srcAccess = src.second;
+    auto dest = convertAccessTypeToBarrierStage(current.accessType);
+    barrier.dstStage = dest.first;
+    barrier.dstAccess = dest.second;
+    barrier.image = image;
+    barrier.initialLayout = decideImageLayout(prev.accessType);
+    barrier.finalLayout = decideImageLayout(current.accessType);
+    return barrier;
+}
+
 void FrameGraph::compile() {
     std::unordered_map<size_t, size_t> resourceIdToRp;
-    std::vector<std::vector<size_t>> graph(renderPasses.size());
+    std::vector<BakedPass> bakedPasses(passes.size());
+    std::vector<std::vector<size_t>> graph(passes.size());
+    for (size_t i = 0; i < passes.size(); ++i) {
+        bakedPasses[i] = BakedPass(passes[i]);
+    }
 
-    for (size_t i = 0; i < renderPasses.size(); ++i) {
-        for (auto r : renderPasses[i].getOutputs()) {
-            resourceIdToRp.emplace(r.id, i);
+    for (size_t i = 0; i < bakedPasses.size(); ++i) {
+        for (auto r : bakedPasses[i].outputs) {
+            resourceIdToRp.emplace(r.resource.getId(), i);
         }
     }
 
-    for (size_t i = 0; i < renderPasses.size(); ++i) {
-        for (auto r : renderPasses[i].getInputs()) {
-            auto it = resourceIdToRp.find(r.id);
+    for (size_t i = 0; i < bakedPasses.size(); ++i) {
+        for (auto r : bakedPasses[i].inputs) {
+            auto it = resourceIdToRp.find(r.resource.getId());
             if (it != resourceIdToRp.end()) {
                 graph[i].push_back(it->second);
             }
@@ -71,15 +127,79 @@ void FrameGraph::compile() {
     // in dfs spanning tree
     // we should place what's on the left early (cross edge)
     // and what's on the bottom early
-    runOrder.clear();
-    std::vector<bool> visited(renderPasses.size());
-    for (int i = 0; i < renderPasses.size(); ++i) {
+    std::vector<size_t> runOrder;
+    std::vector<bool> visited(bakedPasses.size());
+    for (int i = 0; i < bakedPasses.size(); ++i) {
         dfs(graph, visited, runOrder, i);
+    }
+    for (auto idx : runOrder) {
+        bakedGraph.passes.push_back(bakedPasses[idx]);
+    }
+
+    for (int i = 0; i < bakedGraph.passes.size(); ++i) {
+        auto& pass = bakedGraph.passes[i];
+        for (auto [_, res] : pass.resources) {
+            bakedGraph.useChains.emplace(std::make_pair(res.resource.getId(), i));
+            bakedGraph.usedRes.emplace(res.resource.getId());
+        }
+    }
+
+    for (auto res : bakedGraph.usedRes) {
+        auto iterBegin = bakedGraph.useChains.lower_bound(std::make_pair(res, 0));
+        auto iterEnd = bakedGraph.useChains.upper_bound(std::make_pair(res, std::numeric_limits<uint32_t>::max()));
+        for (auto iter = iterBegin; iter != iterEnd; ++iter) {
+            auto& pass = bakedGraph.passes[iter->second];
+            if (iter != iterBegin) {
+                auto b = std::prev(iter);
+                auto& prevPass = bakedGraph.passes[b->second];
+                auto prevRes = prevPass.resources.at(iter->first);
+                auto res = pass.resources.at(iter->first);
+                if (isWriteAccessType(prevRes.accessType)) {
+                    auto type = res.resource.getType();
+                    if (type == ResourceType::Image) {
+                        auto image = *getResource<Handle<HwTexture>>(res.resource);
+                        pass.barriers.push_back(generateImageBarrier(prevRes, res, image));
+                    } else {
+                        pass.barriers.push_back(generateBufferBarrier(prevRes, res));
+                    }
+                }
+            }
+        }
     }
 }
 
 void FrameGraph::run() {
-    for (auto index : runOrder) {
-        renderPasses[index].run(*this);
+    FrameGraphContext context(*this);
+    for (auto pass : bakedGraph.passes) {
+        for (auto barrier : pass.barriers) {
+            driver.setBarrier(barrier);
+        }
+        pass.func(*this, context);
     }
+}
+
+FrameGraph::BakedPass::BakedPass(FramePass pass) : name(pass.name), func(pass.func) {
+    for (auto res : pass.resources) {
+        if (isWriteAccessType(res.accessType)) {
+            outputs.push_back(res);
+        } else {
+            inputs.push_back(res);
+        }
+        resources.emplace(res.resource.getId(), res);
+    }
+}
+
+void FrameGraphContext::bindTextureResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
+    Handle<HwTexture> texture = *parent.getResource<Handle<HwTexture>>(handle);
+    pipe.bindTexture(set, binding, texture);
+}
+
+void FrameGraphContext::bindStorageImageResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
+    Handle<HwTexture> texture = *parent.getResource<Handle<HwTexture>>(handle);
+    pipe.bindStorageImage(set, binding, texture);
+}
+
+void FrameGraphContext::bindStorageBufferResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
+    Handle<HwBufferObject> buffer = *parent.getResource<Handle<HwBufferObject>>(handle);
+    pipe.bindStorageBuffer(set, binding, buffer);
 }

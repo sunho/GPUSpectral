@@ -59,8 +59,18 @@ void main() {
                 uint probeID = gridToProbeID(ogrid, sceneBuffer.gridNum);   
                 vec2 startOffset = vec2((probeID % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (probeID / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
                 vec2 uv = octahedronMap(normal);
-                vec4 irradiance = texture(probeIrradianceMap, (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0));
+                vec2 tuv = (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0);
+                vec4 irradiance = diffuse*texture(probeIrradianceMap, tuv);
+                /*if (any(isnan(irradiance))) {
+                    color = vec4(3.0,0.0,0.0,1.0);
+                    outColor = color;
+                    return;
+                }*/
+                uvec3 d = sceneBuffer.gridNum;
+                float kk = probeID / float(d.x*d.y*d.z);
                 color += vec4(vec3(irradiance), 0.0);
+                //outColor = vec4(kk);
+                //return;
             }
         }
     }

@@ -79,7 +79,7 @@ enum class TextureUsage : uint8_t {
     SAMPLEABLE = 0x4,
     UPLOADABLE = 0x8,
     INPUT_ATTACHMENT = 0x10,
-    STORAGE = 0x11
+    STORAGE = 0x20
 };
 
 static TextureUsage operator|(TextureUsage lhs, TextureUsage rhs) {
@@ -102,7 +102,7 @@ enum class BufferUsage : uint8_t {
     TRANSFER_SRC = 0x4,
     TRANSFER_DST = 0x8,
     STORAGE = 0x10,
-    VERTEX = 0x40
+    VERTEX = 0x20
 };
 
 static BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {
@@ -201,3 +201,51 @@ struct Extent2D {
 };
 
 constexpr static size_t MAX_PUSH_CONSTANT_SIZE = 128;
+
+enum class BarrierStageMask : uint32_t {
+    NONE = 0x0,
+    COMPUTE = 0x1,
+    TRANSFER = 0x2,
+    BOTTOM_OF_PIPE = 0x4,
+    TOP_OF_PIPE = 0x8,
+    VERTEX_SHADER = 0x40,
+    FRAGMENT_SHADER = 0x80,
+    EARLY_FRAGMENT_TESTS = 0x100,
+    LATE_FRAGMENT_TESTS = 0x200,
+    COLOR_ATTACHMENT_OUTPUT = 0x400,
+};
+
+enum class BarrierAccessFlag : uint32_t {
+    NONE = 0x0,
+    SHADER_WRITE = 0x1,
+    SHADER_READ = 0x2,
+    DEPTH_STENCIL_WRITE = 0x4,
+    COLOR_WRITE = 0x8
+};
+
+enum class ImageLayout {
+    NONE,
+    READ_ONLY_OPTIMAL,
+    SHADER_READ_ONLY_OPTIMAL,
+    COLOR_ATTACHMENT_OPTIMAL,
+    DEPTH_ATTACHMENT_OPTIMAL,
+    GENERAL
+};
+
+static BarrierStageMask operator|(BarrierStageMask lhs, BarrierStageMask rhs) {
+    return static_cast<BarrierStageMask>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+static uint32_t operator&(BarrierStageMask lhs, BarrierStageMask rhs) {
+    return static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs);
+}
+
+struct Barrier {
+    BarrierStageMask srcStage;
+    BarrierAccessFlag srcAccess;
+    BarrierStageMask dstStage;
+    BarrierAccessFlag dstAccess;
+    Handle<HwTexture> image{};
+    ImageLayout initialLayout {ImageLayout::NONE};
+    ImageLayout finalLayout{ImageLayout::NONE};
+};

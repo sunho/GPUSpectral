@@ -214,3 +214,63 @@ vk::DescriptorType translateDescriptorType(ProgramParameterType type) {
     }
     return vk::DescriptorType();
 }
+
+vk::PipelineStageFlags2KHR translateStageMask(BarrierStageMask mask) {
+    vk::PipelineStageFlags2KHR out = {};
+    if (mask & BarrierStageMask::BOTTOM_OF_PIPE) {
+        out |= vk::PipelineStageFlagBits2KHR::eBottomOfPipe;
+    }
+    if (mask & BarrierStageMask::COLOR_ATTACHMENT_OUTPUT) {
+        out |= vk::PipelineStageFlagBits2KHR::eColorAttachmentOutput;
+    }
+    if (mask & BarrierStageMask::COMPUTE) {
+        out |= vk::PipelineStageFlagBits2KHR::eComputeShader;
+    }
+    if (mask & BarrierStageMask::EARLY_FRAGMENT_TESTS) {
+        out |= vk::PipelineStageFlagBits2KHR::eEarlyFragmentTests;
+    }
+    if (mask & BarrierStageMask::FRAGMENT_SHADER) {
+        out |= vk::PipelineStageFlagBits2KHR::eFragmentShader;
+    }
+    if (mask & BarrierStageMask::LATE_FRAGMENT_TESTS) {
+        out |= vk::PipelineStageFlagBits2KHR::eLateFragmentTests;
+    }
+    if (mask & BarrierStageMask::TOP_OF_PIPE) {
+        out |= vk::PipelineStageFlagBits2KHR::eTopOfPipe;
+    }
+    if (mask & BarrierStageMask::TRANSFER) {
+        out |= vk::PipelineStageFlagBits2KHR::eTransfer;
+    }
+    if (mask & BarrierStageMask::VERTEX_SHADER) {
+        out |= vk::PipelineStageFlagBits2KHR::eVertexShader;
+    }
+    return out;
+}
+
+vk::AccessFlags2KHR translateAccessMask(BarrierAccessFlag flag) {
+    switch (flag) {
+        case BarrierAccessFlag::SHADER_READ:
+            return vk::AccessFlagBits2KHR::eShaderRead;
+        case BarrierAccessFlag::SHADER_WRITE:
+            return vk::AccessFlagBits2KHR::eShaderWrite;
+        case BarrierAccessFlag::COLOR_WRITE:
+            return vk::AccessFlagBits2KHR::eColorAttachmentWrite;
+        case BarrierAccessFlag::DEPTH_STENCIL_WRITE:
+            return vk::AccessFlagBits2KHR::eDepthStencilAttachmentWrite;
+    }
+}
+
+vk::ImageLayout translateImageLayout(ImageLayout layout) {
+    switch (layout) {
+        case ImageLayout::NONE:
+            return vk::ImageLayout::eUndefined;
+        case ImageLayout::COLOR_ATTACHMENT_OPTIMAL:
+            return vk::ImageLayout::eColorAttachmentOptimal;
+        case ImageLayout::DEPTH_ATTACHMENT_OPTIMAL:
+            return vk::ImageLayout::eDepthAttachmentOptimal;
+        case ImageLayout::READ_ONLY_OPTIMAL:
+            return vk::ImageLayout::eReadOnlyOptimalKHR;
+        case ImageLayout::SHADER_READ_ONLY_OPTIMAL:
+            return vk::ImageLayout::eShaderReadOnlyOptimal;
+    }
+}

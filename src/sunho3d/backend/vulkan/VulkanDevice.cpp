@@ -34,6 +34,7 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
                     .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
                     .add_required_extension(VK_AMD_SHADER_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
+                       .add_required_extension(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)
                     .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
 
                        .select ();
@@ -50,6 +51,7 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     }
     vkbDevice = devRet.value();
     device = vkbDevice.device;
+    
     physicalDevice = vkbDevice.physical_device;
 
     // Init graphics queue
@@ -85,6 +87,10 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     vmaCreateAllocator(&allocatorInfo, &allocator);
 
     cache = std::make_unique<VulkanPipelineCache>(*this);
+
+    vk::DynamicLoader dl;
+    PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+    dld = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr, device);
 }
 
 VulkanDevice::~VulkanDevice() {
