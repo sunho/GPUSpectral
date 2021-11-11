@@ -7,7 +7,7 @@
 template <typename K, typename V, typename Hasher>
 class GCPool {
   public:
-    const static constexpr uint32_t INITIAL_REF_COUNT = 2;
+    const static constexpr uint32_t INITIAL_REF_COUNT = 4;
     template <typename G>
     struct Holder {
         uint32_t refCount;

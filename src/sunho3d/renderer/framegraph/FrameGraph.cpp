@@ -164,7 +164,7 @@ void FrameGraph::compile() {
                     if (type == ResourceType::Image) {
                         auto res = pass.resources.at(iter->first);
                         // hack: we should do this translation in vulkanrenderpass.attachments
-                        if (res.accessType == ResourceAccessType::ColorWrite) {
+                        if (prevRes.accessType == ResourceAccessType::ColorWrite) {
                             auto image = *getResource<Handle<HwTexture>>(res.resource);
                             Barrier barrier = {};
                             auto src = convertAccessTypeToBarrierStage(prevRes.accessType);
@@ -215,6 +215,12 @@ void FrameGraph::compile() {
                     barrier.initialLayout = driver.getTextureImageLayout(image);
                     barrier.finalLayout = decideImageLayout(res.accessType);
                     pass.barriers.push_back(barrier);
+                } else {
+                    auto barrier = generateBufferBarrier(res, res);
+                    barrier.srcStage = BarrierStageMask::TOP_OF_PIPE;
+                    barrier.srcAccess = BarrierAccessFlag::NONE;
+                    barrier.dstAccess = BarrierAccessFlag::NONE;
+                    pass.barriers.push_back(barrier);
                 }
             }
         }
@@ -224,7 +230,7 @@ void FrameGraph::compile() {
 void FrameGraph::run() {
     FrameGraphContext context(*this);
     for (auto pass : bakedGraph.passes) {
-        for (auto barrier : pass.barriers) {
+        for (auto& barrier : pass.barriers) {
             driver.setBarrier(barrier);
         }
         pass.func(*this, context);

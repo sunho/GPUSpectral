@@ -135,13 +135,11 @@ VulkanTexture::~VulkanTexture() {
 }
 
 void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &data) {
-    // VulkanBufferObject *buffer = new VulkanBufferObject(device, width * height * 4, BufferUsage::TRANSFER_SRC);
-    // buffer->upload(data);
-    auto bi = vk::BufferCreateInfo().setSize(width * height * 4).setUsage(vk::BufferUsageFlagBits::eTransferSrc);
+    auto bi = vk::BufferCreateInfo().setSize(width * height * getTextureFormatSize(format)).setUsage(vk::BufferUsageFlagBits::eTransferSrc);
     auto staging = device.allocateBuffer(bi, VMA_MEMORY_USAGE_CPU_ONLY);
     void* d;
     staging.map(device, &d);
-    memcpy(d, data.data, width*height*4);
+    memcpy(d, data.data, width*height*getTextureFormatSize(format));
     staging.unmap(device);
     device.immediateSubmit([&](vk::CommandBuffer cmd) {
 		vk::ImageSubresourceRange range;

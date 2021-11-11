@@ -528,7 +528,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     glm::uvec2 probeTexSize = glm::uvec2(IRD_MAP_SIZE * IRD_MAP_PROBE_COLS, IRD_MAP_SIZE * (probeNum / IRD_MAP_PROBE_COLS));
     if (!rayGbuffer) {
         rayGbuffer = std::make_unique<GBuffer>(driver, RAYS_PER_PROBE, probeNum);
-        probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, probeTexSize.x, probeTexSize.y);
+        probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, probeTexSize.x, probeTexSize.y);
         probeDistTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS));
         probeDistSquareTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS));
         std::vector<half> blank(probeTexSize.x * probeTexSize.y*4, 0.0f);
@@ -616,9 +616,9 @@ void Renderer::ddgiSuite(Scene* scene) {
                 t[3] = model[3];
                 instance.transfom = t;
                 inflight.instances.push_back(instance);
-                RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
-                driver.buildTLAS(tlas, desc);
             }
+            RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
+            driver.buildTLAS(tlas, desc);
         },
     });
 
