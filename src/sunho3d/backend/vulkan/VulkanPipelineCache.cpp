@@ -389,7 +389,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
                                         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
                                         .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                                         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                        .initialLayout = VK_IMAGE_LAYOUT_GENERAL,
+                                        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                                         .finalLayout = VK_IMAGE_LAYOUT_GENERAL });
 
                 colorAttachmentRef.push_back({ .attachment = (uint32_t)i,

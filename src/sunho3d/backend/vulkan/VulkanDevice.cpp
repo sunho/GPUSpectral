@@ -29,12 +29,12 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     // Init vulkan device
     vkb::PhysicalDeviceSelector selector{ vkbInstance };
     auto physRet = selector.set_surface(wsi->surface)
+                       .add_required_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
                     .add_required_extension(VK_AMD_SHADER_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
-                       .add_required_extension(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)
                     .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
 
                        .select ();

@@ -6,7 +6,6 @@
 #define IRD_MAP_PROBE_COLS 8
 
 #include "common.glsl"
-
 #include "probe.glsl"
 
 layout(location = 0) in vec2 inPos;
@@ -45,18 +44,22 @@ layout( push_constant ) uniform PushConstants {
 void main() {
     vec2 uv = inPos / 2.0 + 0.5;
 
+    uint numProbe = sceneBuffer.gridNum.x * sceneBuffer.gridNum.y * sceneBuffer.gridNum.z;
     vec3 pos = vec3(texture(positionBuffer, uv));
     vec3 normal = vec3(texture(normalBuffer, uv));
     vec3 v = normalize(constants.cameraPos - pos);
     vec4 diffuse = texture(diffuseBuffer, uv);
     vec4 color = diffuse * 0.1;
-    uvec3 grid = posToGrid(pos, sceneBuffer.gridNum, sceneBuffer.sceneSize); 
+    ivec3 grid = posToGrid(pos, sceneBuffer.gridNum, sceneBuffer.sceneSize); 
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             for (int k = 0; k < 2; ++k) {
-                uvec3 offset = uvec3(i,j,k);
-                uvec3 ogrid = grid + offset;
-                uint probeID = gridToProbeID(ogrid, sceneBuffer.gridNum);   
+                ivec3 offset = ivec3(i,j,k);
+                ivec3 ogrid = grid + offset;
+                int probeID = gridToProbeID(ogrid, sceneBuffer.gridNum);
+                if (probeID < 0 || probeID > numProbe) {
+                    continue;
+                }   
                 vec2 startOffset = vec2((probeID % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (probeID / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
                 vec2 uv = octahedronMap(normal);
                 vec2 tuv = (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0);
@@ -68,7 +71,7 @@ void main() {
                 }*/
                 uvec3 d = sceneBuffer.gridNum;
                 float kk = probeID / float(d.x*d.y*d.z);
-                color += vec4(vec3(irradiance), 0.0);
+                color += vec4(vec3(irradiance/M_PI), 0.0)/8.0;
                 //outColor = vec4(kk);
                 //return;
             }

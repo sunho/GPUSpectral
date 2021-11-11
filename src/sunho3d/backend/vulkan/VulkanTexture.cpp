@@ -79,7 +79,7 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
         imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     }*/
 
-    imageLayout = vk::ImageLayout::eGeneral;
+    vkImageLayout = vk::ImageLayout::eGeneral;
 
     _image = createImage(device, width, height, vkFormat, vk::ImageTiling::eOptimal, flags);
     image = _image.image;

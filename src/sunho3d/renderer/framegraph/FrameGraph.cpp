@@ -76,7 +76,7 @@ static ImageLayout decideImageLayout(const ResourceAccessType& type) {
         case ResourceAccessType::ColorWrite:
             return ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
         case ResourceAccessType::ComputeRead:
-            return ImageLayout::READ_ONLY_OPTIMAL;
+            return ImageLayout::GENERAL;
         case ResourceAccessType::ComputeWrite:
             return ImageLayout::GENERAL;
         case ResourceAccessType::FragmentRead:
@@ -123,6 +123,7 @@ void FrameGraph::compile() {
         }
     }
 
+    /*
     // topological sort
     // in dfs spanning tree
     // we should place what's on the left early (cross edge)
@@ -134,6 +135,10 @@ void FrameGraph::compile() {
     }
     for (auto idx : runOrder) {
         bakedGraph.passes.push_back(bakedPasses[idx]);
+    }
+    */
+    for (auto pass : bakedPasses) {
+        bakedGraph.passes.push_back(pass);
     }
 
     for (int i = 0; i < bakedGraph.passes.size(); ++i) {
@@ -154,14 +159,62 @@ void FrameGraph::compile() {
                 auto& prevPass = bakedGraph.passes[b->second];
                 auto prevRes = prevPass.resources.at(iter->first);
                 auto res = pass.resources.at(iter->first);
-                if (isWriteAccessType(prevRes.accessType)) {
-                    auto type = res.resource.getType();
+                auto type = res.resource.getType();
+                if (isWriteAccessType(prevRes.accessType)) { 
                     if (type == ResourceType::Image) {
-                        auto image = *getResource<Handle<HwTexture>>(res.resource);
-                        pass.barriers.push_back(generateImageBarrier(prevRes, res, image));
+                        auto res = pass.resources.at(iter->first);
+                        // hack: we should do this translation in vulkanrenderpass.attachments
+                        if (res.accessType == ResourceAccessType::ColorWrite) {
+                            auto image = *getResource<Handle<HwTexture>>(res.resource);
+                            Barrier barrier = {};
+                            auto src = convertAccessTypeToBarrierStage(prevRes.accessType);
+                            barrier.srcStage = src.first;
+                            barrier.srcAccess = src.second;
+                            auto dest = convertAccessTypeToBarrierStage(res.accessType);
+                            barrier.dstStage = dest.first;
+                            barrier.dstAccess = dest.second;
+                            barrier.image = image;
+                            barrier.initialLayout = ImageLayout::GENERAL;
+                            barrier.finalLayout = decideImageLayout(res.accessType);
+                            pass.barriers.push_back(barrier);
+                        } else {
+                            auto image = *getResource<Handle<HwTexture>>(res.resource);
+                            auto barrier = generateImageBarrier(prevRes, res, image);
+                            pass.barriers.push_back(barrier);
+                        }
                     } else {
                         pass.barriers.push_back(generateBufferBarrier(prevRes, res));
                     }
+                } else {
+                    if (isWriteAccessType(res.accessType)) {
+                        if (type == ResourceType::Image) {
+                            auto image = *getResource<Handle<HwTexture>>(res.resource);
+                            auto barrier = generateImageBarrier(prevRes, res, image);
+                            pass.barriers.push_back(barrier);
+                        } else {
+                            auto barrier = generateBufferBarrier(prevRes, res);
+                            barrier.srcAccess = BarrierAccessFlag::NONE;
+                            barrier.dstAccess = BarrierAccessFlag::NONE;
+                            pass.barriers.push_back(barrier);
+                        }
+                    }
+                }
+            } else {
+                auto res = pass.resources.at(iter->first);
+                auto type = res.resource.getType();
+                if (type == ResourceType::Image) {
+                    auto image = *getResource<Handle<HwTexture>>(res.resource);
+                    Barrier barrier = {};
+
+                    auto dest = convertAccessTypeToBarrierStage(res.accessType);
+                    barrier.dstStage = dest.first;
+                    barrier.dstAccess = dest.second;
+                    barrier.srcStage = BarrierStageMask::TOP_OF_PIPE;
+                    barrier.srcAccess = BarrierAccessFlag::NONE;
+                    barrier.image = image;
+                    barrier.initialLayout = driver.getTextureImageLayout(image);
+                    barrier.finalLayout = decideImageLayout(res.accessType);
+                    pass.barriers.push_back(barrier);
                 }
             }
         }
@@ -190,16 +243,29 @@ FrameGraph::BakedPass::BakedPass(FramePass pass) : name(pass.name), func(pass.fu
 }
 
 void FrameGraphContext::bindTextureResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
+    assert(handle.getType() == ResourceType::Image);
     Handle<HwTexture> texture = *parent.getResource<Handle<HwTexture>>(handle);
     pipe.bindTexture(set, binding, texture);
 }
 
 void FrameGraphContext::bindStorageImageResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
+    assert(handle.getType() == ResourceType::Image);
     Handle<HwTexture> texture = *parent.getResource<Handle<HwTexture>>(handle);
     pipe.bindStorageImage(set, binding, texture);
 }
 
 void FrameGraphContext::bindStorageBufferResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
+    assert(handle.getType() == ResourceType::Buffer);
     Handle<HwBufferObject> buffer = *parent.getResource<Handle<HwBufferObject>>(handle);
     pipe.bindStorageBuffer(set, binding, buffer);
+}
+
+Handle<HwTexture> FrameGraphContext::unwrapTextureHandle(ResourceHandle handle) {
+    assert(handle.getType() == ResourceType::Image);
+    return *parent.getResource<Handle<HwTexture>>(handle);
+}
+
+Handle<HwBufferObject> FrameGraphContext::unwrapBufferHandle(ResourceHandle handle) {
+    assert(handle.getType() == ResourceType::Buffer);
+    return *parent.getResource<Handle<HwBufferObject>>(handle);
 }

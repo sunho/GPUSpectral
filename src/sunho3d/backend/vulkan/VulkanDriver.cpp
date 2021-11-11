@@ -337,6 +337,11 @@ void VulkanDriver::buildTLAS(Handle<HwTLAS> handle, RTSceneDescriptor descriptor
     rayTracer->buildTLAS(context.inflight->rayFrameContext, tlas, desc);
 }
 
+ImageLayout VulkanDriver::getTextureImageLayout(Handle<HwTexture> handle) {
+    auto texture = handle_cast<VulkanTexture, HwTexture>(handle);
+    return texture->imageLayout;
+}
+
 void VulkanDriver::intersectRays(Handle<HwTLAS> tlasHandle, uint32_t rayCount, Handle<HwBufferObject> raysHandle, Handle<HwBufferObject> hitsHandle) {
     VulkanTLAS* tlas = handle_cast<VulkanTLAS>(tlasHandle);
     VulkanBufferObject* rays = handle_cast<VulkanBufferObject>(raysHandle);
@@ -415,7 +420,7 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
                 for (auto handle : binding.handles) {
                     auto tex = handle_cast<VulkanTexture>(handle.texture);
                     vk::DescriptorImageInfo imageInfo{};
-                    imageInfo.imageLayout = tex->imageLayout;
+                    imageInfo.imageLayout = tex->vkImageLayout;
                     imageInfo.imageView = tex->view;
                     imageInfo.sampler = tex->sampler;
                     vb.imageInfo.push_back(imageInfo);
@@ -432,28 +437,35 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
 void VulkanDriver::setBarrier(Barrier barrier) {
     auto& cmd = context.inflight->cmd;
     if (barrier.image) {
-        vk::ImageMemoryBarrier2KHR imageBarrier{};
-        imageBarrier.srcStageMask = translateStageMask(barrier.srcStage);
-        imageBarrier.dstStageMask = translateStageMask(barrier.dstStage);
+        auto texture = handle_cast<VulkanTexture, HwTexture>(barrier.image);
+        vk::ImageMemoryBarrier imageBarrier{};
         imageBarrier.srcAccessMask = translateAccessMask(barrier.srcAccess);
         imageBarrier.dstAccessMask = translateAccessMask(barrier.dstAccess);
         imageBarrier.oldLayout = translateImageLayout(barrier.initialLayout);
         imageBarrier.newLayout = translateImageLayout(barrier.finalLayout);
+        imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        imageBarrier.subresourceRange.aspectMask = decideAsepctFlags(barrier.srcAccess) | decideAsepctFlags(barrier.dstAccess);
+        imageBarrier.subresourceRange.baseArrayLayer = 0;
+        imageBarrier.subresourceRange.layerCount = 1;
+        imageBarrier.subresourceRange.baseMipLevel = 0;
+        imageBarrier.subresourceRange.levelCount= 1;
+        imageBarrier.image = texture->image;
+        texture->vkImageLayout = translateImageLayout(barrier.finalLayout);
+        texture->imageLayout = barrier.finalLayout;
 
-        vk::DependencyInfoKHR info{};
-        info.imageMemoryBarrierCount = 1;
-        info.pImageMemoryBarriers = &imageBarrier;
-        cmd.pipelineBarrier2KHR(info, device->dld);
-    } else {
-        vk::MemoryBarrier2KHR memBarrier{};
-        memBarrier.srcStageMask = translateStageMask(barrier.srcStage);
-        memBarrier.dstStageMask = translateStageMask(barrier.dstStage);
+        cmd.pipelineBarrier(translateStageMask(barrier.srcStage),
+                            translateStageMask(barrier.dstStage), vk::DependencyFlags(), 0, nullptr, 0, nullptr, 1, &imageBarrier);
+    } else if (barrier.srcAccess != BarrierAccessFlag::NONE || barrier.dstAccess != BarrierAccessFlag::NONE){
+        vk::MemoryBarrier memBarrier{};
         memBarrier.srcAccessMask = translateAccessMask(barrier.srcAccess);
         memBarrier.dstAccessMask = translateAccessMask(barrier.dstAccess);
 
-        vk::DependencyInfoKHR info{};
-        info.memoryBarrierCount = 1;
-        info.pMemoryBarriers = &memBarrier;
-        cmd.pipelineBarrier2KHR(info, device->dld);
+        cmd.pipelineBarrier(translateStageMask(barrier.srcStage),
+                            translateStageMask(barrier.dstStage), vk::DependencyFlags(), 1, &memBarrier, 0, nullptr, 0, nullptr);
+    } else {
+        cmd.pipelineBarrier(translateStageMask(barrier.srcStage),
+                            translateStageMask(barrier.dstStage), vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr);
+    
     }
 }

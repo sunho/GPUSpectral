@@ -16,7 +16,8 @@ class VulkanTexture : public HwTexture {
     vk::ImageView view;
     vk::Format vkFormat;
     vk::Sampler sampler;
-    vk::ImageLayout imageLayout;
+    vk::ImageLayout vkImageLayout;
+    ImageLayout imageLayout{ImageLayout::GENERAL};
 
   private:
     AllocatedImage _image;

@@ -11,14 +11,14 @@ uvec3 probIDToGrid(uint id, uvec3 gridNum) {
     return uvec3(x,y,z);
 }
 
-uvec3 posToGrid(vec3 pos, uvec3 gridNum, vec3 sceneSize) {
+ivec3 posToGrid(vec3 pos, uvec3 gridNum, vec3 sceneSize) {
     vec3 gridSize = sceneSize * 2.0 / gridNum;
-    uvec3 grid = uvec3((pos + sceneSize) / gridSize);
+    ivec3 grid = ivec3((pos + sceneSize) / gridSize);
     return grid;
 }
 
-uint gridToProbeID(uvec3 grid, uvec3 gridNum) {
-    return grid.x + grid.y * gridNum.x + grid.z * gridNum.y * gridNum.x;
+int gridToProbeID(ivec3 grid, uvec3 gridNum) {
+    return grid.x + grid.y * int(gridNum.x) + grid.z * int(gridNum.y * gridNum.x);
 }
 
 vec3 probeIDToPos(uint id, uvec3 gridNum, vec3 sceneSize) {

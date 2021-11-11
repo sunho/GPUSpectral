@@ -79,9 +79,9 @@ struct DDGIPassContext {
 
 struct GBuffer {
     GBuffer(VulkanDriver& driver, uint32_t width, uint32_t height) {
-        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
-        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
-        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
         depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::DEPTH32F, width, height);
         RenderAttachments atts = {};
         atts.colors[0] = positionBuffer;

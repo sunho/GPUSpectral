@@ -72,6 +72,63 @@ enum class TextureFormat : uint16_t {
     DEPTH32F_STENCIL8
 };
 
+static inline size_t getTextureFormatSize(TextureFormat format) {
+    switch (format) {
+        case TextureFormat::R8:
+            return 1;
+        case TextureFormat::R8_SNORM:
+            return 1;
+        case TextureFormat::R8UI:
+            return 1;
+        case TextureFormat::R8I:
+            return 1;
+        case TextureFormat::R16F:
+            return 2;
+        case TextureFormat::R16UI:
+            return 2;
+        case TextureFormat::R16I:
+            return 2;
+        case TextureFormat::DEPTH16:
+            return 2;
+        case TextureFormat::R32F:
+            return 4;
+        case TextureFormat::R32UI:
+            return 4;
+        case TextureFormat::R32I:
+            return 4;
+        case TextureFormat::RG16F:
+            return 4;
+        case TextureFormat::RGBA16F:
+            return 8;
+        case TextureFormat::RG16UI:
+            return 4;
+        case TextureFormat::RG16I:
+            return 4;
+        case TextureFormat::R11F_G11F_B10F:
+            return 4;
+        case TextureFormat::RGBA8:
+            return 4;
+        case TextureFormat::SRGB8_A8:
+            return 4;
+        case TextureFormat::RGBA8_SNORM:
+            return 4;
+        case TextureFormat::RGB10_A2:
+            return 4;
+        case TextureFormat::RGBA8UI:
+            return 4;
+        case TextureFormat::RGBA8I:
+            return 4;
+        case TextureFormat::DEPTH32F:
+            return 4;
+        case TextureFormat::DEPTH24_STENCIL8:
+            return 4;
+        case TextureFormat::DEPTH32F_STENCIL8:
+            return 8;
+        default:
+            return 0;
+    }
+}
+
 enum class TextureUsage : uint8_t {
     NONE = 0x0,
     COLOR_ATTACHMENT = 0x1,

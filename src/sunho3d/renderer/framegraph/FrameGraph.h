@@ -143,6 +143,7 @@ class FrameGraph {
         std::vector<FramePassResource> inputs;
         std::unordered_map<uint32_t, FramePassResource> resources;
         std::vector<Barrier> barriers;
+        std::vector<Barrier> postBarriers;
     };
 
     struct BakedGraph {
@@ -190,6 +191,10 @@ struct FrameGraphContext {
     void bindTextureResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle);
     void bindStorageImageResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle);
     void bindStorageBufferResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle);
+
+    Handle<HwTexture> unwrapTextureHandle(ResourceHandle handle);
+    Handle<HwBufferObject> unwrapBufferHandle(ResourceHandle handle);
+
 
   private:
     FrameGraph& parent;

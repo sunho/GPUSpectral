@@ -70,6 +70,7 @@ VOIDCOMMAND(updateUniformBuffer, UniformBufferHandle, handle, BufferDescriptor, 
 VOIDCOMMAND(setPrimitiveBuffer, PrimitiveHandle, handle, VertexBufferHandle, vertexBuffer, IndexBufferHandle, indexBuffer)
 VOIDCOMMAND(beginRenderPass, RenderTargetHandle, renderTarget, RenderPassParams, params)
 VOIDCOMMAND(setBarrier, Barrier, barrier)
+COMMAND(ImageLayout, getTextureImageLayout, TextureHandle, handle)
 VOIDCOMMAND0(endRenderPass)
 VOIDCOMMAND(draw, PipelineState, pipeline, PrimitiveHandle, primitive)
 VOIDCOMMAND(dispatch, PipelineState, pipeline, size_t, groupCountX, size_t, groupCountY, size_t, groupCountZ)

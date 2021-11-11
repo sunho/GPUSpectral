@@ -45,6 +45,9 @@ set(SOURCE_LIST
     utils/FixedVector.h
     utils/Hash.h
     utils/GCPool.h
+    utils/HalfFloat/umHalf.h
+    utils/HalfFloat/umHalf.inl
+    utils/HalfFloat/stdint.h
     Engine.h
     Engine.cpp
     Window.h
@@ -82,7 +85,7 @@ function(add_shader TARGET SHADENAME SHADER)
 	file(MAKE_DIRECTORY ${current-output-dir})
 	add_custom_command(
 		OUTPUT ${current-output-path}
-		COMMAND ${GLSLC} --target-env=vulkan1.1 -o ${current-output-path} ${current-shader-path}
+		COMMAND ${GLSLC} --target-env=vulkan1.2 -o ${current-output-path} ${current-shader-path}
 		DEPENDS ${current-shader-path}
 		IMPLICIT_DEPENDS CXX ${current-shader-path}
 		VERBATIM)

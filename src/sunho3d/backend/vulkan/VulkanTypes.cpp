@@ -215,48 +215,50 @@ vk::DescriptorType translateDescriptorType(ProgramParameterType type) {
     return vk::DescriptorType();
 }
 
-vk::PipelineStageFlags2KHR translateStageMask(BarrierStageMask mask) {
-    vk::PipelineStageFlags2KHR out = {};
+vk::PipelineStageFlags translateStageMask(BarrierStageMask mask) {
+    vk::PipelineStageFlags out = {};
     if (mask & BarrierStageMask::BOTTOM_OF_PIPE) {
-        out |= vk::PipelineStageFlagBits2KHR::eBottomOfPipe;
+        out |= vk::PipelineStageFlagBits::eBottomOfPipe;
     }
     if (mask & BarrierStageMask::COLOR_ATTACHMENT_OUTPUT) {
-        out |= vk::PipelineStageFlagBits2KHR::eColorAttachmentOutput;
+        out |= vk::PipelineStageFlagBits::eColorAttachmentOutput;
     }
     if (mask & BarrierStageMask::COMPUTE) {
-        out |= vk::PipelineStageFlagBits2KHR::eComputeShader;
+        out |= vk::PipelineStageFlagBits::eComputeShader;
     }
     if (mask & BarrierStageMask::EARLY_FRAGMENT_TESTS) {
-        out |= vk::PipelineStageFlagBits2KHR::eEarlyFragmentTests;
+        out |= vk::PipelineStageFlagBits::eEarlyFragmentTests;
     }
     if (mask & BarrierStageMask::FRAGMENT_SHADER) {
-        out |= vk::PipelineStageFlagBits2KHR::eFragmentShader;
+        out |= vk::PipelineStageFlagBits::eFragmentShader;
     }
     if (mask & BarrierStageMask::LATE_FRAGMENT_TESTS) {
-        out |= vk::PipelineStageFlagBits2KHR::eLateFragmentTests;
+        out |= vk::PipelineStageFlagBits::eLateFragmentTests;
     }
     if (mask & BarrierStageMask::TOP_OF_PIPE) {
-        out |= vk::PipelineStageFlagBits2KHR::eTopOfPipe;
+        out |= vk::PipelineStageFlagBits::eTopOfPipe;
     }
     if (mask & BarrierStageMask::TRANSFER) {
-        out |= vk::PipelineStageFlagBits2KHR::eTransfer;
+        out |= vk::PipelineStageFlagBits::eTransfer;
     }
     if (mask & BarrierStageMask::VERTEX_SHADER) {
-        out |= vk::PipelineStageFlagBits2KHR::eVertexShader;
+        out |= vk::PipelineStageFlagBits::eVertexShader;
     }
     return out;
 }
 
-vk::AccessFlags2KHR translateAccessMask(BarrierAccessFlag flag) {
+vk::AccessFlags translateAccessMask(BarrierAccessFlag flag) {
     switch (flag) {
         case BarrierAccessFlag::SHADER_READ:
-            return vk::AccessFlagBits2KHR::eShaderRead;
+            return vk::AccessFlagBits::eShaderRead;
         case BarrierAccessFlag::SHADER_WRITE:
-            return vk::AccessFlagBits2KHR::eShaderWrite;
+            return vk::AccessFlagBits::eShaderWrite;
         case BarrierAccessFlag::COLOR_WRITE:
-            return vk::AccessFlagBits2KHR::eColorAttachmentWrite;
+            return vk::AccessFlagBits::eColorAttachmentWrite;
         case BarrierAccessFlag::DEPTH_STENCIL_WRITE:
-            return vk::AccessFlagBits2KHR::eDepthStencilAttachmentWrite;
+            return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case BarrierAccessFlag::NONE:
+            return {};
     }
 }
 
@@ -272,5 +274,22 @@ vk::ImageLayout translateImageLayout(ImageLayout layout) {
             return vk::ImageLayout::eReadOnlyOptimalKHR;
         case ImageLayout::SHADER_READ_ONLY_OPTIMAL:
             return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case ImageLayout::GENERAL:
+            return vk::ImageLayout::eGeneral;
+    }
+}
+
+vk::ImageAspectFlags decideAsepctFlags(BarrierAccessFlag flags) {
+    switch (flags) {
+        case BarrierAccessFlag::SHADER_WRITE:
+            return vk::ImageAspectFlagBits::eColor;
+        case BarrierAccessFlag::SHADER_READ:
+            return vk::ImageAspectFlagBits::eColor;
+        case BarrierAccessFlag::COLOR_WRITE:
+            return vk::ImageAspectFlagBits::eColor;
+        case BarrierAccessFlag::DEPTH_STENCIL_WRITE:
+            return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+        default:
+            return {};
     }
 }
