@@ -64,8 +64,9 @@ void main() {
         irradiance *= M_PI;
         ivec2 startPos =  ivec2((probeID % IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE, (probeID/IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE);
         vec4 bb = imageLoad(irradianceMap, startPos + iuv);
-        imageStore(irradianceMap, startPos + iuv, mix(bb, irradiance, 0.95));
+        imageStore(irradianceMap, startPos + iuv, mix(bb, irradiance, 0.05));
     }
+    /*
     if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
         float distSG = subgroupInclusiveAdd(dist);
         int disti = int(distSG * FIXED_POINT_PRECISION);
@@ -85,5 +86,5 @@ void main() {
             imageStore(distanceMap, ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(dist));
             imageStore(distanceSquareMap,  ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(distSquare));
         }
-    }
+    }*/
 }

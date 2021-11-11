@@ -76,7 +76,7 @@ static ImageLayout decideImageLayout(const ResourceAccessType& type) {
         case ResourceAccessType::ColorWrite:
             return ImageLayout::COLOR_ATTACHMENT_OPTIMAL;
         case ResourceAccessType::ComputeRead:
-            return ImageLayout::GENERAL;
+            return ImageLayout::SHADER_READ_ONLY_OPTIMAL;
         case ResourceAccessType::ComputeWrite:
             return ImageLayout::GENERAL;
         case ResourceAccessType::FragmentRead:

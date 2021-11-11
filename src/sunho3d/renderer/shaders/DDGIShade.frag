@@ -49,8 +49,14 @@ void main() {
     vec3 normal = vec3(texture(normalBuffer, uv));
     vec3 v = normalize(constants.cameraPos - pos);
     vec4 diffuse = texture(diffuseBuffer, uv);
-    vec4 color = diffuse * 0.1;
-    ivec3 grid = posToGrid(pos, sceneBuffer.gridNum, sceneBuffer.sceneSize); 
+    vec4 color = vec4(0.0);
+    ivec3 grid = posToGrid(pos, sceneBuffer.gridNum, sceneBuffer.sceneSize);
+    vec3 gridSize = sceneBuffer.sceneSize * 2.0 / sceneBuffer.gridNum;
+    int mainProbeID = gridToProbeID(grid, sceneBuffer.gridNum);
+    vec3 mainProbePos = probeIDToPos(mainProbeID, sceneBuffer.gridNum, sceneBuffer.sceneSize);
+    vec3 tt = (pos - mainProbePos) / gridSize;
+    float sumWeight = 0.01;
+    vec4 sumIrradiance = vec4(0.0);
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             for (int k = 0; k < 2; ++k) {
@@ -60,23 +66,27 @@ void main() {
                 if (probeID < 0 || probeID > numProbe) {
                     continue;
                 }   
+                vec3 probePos = probeIDToPos(probeID, sceneBuffer.gridNum, sceneBuffer.sceneSize);
+                vec3 interp = mix(1.0-tt, tt, vec3(offset));
+                float weight = interp.x * interp.y * interp.z;
+
+                // back face cull
+                vec3 probeToPoint = pos-probePos;
+                vec3 lightDir = normalize(-probeToPoint);
+                weight *= max(0.05, dot(lightDir, normal));
+
                 vec2 startOffset = vec2((probeID % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (probeID / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
                 vec2 uv = octahedronMap(normal);
                 vec2 tuv = (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0);
-                vec4 irradiance = diffuse*texture(probeIrradianceMap, tuv);
-                /*if (any(isnan(irradiance))) {
-                    color = vec4(3.0,0.0,0.0,1.0);
-                    outColor = color;
-                    return;
-                }*/
-                uvec3 d = sceneBuffer.gridNum;
-                float kk = probeID / float(d.x*d.y*d.z);
-                color += vec4(vec3(irradiance/M_PI), 0.0)/8.0;
-                //outColor = vec4(kk);
-                //return;
+                vec4 irradiance = texture(probeIrradianceMap, tuv);
+                
+                sumIrradiance += irradiance * weight;
+                sumWeight += weight;
             }
         }
     }
+
+    color += diffuse * (sumIrradiance / sumWeight) / (2.0 * M_PI);
 
     for (int i = 0; i < light.numLights; i++) {
         vec3 lightV = light.light[i].pos - pos;
