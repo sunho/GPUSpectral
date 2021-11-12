@@ -749,7 +749,7 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindStorageImageResource(pipe, 2, 1, probeDistTex);
             ctx.bindStorageImageResource(pipe, 2, 2, probeDistSquareTex);
             pipe.program = ddgiProbeUpdateProgram;
-            driver.dispatch(pipe, probeNum, IRD_MAP_SIZE, IRD_MAP_SIZE);
+            driver.dispatch(pipe, probeNum, 1, 1);
         },
     });
 
