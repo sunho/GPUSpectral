@@ -40,7 +40,6 @@ layout( push_constant ) uniform PushConstants {
     vec3 cameraPos;
 } constants;
 
-
 void main() {
     vec2 uv = inPos / 2.0 + 0.5;
 

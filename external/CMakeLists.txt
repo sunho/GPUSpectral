@@ -12,6 +12,7 @@ add_subdirectory(VulkanMemoryAllocator)
 
 add_subdirectory(spdlog)
 
+add_subdirectory(TinyParser-Mitsuba)
 
 find_package(Vulkan)
 add_library(Vulkan INTERFACE)

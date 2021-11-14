@@ -1,14 +1,18 @@
 #include "Loader.h"
 
 #include <iostream>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "Engine.h"
 #include "renderer/Renderer.h"
 #include "Scene.h"
+#include "Material.h"
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <tiny_gltf.h>
+
+#include <tinyparser-mitsuba.h>
 
 #include <stdexcept>
 #define TINYOBJLOADER_IMPLEMENTATION
@@ -46,8 +50,71 @@ Scene *Loader::loadGLTF(const std::string &path) {
     return scene;
 }
 
-Entity *Loader::loadObj(const std::string &path) {
-    Entity *out = engine.createEntity();
+void Loader::loadMaterial(Material *material, tinyparser_mitsuba::Object &obj, const std::filesystem:: path &basepath) {
+    std::string type = obj.pluginType();
+
+    if (type == "twosided") {
+        material->twosided = true;
+    } else if (type == "diffuse") {
+        bool found = false;
+        for (auto child : obj.anonymousChildren()) {
+            if (child->type() == tinyparser_mitsuba::OT_TEXTURE) {
+                found = true;
+                auto filename = child->property("filename").getString();
+                auto path = (basepath / filename).string();
+                auto tex = loadTexture(path);
+                material->materialData = DiffuseTextureMaterialData{tex};
+                break;
+            }
+        }
+        if (!found) {
+            auto rgb = obj.property("reflectance").getColor();
+            material->materialData = DiffuseColorMaterialData{ glm::vec3(rgb.r, rgb.g, rgb.b) };
+        }
+    }
+
+    for (auto child : obj.anonymousChildren()) {
+        if (child->type() == tinyparser_mitsuba::OT_BSDF) {
+            loadMaterial(material, *child, basepath);
+        }
+    }
+}
+
+Scene *Loader::loadMitsuba(const std::string &path) {
+    auto p = std::filesystem::path(path).parent_path();
+    tinyparser_mitsuba::SceneLoader loader;
+    auto outScene = engine.createScene(&renderer);
+    auto scene = loader.loadFromFile(path.c_str());
+    for (auto obj : scene.anonymousChildren()) {
+        if (obj->type() == tinyparser_mitsuba::OT_SHAPE) {
+
+            if (obj->pluginType() == "obj") {
+                auto entity = engine.createEntity();
+                auto filename = obj->property("filename").getString();
+                auto mesh = loadObj((p / filename).string());
+                auto transform = obj->property("toWorle").getTransform();
+
+                for (auto child : obj->anonymousChildren()) {
+                    if (child->type() == tinyparser_mitsuba::OT_BSDF) {
+                        auto material = engine.createMaterial();
+                        loadMaterial(material, *child, p);
+                        entity->setMaterial(material);
+                    }
+                }
+
+                auto matrix = glm::make_mat4(transform.matrix.data());
+                entity->setTransformMatrix(matrix);
+                entity->setMesh(mesh);
+                outScene->addEntity(entity);
+            }
+
+        }
+    }
+    return outScene;
+}
+
+Mesh *Loader::loadObj(const std::string &path) {
+    Mesh *out = engine.createMesh();
     std::string warn;
     std::string err;
     std::vector<tinyobj::shape_t> shapes;
@@ -72,7 +139,7 @@ Entity *Loader::loadObj(const std::string &path) {
         auto &driver = renderer.getDriver();
         Material *material = nullptr;
         const int matId = shapes[s].mesh.material_ids[0];
-        auto it = generatedMaterials.find(matId);
+        /* auto it = generatedMaterials.find(matId);
         if (it == generatedMaterials.end()) {
             int width, height, comp;
             unsigned char *data =
@@ -91,16 +158,13 @@ Entity *Loader::loadObj(const std::string &path) {
             }
             auto tex = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, width, height);
             driver.updateTexture(tex, { .data = (uint32_t *)textureData.data() });
-            material = engine.createMaterial();
-            material->diffuseMap = tex;
             stbi_image_free(data);
             generatedMaterials.emplace(matId, material);
         } else {
             material = it->second;
         }
-
+        */
         Primitive primitive;
-        primitive.material = material;
         std::vector<float> v;
         std::vector<float> vt;
         std::vector<float> vn;
@@ -166,6 +230,28 @@ Entity *Loader::loadObj(const std::string &path) {
         out->addPrimitive(primitive);
     }
     return out;
+}
+
+Handle<HwTexture> Loader::loadTexture(const std::string &path) {
+    int width, height, comp;
+    unsigned char *data =
+        stbi_load(path.c_str(), &width, &height, &comp, 0);
+    if (!data) {
+        throw std::runtime_error("FUCK");
+    }
+    std::vector<char> textureData;
+    for (int j = height - 1; j >= 0; --j) {
+        for (int i = 0; i < width; ++i) {
+            textureData.push_back(data[(j * width + i) * comp]);
+            textureData.push_back(data[(j * width + i) * comp + 1]);
+            textureData.push_back(data[(j * width + i) * comp + 2]);
+            textureData.push_back(0xFF);
+        }
+    }
+    auto tex = renderer.getDriver().createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, width, height);
+    renderer.getDriver().updateTexture(tex, { .data = (uint32_t *)textureData.data() });
+    stbi_image_free(data);
+    return tex;
 }
 
 void Loader::loadGLTFNode(Scene *scene, tinygltf::Model &model, tinygltf::Node &node,

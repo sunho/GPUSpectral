@@ -27,3 +27,7 @@ Scene *Engine::createScene(Renderer *renderer) {
 Material *Engine::createMaterial() {
     return materials.construct();
 }
+
+Mesh *Engine::createMesh() {
+    return meshes.construct();
+}

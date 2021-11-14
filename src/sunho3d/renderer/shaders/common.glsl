@@ -13,10 +13,20 @@ struct RayHit {
     uint primId;
 };
 
+
+#define MATERIAL_DIFFUSE_TEXTURE 1
+#define MATERIAL_DIFFUSE_COLOR 2
+
+struct Material {
+    vec3 diffuseColor;
+    int diffuseMapIndex;
+    int typeID;
+};
+
 struct Instance {
     mat4 transform;
     int vertexStart;
-    int diffuseMapIndex;
+    Material material;
 };
 
 struct Ray {

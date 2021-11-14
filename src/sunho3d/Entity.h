@@ -31,9 +31,20 @@ struct Primitive {
     AttributeArray attibutes;
     uint32_t elementCount;
     uint32_t attributeCount;
-    Material *material;
     PrimitiveMode mode;
     Handle<HwPrimitive> hwInstance;
+};
+
+class Mesh : public IdResource {
+  public:
+    Mesh();
+    void addPrimitive(const Primitive &primitive);
+    const std::list<Primitive> &getPrimitives() {
+        return primitives;
+    }
+
+  private:
+    std::list<Primitive> primitives;
 };
 
 class Entity : public IdResource {
@@ -41,26 +52,44 @@ class Entity : public IdResource {
     explicit Entity();
 
     void addNode(Entity *entity);
-    void addPrimitive(const Primitive &primitive);
 
     const std::vector<Entity *> &getNodes() {
         return nodes;
     }
-    const std::list<Primitive> &getPrimitives() {
-        return primitives;
-    }
 
-    const Transform &getTransform() const {
+    const glm::mat4 &getTransform() const {
         return transform;
     }
+
+    Material *getMaterial() const {
+        return material;
+    }
+
+    Mesh *getMesh() const {
+        return mesh;
+    }
+   
+    void setMesh(Mesh *mesh) {
+        this->mesh = mesh;
+    }
+
+    void setMaterial(Material *material) {
+        this->material = material;
+    }
+
     void setTransform(const Transform &transform) {
-        this->transform = transform;
+        this->transform = transform.toMatrix();
+    }
+
+    void setTransformMatrix(const glm::mat4 &mat) {
+        transform = mat;
     }
 
   private:
-    Transform transform;
+    glm::mat4 transform;
     std::vector<Entity *> nodes;
-    std::list<Primitive> primitives;
+    Material *material{};
+    Mesh *mesh{};
 };
 
 }  // namespace sunho3d

@@ -26,11 +26,21 @@ struct TransformBuffer {
     glm::vec4 cameraPos;
 };
 
+#define MATERIAL_DIFFUSE_TEXTURE 1
+#define MATERIAL_DIFFUSE_COLOR 2
+
+struct InstanceMaterial {
+    glm::vec3 diffuseColor;
+    int diffuseMapIndex;
+    int typeID;
+    float pad[3];
+};
+
 struct Instance {
     glm::mat4 transform;
     uint32_t vertexStart;
-    uint32_t diffuseMapIndex;
-    float pad[2];
+    float pad[3];
+    InstanceMaterial material;
 };
 
 static constexpr const size_t MAX_INSTANCES = 32;

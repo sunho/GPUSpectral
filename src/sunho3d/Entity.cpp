@@ -13,6 +13,9 @@ void Entity::addNode(Entity* entity) {
     nodes.push_back(entity);
 }
 
-void Entity::addPrimitive(const Primitive& primitive) {
+Mesh::Mesh() {
+}
+
+void Mesh::addPrimitive(const Primitive& primitive) {
     primitives.push_back(primitive);
 }

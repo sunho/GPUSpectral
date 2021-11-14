@@ -19,6 +19,7 @@ class Engine {
 
     Window *createWindow(size_t width, size_t height);
     Entity *createEntity();
+    Mesh *createMesh();
     Renderer *createRenderer(Window *window);
     Scene *createScene(Renderer *renderer);
     Material *createMaterial();
@@ -29,6 +30,7 @@ class Engine {
     ResourceList<Entity> entities;
     ResourceList<Scene> scenes;
     ResourceList<Material> materials;
+    ResourceList<Mesh> meshes;
 };
 
 }  // namespace sunho3d

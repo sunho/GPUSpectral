@@ -321,7 +321,7 @@ void Renderer::deferSuite(Scene* scene) {
                 auto& geom = sceneData.geometries[i];
                 auto& model = sceneData.worldTransforms[i];
                 pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(rg, camera, model));
-                pipe.bindTexture(1, 0, geom.material->diffuseMap);
+                //pipe.bindTexture(1, 0, geom.material->diffuseMap);
                 driver.draw(pipe, geom.primitive);
             }
             driver.endRenderPass();
@@ -515,6 +515,11 @@ void Renderer::rtSuite(Scene* scene) {
     driver.endFrame();*/
 }
 
+template <class... Ts>
+struct overload : Ts... { using Ts::operator()...; };
+template <class... Ts>
+overload(Ts...) -> overload<Ts...>;
+
 void Renderer::ddgiSuite(Scene* scene) {
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
@@ -568,7 +573,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     sb.instanceNum = sceneData.geometries.size();
     sb.gridNum = scene->ddgi.gridNum;
     sb.sceneSize = scene->ddgi.worldSize;
-    FixedVector<TextureHandle> diffuseMap(sb.instanceNum);
+    std::vector<TextureHandle> diffuseMap);
 
     for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
         auto& geom = sceneData.geometries[i];
@@ -576,9 +581,20 @@ void Renderer::ddgiSuite(Scene* scene) {
         Instance ginstance = {};
         ginstance.vertexStart = geom.vertexStart;
         ginstance.transform = model;
-        ginstance.diffuseMapIndex = i;
+        InstanceMaterial material;
+        std::visit(overload{
+            [&](DiffuseColorMaterialData& data) {
+                material.typeID = MATERIAL_DIFFUSE_COLOR;
+                material.diffuseColor = data.rgb;
+            },
+            [&](DiffuseTextureMaterialData& data) {
+                material.typeID = MATERIAL_DIFFUSE_TEXTURE;
+                material.diffuseMapIndex = diffuseMap.size();
+                diffuseMap.push_back(data.diffuseMap);
+            },
+        }, geom.material->materialData);
         sb.instances[i] = ginstance;
-        diffuseMap[i] = geom.material->diffuseMap;
+        //diffuseMap[i] = geom.material->diffuseMap;
     }
 
     auto tlas = driver.createTLAS();
@@ -679,7 +695,7 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindStorageImageResource(pipe, 2, 1, rayGNormalBuffer);
             ctx.bindStorageImageResource(pipe, 2, 2, rayGDiffuseBuffer);
             ctx.bindStorageImageResource(pipe, 2, 3, distanceBuffer);
-            pipe.bindTextureArray(2, 4, diffuseMap.data(), sceneData.geometries.size());
+            pipe.bindTextureArray(2, 4, diffuseMap.data(), diffuseMap.size());
             pipe.bindUniformBuffer(0, 0, sceneBuffer);
             pipe.bindStorageBuffer(1, 0, sceneData.globalVertexBuffer);
             ctx.bindStorageBufferResource(pipe, 1, 1, hitBuffer);

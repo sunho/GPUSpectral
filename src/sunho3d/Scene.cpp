@@ -56,7 +56,7 @@ Scene::Scene(Renderer* renderer)
 }
 
 void Scene::addEntity(Entity* entity) {
-    for (auto& p : entity->getPrimitives()) {
+    for (auto& p : entity->getMesh()->getPrimitives()) {
         globalVertexBufferContainer.registerPrimitiveIfNeccesary(p);
     }
     entities.push_back(entity);
@@ -86,10 +86,10 @@ void Scene::prepare() {
 }
 
 void Scene::visitEntity(Entity* entity, const glm::mat4& currentTransform) {
-    glm::mat4 nextTransform = entity->getTransform().toMatrix() * currentTransform;
-    for (auto& prim : entity->getPrimitives()) {
+    glm::mat4 nextTransform = entity->getTransform() * currentTransform;
+    for (auto& prim : entity->getMesh()->getPrimitives()) {
         sceneData.geometries.push_back({
-            .material = prim.material, 
+            .material = entity->getMaterial(), 
             .primitive = prim.hwInstance, 
             .vertexStart = globalVertexBufferContainer.getVertexStart(prim)
                                          });
