@@ -31,3 +31,6 @@ url=git@github.com:sunho/RadeonRays_SDK.git
 [submodule "external/pugixml"]
 	path = external/pugixml
 	url = https://github.com/zeux/pugixml.git
+[submodule "external/TinyParser-Mitsuba"]
+	path = external/TinyParser-Mitsuba
+	url = https://github.com/PearCoding/TinyParser-Mitsuba.git
