@@ -27,7 +27,7 @@ int main() {
     scene->ddgi.worldSize = glm::vec3(2.0f,3.0f,2.0f);
     auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
     l->setIntensity(0.6);
-    l->setTransform({.x=0.0,.y=1.3,.z=2.0});
+    l->setTransform({.x=0.5,.y=-0.5,.z=6.0});
     scene->addLight(l);
     window->run([&](){
         //t.x += 0.1;

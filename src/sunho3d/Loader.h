@@ -32,7 +32,7 @@ class Loader {
     explicit Loader(Engine &engine, Renderer &renderer, const std::filesystem::path& basepath);
     Scene *loadGLTF(const std::string &path);
     Scene *loadMitsuba(const std::string &path);
-    Mesh *loadObj(const std::string &path);
+    Mesh *loadObj(const std::string &path, bool twosided=false);
     Handle<HwTexture> loadTexture(const std::string &path);
     
 

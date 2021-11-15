@@ -133,7 +133,7 @@ Scene *Loader::loadMitsuba(const std::string &path) {
     return outScene;
 }
 
-Mesh *Loader::loadObj(const std::string &path) {
+Mesh *Loader::loadObj(const std::string &path, bool twosided) {
     Mesh *out = engine.createMesh();
     std::string warn;
     std::string err;
@@ -212,6 +212,29 @@ Mesh *Loader::loadObj(const std::string &path) {
             vn.push_back(normal.z);
             primitive.vertices.push_back({.pos = pos, .normal = normal, .uv = uv});
         }
+        if (twosided) {
+            size_t beforeSize = primitive.vertices.size();
+            for (size_t i = 0; i < beforeSize; i+=3) {
+                std::array<Vertex, 3> verts = { primitive.vertices[i], primitive.vertices[i+2], primitive.vertices[i+1] };
+                verts[0].normal *= -1;
+                verts[1].normal *= -1;
+                verts[2].normal *= -1;
+                for (size_t j = 0; j < 3; ++j) {
+                    v.push_back(verts[j].pos.x);
+                    v.push_back(verts[j].pos.y);
+                    v.push_back(verts[j].pos.z);
+                    vn.push_back(verts[j].normal.x);
+                    vn.push_back(verts[j].normal.y);
+                    vn.push_back(verts[j].normal.z);
+                    vt.push_back(verts[j].uv.x);
+                    vt.push_back(verts[j].uv.y);
+                    primitive.vertices.push_back(verts[j]);
+                }
+                primitive.indices.push_back(i+beforeSize);
+                primitive.indices.push_back(i + 1+ beforeSize);
+                primitive.indices.push_back(i + 2+beforeSize);
+            }
+        }
         primitive.attibutes[0] = {
             .name = "position",
             .index = 0,
@@ -286,7 +309,7 @@ Mesh *sunho3d::Loader::loadOrGetMesh(const std::string &path) {
         return mesh;
     }
 
-    auto mesh = loadObj(path);
+    auto mesh = loadObj(path, true);
     meshCache.emplace(path, mesh);
     return mesh;
 }
