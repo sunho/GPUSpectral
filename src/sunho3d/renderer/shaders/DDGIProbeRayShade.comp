@@ -33,8 +33,9 @@ layout(std140,set=1,binding = 1) readonly buffer RayHitBuffer {
 layout (set=2,binding = 0, rgba16f) uniform writeonly image2D positionBuffer;
 layout (set=2,binding = 1, rgba16f) uniform writeonly image2D normalBuffer;
 layout (set=2,binding = 2, rgba16f) uniform writeonly image2D diffuseBuffer;
-layout (set=2,binding = 3, rgba16f) uniform writeonly image2D distanceBuffer;
-layout (set=2,binding = 4) uniform sampler2D diffuseMap[MAX_DIFFUSE_MAPS];
+layout (set=2,binding = 3, rgba16f) uniform writeonly image2D emissionBuffer;
+layout (set=2,binding = 4, rgba16f) uniform writeonly image2D distanceBuffer;
+layout (set=2,binding = 5) uniform sampler2D diffuseMap[MAX_DIFFUSE_MAPS];
 
 void main() {
     uint probeID = gl_WorkGroupID.x;
@@ -45,6 +46,7 @@ void main() {
         imageStore(distanceBuffer, outCoord, vec4(0.0));
         imageStore(normalBuffer, outCoord, vec4(0.0));
         imageStore(positionBuffer, outCoord, vec4(0.0));
+        imageStore(emissionBuffer, outCoord, vec4(0.0));
         imageStore(diffuseBuffer, outCoord, vec4(0.0));
     } else {
         Instance instance = sceneBuffer.instances[hit.instId];
@@ -66,11 +68,16 @@ void main() {
         imageStore(normalBuffer, outCoord, vec4(nor,0.0));
         imageStore(positionBuffer, outCoord, vec4(pos,0.0));
         vec4 diffuse = vec4(0.0);
-        if (sceneBuffer.instances[hit.instId].material.typeID == MATERIAL_DIFFUSE_COLOR) {
-            diffuse = vec4(sceneBuffer.instances[hit.instId].material.diffuseColor, 1.0);
+        vec4 emission = vec4(0.0);
+        Material material = sceneBuffer.instances[hit.instId].material;
+        if (material.typeID == MATERIAL_DIFFUSE_COLOR) {
+            diffuse = vec4(material.diffuseColor, 1.0);
+        } else if (material.typeID == MATERIAL_DIFFUSE_TEXTURE) {
+            diffuse = texture(diffuseMap[material.diffuseMapIndex], uv);
         } else {
-            diffuse = texture(diffuseMap[sceneBuffer.instances[hit.instId].material.diffuseMapIndex], uv);
+            emission = vec4(material.diffuseColor, 1.0);
         }
         imageStore(diffuseBuffer, outCoord, diffuse);
+        imageStore(emissionBuffer, outCoord, emission);
     }
 }

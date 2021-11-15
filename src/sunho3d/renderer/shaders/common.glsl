@@ -1,7 +1,7 @@
 #define MAX_INSTANCES 64
 #define M_PI 3.1415926535897932384626433832795
 
-#define RAYS_PER_PROBE 32
+#define RAYS_PER_PROBE 64
 
 struct Vertex {
     vec3 pos;
@@ -18,6 +18,7 @@ struct RayHit {
 
 #define MATERIAL_DIFFUSE_TEXTURE 1
 #define MATERIAL_DIFFUSE_COLOR 2
+#define MATERIAL_EMISSION 3
 
 struct Material {
     vec3 diffuseColor;
@@ -71,4 +72,14 @@ vec3 randDirSphere() {
     float y = sin(phi) * sin(theta);
     float z = cos(phi);
     return vec3(x,y,z);
+}
+
+vec3 ACESFilm(vec3 x)
+{
+    float a = 2.51;
+    float b = 0.03;
+    float c = 2.43;
+    float d = 0.59;
+    float e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0);
 }

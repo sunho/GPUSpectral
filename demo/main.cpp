@@ -23,12 +23,12 @@ int main() {
     auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
     
 
-    scene->ddgi.gridNum = glm::uvec3(12, 12, 12);
-    scene->ddgi.worldSize = glm::vec3(2.0f,3.0f,2.0f);
-    auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
+    scene->ddgi.gridNum = glm::uvec3(24, 24, 24);
+    scene->ddgi.worldSize = glm::vec3(2.0f,2.2f,2.0f);
+    /* auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
     l->setIntensity(0.6);
     l->setTransform({.x=0.5,.y=-0.5,.z=6.0});
-    scene->addLight(l);
+    scene->addLight(l);*/
     window->run([&](){
         //t.x += 0.1;
         //neptune->setTransform(t);

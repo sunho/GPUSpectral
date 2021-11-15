@@ -105,7 +105,8 @@ void Renderer::registerPrograms() {
         .addStorageImage(2, 1)
         .addStorageImage(2, 2)
         .addStorageImage(2, 3)
-        .addTextureArray(2, 4, 32)
+        .addStorageImage(2, 4)
+        .addTextureArray(2, 5, 32)
         .addStorageBuffer(1, 0)
         .addStorageBuffer(1, 1)
         .addUniformBuffer(0, 0);
@@ -134,7 +135,8 @@ void Renderer::registerPrograms() {
         .addTexture(1, 0)
         .addTexture(1, 1)
         .addTexture(1, 2)
-        .addTexture(1, 3);
+        .addTexture(1, 3)
+        .addTexture(1, 4);
     ddgiShadeProgram = driver.createProgram(prog);
 
     prog = { DDGIProbeUpdate, DDGIProbeUpdateSize };
@@ -596,12 +598,17 @@ void Renderer::ddgiSuite(Scene* scene) {
                 material.diffuseMapIndex = diffuseMap.size();
                 diffuseMap.push_back(data.diffuseMap);
             },
+            [&](EmissionMaterialData& data) {
+                material.typeID = MATERIAL_EMISSION;
+                material.diffuseColor = data.radiance;
+            },
             [](auto k) {}
         }, geom.material->materialData);
         materials.push_back(material);
         auto materialBuffer = renderGraph.createUniformBufferSC(sizeof(InstanceMaterial));
         driver.updateUniformBuffer(materialBuffer, { (uint32_t*)&material }, 0);
         materialBuffers.push_back(materialBuffer);
+        ginstance.material = material;
         sb.instances[i] = ginstance;
         //diffuseMap[i] = geom.material->diffuseMap;
     }
@@ -685,6 +692,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto rayGPositionBuffer = renderGraph.importImage("ray g position", rayGbuffer->positionBuffer);
     auto rayGNormalBuffer = renderGraph.importImage("ray g normal", rayGbuffer->normalBuffer);
     auto rayGDiffuseBuffer = renderGraph.importImage("ray g diffuse", rayGbuffer->diffuseBuffer);
+    auto rayGEmissionBuffer = renderGraph.importImage("ray g emission", rayGbuffer->emissionBuffer);
     auto db = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, RAYS_PER_PROBE, probeNum);
     auto distanceBuffer = renderGraph.importImage("distance buffer", db);
 
@@ -695,17 +703,19 @@ void Renderer::ddgiSuite(Scene* scene) {
             { rayGPositionBuffer, ResourceAccessType::ComputeWrite },
             { rayGNormalBuffer, ResourceAccessType::ComputeWrite },
             { rayGDiffuseBuffer, ResourceAccessType::ComputeWrite },
+            { rayGEmissionBuffer, ResourceAccessType::ComputeWrite },
             { distanceBuffer , ResourceAccessType::ComputeWrite },
         },
-        .func = [this, scene, probeNum , & sceneData, &inflight, tlas, &diffuseMap, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+        .func = [this, scene, probeNum, &sceneData, &inflight, tlas, &diffuseMap, rayGEmissionBuffer, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             DDGIPushConstants constants = {};
             constants.globalRngState = rand();
             PipelineState pipe = {};
             ctx.bindStorageImageResource(pipe, 2, 0, rayGPositionBuffer);
             ctx.bindStorageImageResource(pipe, 2, 1, rayGNormalBuffer);
             ctx.bindStorageImageResource(pipe, 2, 2, rayGDiffuseBuffer);
-            ctx.bindStorageImageResource(pipe, 2, 3, distanceBuffer);
-            pipe.bindTextureArray(2, 4, diffuseMap.data(), diffuseMap.size());
+            ctx.bindStorageImageResource(pipe, 2, 3, rayGEmissionBuffer);
+            ctx.bindStorageImageResource(pipe, 2, 4, distanceBuffer);
+            pipe.bindTextureArray(2, 5, diffuseMap.data(), diffuseMap.size());
             pipe.bindUniformBuffer(0, 0, sceneBuffer);
             pipe.bindStorageBuffer(1, 0, sceneData.globalVertexBuffer);
             ctx.bindStorageBufferResource(pipe, 1, 1, hitBuffer);
@@ -715,7 +725,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         },
     });
 
-    auto radianceColor = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, RAYS_PER_PROBE, probeNum);
+    auto radianceColor = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, RAYS_PER_PROBE, probeNum);
     RenderAttachments att = {};
     att.colors[0] = radianceColor;
     auto radianceRenderTarget = renderGraph.createRenderTargetSC(RAYS_PER_PROBE, probeNum, att);
@@ -730,10 +740,11 @@ void Renderer::ddgiSuite(Scene* scene) {
             { rayGPositionBuffer, ResourceAccessType::FragmentRead },
             { rayGNormalBuffer, ResourceAccessType::FragmentRead },
             { rayGDiffuseBuffer, ResourceAccessType::FragmentRead },
+            { rayGEmissionBuffer, ResourceAccessType::FragmentRead },
             { probeTex, ResourceAccessType::FragmentRead },
             { randianceBuffer , ResourceAccessType::ColorWrite },
         },
-        .func = [this, scene, probeNum, &sceneData, &inflight, tlas, &diffuseMap, sceneBuffer, radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer, probeTex](FrameGraph& rg, FrameGraphContext& ctx) {
+        .func = [this, scene, probeNum, &sceneData, &inflight, tlas, rayGEmissionBuffer, & diffuseMap, sceneBuffer, radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer, probeTex](FrameGraph& rg, FrameGraphContext& ctx) {
             auto& camera = scene->getCamera();
             PipelineState pipe = {};
             pipe.program = this->ddgiShadeProgram;
@@ -744,7 +755,8 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindTextureResource(pipe, 1, 0, rayGPositionBuffer);
             ctx.bindTextureResource(pipe, 1, 1, rayGNormalBuffer);
             ctx.bindTextureResource(pipe, 1, 2, rayGDiffuseBuffer);
-            ctx.bindTextureResource(pipe, 1, 3, probeTex);
+            ctx.bindStorageImageResource(pipe, 1, 3, rayGEmissionBuffer);
+            ctx.bindTextureResource(pipe, 1, 4, probeTex);
             RenderPassParams params;
             driver.beginRenderPass(radianceRenderTarget, params);
             driver.draw(pipe, quadPrimitive);
@@ -779,7 +791,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         },
     });
 
-    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
     auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
     RenderAttachments att2 = {};
     att2.colors[0] = color;
@@ -789,6 +801,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto positionBuffer = renderGraph.importImage("g position", gbuffer->positionBuffer);
     auto normalBuffer = renderGraph.importImage("g normal", gbuffer->normalBuffer);
     auto diffuseBuffer = renderGraph.importImage("g diffuse", gbuffer->diffuseBuffer);
+    auto emissionBuffer = renderGraph.importImage("g emission", gbuffer->emissionBuffer);
     
     renderGraph.addFramePass({
         .name = "gbuffer gen",
@@ -796,6 +809,7 @@ void Renderer::ddgiSuite(Scene* scene) {
             { positionBuffer, ResourceAccessType::ColorWrite },
             { normalBuffer, ResourceAccessType::ColorWrite },
             { diffuseBuffer, ResourceAccessType::ColorWrite },
+            { emissionBuffer, ResourceAccessType::ColorWrite },
         },
         .func = [this, scene, probeNum, &sceneData, &inflight, color, tlas, &materials, &materialBuffers, &diffuseMap, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             auto& camera = scene->getCamera();
@@ -829,10 +843,11 @@ void Renderer::ddgiSuite(Scene* scene) {
             { positionBuffer, ResourceAccessType::FragmentRead },
             { normalBuffer, ResourceAccessType::FragmentRead },
             { diffuseBuffer, ResourceAccessType::FragmentRead },
+            { emissionBuffer, ResourceAccessType::FragmentRead },
             { probeTex, ResourceAccessType::FragmentRead },
             { renderedImage, ResourceAccessType::ColorWrite },
         },
-        .func = [this, scene, probeNum, &sceneData, &inflight, tlas, &diffuseMap, renderTarget, sceneBuffer, probeTex, rayBuffer, hitBuffer, distanceBuffer, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+        .func = [this, scene, probeNum, &sceneData, &inflight, tlas, emissionBuffer , & diffuseMap, renderTarget, sceneBuffer, probeTex, rayBuffer, hitBuffer, distanceBuffer, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             
             auto& camera = scene->getCamera();
             PipelineState pipe = {};
@@ -844,7 +859,8 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindTextureResource(pipe, 1, 0, positionBuffer);
             ctx.bindTextureResource(pipe, 1, 1, normalBuffer);
             ctx.bindTextureResource(pipe, 1, 2, diffuseBuffer);
-            ctx.bindTextureResource(pipe, 1, 3, probeTex);
+            ctx.bindTextureResource(pipe, 1, 3, emissionBuffer);
+            ctx.bindTextureResource(pipe, 1, 4, probeTex);
             RenderPassParams params;
             driver.beginRenderPass(renderTarget, params);
             driver.draw(pipe, quadPrimitive);

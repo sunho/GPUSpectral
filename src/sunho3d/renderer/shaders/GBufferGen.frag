@@ -13,6 +13,7 @@ layout(location = 2) in vec3 inPos;
 layout(location = 0) out vec4 outPos;
 layout(location = 1) out vec4 outNormal;
 layout(location = 2) out vec4 outDiffuse;
+layout(location = 3) out vec4 outEmission;
 
 layout(binding = 0) uniform TransformUniformBuffer {
     mat4 MVP;
@@ -30,12 +31,18 @@ layout(set=1,binding = 0) uniform sampler2D diffuseMap;
 void main() {
     vec3 normal = normalize(inNormal);
     vec3 v = normalize(transform.cameraPos - inPos);
-    if (material.material.typeID != MATERIAL_DIFFUSE_COLOR) {
-        vec3 diffuse = texture(diffuseMap, inUV).rgb;
-        outDiffuse = vec4(diffuse, 1.0);
+    vec4 diffuse = vec4(0.0);
+    vec4 emission = vec4(0.0);
+    if (material.material.typeID == MATERIAL_DIFFUSE_TEXTURE) {
+        vec3 d = texture(diffuseMap, inUV).rgb;
+        diffuse = vec4(d, 1.0);
+    } else if (material.material.typeID == MATERIAL_DIFFUSE_COLOR) {
+        diffuse = vec4(material.material.diffuseColor, 1.0);
     } else {
-        outDiffuse = vec4(material.material.diffuseColor, 1.0);
+        emission = vec4(material.material.diffuseColor, 1.0);
     }
+    outDiffuse = diffuse;
+    outEmission = emission;
     outNormal = vec4(normal, 0.0);
     outPos = vec4(inPos, 0.0);
 }

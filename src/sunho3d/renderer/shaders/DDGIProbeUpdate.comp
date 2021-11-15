@@ -33,19 +33,17 @@ void main() {
     ivec2 iuv = ivec2( gl_LocalInvocationID.x, gl_LocalInvocationID.y);
     vec2 uv = vec2(iuv) / IRD_MAP_SIZE;
     vec3 dir = octahedronReverseMap(uv);
-    int sumSamples = 0;
     vec4 sumIrradiance = vec4(0.0);
     for (int i = 0; i < RAYS_PER_PROBE; i++) {
         uint rayID = i;
         Ray ray = rayBuffer.rays[probeID * RAYS_PER_PROBE + rayID];
         vec4 radiance = texelFetch(radianceBuffer, ivec2(rayID, probeID), 0);
         float dist = texelFetch(distanceBuffer, ivec2(rayID, probeID), 0).x;
+        if (dist == 0.0) radiance = vec4(0.3);
         sumIrradiance += max(0.0, dot(dir, ray.dir))* radiance;
-        int valid = dist == 0.0 ? 0 : 1;
-        sumSamples += valid;
     }
-    vec4 irradiance = sumIrradiance / max(sumSamples, 1);
-    irradiance *= M_PI;
+    vec4 irradiance = sumIrradiance / RAYS_PER_PROBE;
+    irradiance *= M_PI * 4.0;
     irradiance.a = 1.0;
     ivec2 startPos = ivec2((probeID % IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE, (probeID/IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE);
     vec4 bb = imageLoad(irradianceMap, startPos + iuv);
@@ -71,4 +69,5 @@ void main() {
             imageStore(distanceSquareMap,  ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(distSquare));
         }
     }*/
+
 }

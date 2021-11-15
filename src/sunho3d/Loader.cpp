@@ -99,18 +99,26 @@ Scene *Loader::loadMitsuba(const std::string &path) {
             }
             auto mesh = loadOrGetMesh((p / filename).string());
             auto transform = obj->property("to_world").getTransform();
-
+            auto matrix = glm::make_mat4(transform.matrix.data());
+            matrix = glm::transpose(matrix);
+            auto material = engine.createMaterial();
+            entity->setMaterial(material);
             for (auto child : obj->anonymousChildren()) {
                 if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-                    auto material = engine.createMaterial();
+                    
                     material->materialData = DiffuseColorMaterialData{ glm::vec3(1.0f) };
                     loadMaterial(material, *child, p);
-                    entity->setMaterial(material);
+      
+                } else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
+                    auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
+                    auto pos = matrix[3];
+                    l->setTransform({ .x = pos.x, .y = pos.y, .z = pos.z});
+                    outScene->addLight(l);
+                    material->materialData = EmissionMaterialData{ glm::vec3(1.0f) };
                 }
             }
 
-            auto matrix = glm::make_mat4(transform.matrix.data());
-            matrix = glm::transpose(matrix);
+  
             entity->setTransformMatrix(matrix);
             entity->setMesh(mesh);
 
@@ -121,10 +129,14 @@ Scene *Loader::loadMitsuba(const std::string &path) {
             auto matrix = glm::make_mat4(transform.matrix.data());
             matrix = glm::transpose(matrix);
             glm::vec4 affine = matrix[3];
-            matrix = glm::inverse(matrix); // TODO: need this?
+
+
+            //matrix = glm::inverse(matrix); // TODO: need this?
             matrix[3] = -1.0f*affine;
-            matrix[2][2] *= -1.0f;
             matrix[3][3] *= -1.0f;
+            matrix[2][2] *= -1.0f;
+
+
 
             outScene->getCamera().view = matrix;
             outScene->getCamera().setProjectionFov(glm::radians(fov*2.0), 1.0, 0.8f, 12.0f);

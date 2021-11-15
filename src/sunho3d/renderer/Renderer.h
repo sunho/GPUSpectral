@@ -28,6 +28,7 @@ struct TransformBuffer {
 
 #define MATERIAL_DIFFUSE_TEXTURE 1
 #define MATERIAL_DIFFUSE_COLOR 2
+#define MATERIAL_EMISSION 3
 
 struct InstanceMaterial {
     glm::vec3 diffuseColor;
@@ -44,7 +45,7 @@ struct Instance {
 };
 
 static constexpr const size_t MAX_INSTANCES = 64;
-static constexpr const size_t RAYS_PER_PROBE = 32;
+static constexpr const size_t RAYS_PER_PROBE = 64;
 
 struct ForwardRTSceneBuffer {
     glm::uvec2 frameSize;
@@ -92,11 +93,13 @@ struct GBuffer {
         positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
         normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
         diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
+        emissionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
         depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::DEPTH32F, width, height);
         RenderAttachments atts = {};
         atts.colors[0] = positionBuffer;
         atts.colors[1] = normalBuffer;
         atts.colors[2] = diffuseBuffer;
+        atts.colors[3] = emissionBuffer;
         atts.depth = depthBuffer;
 
         renderTarget = driver.createRenderTarget(width, height, atts);
@@ -104,6 +107,7 @@ struct GBuffer {
     Handle<HwTexture> positionBuffer;
     Handle<HwTexture> normalBuffer;
     Handle<HwTexture> diffuseBuffer;
+    Handle<HwTexture> emissionBuffer;
     Handle<HwTexture> depthBuffer;
     Handle<HwRenderTarget> renderTarget;
 };

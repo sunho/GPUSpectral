@@ -34,7 +34,8 @@ layout(std140, binding = 1) uniform LightUniformBuffer {
 layout(set=1,binding = 0) uniform sampler2D positionBuffer;
 layout(set=1,binding = 1) uniform sampler2D normalBuffer;
 layout(set=1,binding = 2) uniform sampler2D diffuseBuffer;
-layout(set=1,binding = 3) uniform sampler2D probeIrradianceMap;
+layout(set=1,binding = 3) uniform sampler2D emissionBuffer;
+layout(set=1,binding = 4) uniform sampler2D probeIrradianceMap;
 
 layout( push_constant ) uniform PushConstants {
     vec3 cameraPos;
@@ -85,14 +86,16 @@ void main() {
         }
     }
 
-    color += diffuse * (sumIrradiance / sumWeight) / (2.0 * M_PI);
+    vec4 emission = texture(emissionBuffer, uv);
+    color += (diffuse / M_PI) * (sumIrradiance / sumWeight);
+    color += emission;
 
     for (int i = 0; i < light.numLights; i++) {
         vec3 lightV = light.light[i].pos - pos;
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);
         float dis = length(lightV);
-        float lightI = 1.0/(dis*dis);
+        float lightI = 4.0/(dis*dis);
         color += lightI* diffuse * max(dot(light,normal),0.0f);
     }
     outColor = vec4(vec3(color), 1.0);
