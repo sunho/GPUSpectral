@@ -1,12 +1,11 @@
 #version 450
 
-#define RAYS_PER_PROBE 256
 #define MAX_DIFFUSE_MAPS 32
-
-layout (local_size_x = RAYS_PER_PROBE) in;
 #extension GL_GOOGLE_include_directive : require
 
 #include "common.glsl"
+
+layout (local_size_x = RAYS_PER_PROBE) in;
 
 #include "probe.glsl"
 
@@ -66,7 +65,12 @@ void main() {
         imageStore(distanceBuffer, outCoord, vec4(dist));
         imageStore(normalBuffer, outCoord, vec4(nor,0.0));
         imageStore(positionBuffer, outCoord, vec4(pos,0.0));
-        vec4 diffuse = texture(diffuseMap[instance.diffuseMapIndex], uv);
+        vec4 diffuse = vec4(0.0);
+        if (sceneBuffer.instances[hit.instId].material.typeID == MATERIAL_DIFFUSE_COLOR) {
+            diffuse = vec4(sceneBuffer.instances[hit.instId].material.diffuseColor, 1.0);
+        } else {
+            diffuse = texture(diffuseMap[sceneBuffer.instances[hit.instId].material.diffuseMapIndex], uv);
+        }
         imageStore(diffuseBuffer, outCoord, diffuse);
     }
 }

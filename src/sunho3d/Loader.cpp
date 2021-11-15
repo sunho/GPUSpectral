@@ -22,8 +22,8 @@
 
 using namespace sunho3d;
 
-Loader::Loader(Engine &engine, Renderer &renderer)
-    : engine(engine), renderer(renderer) {
+Loader::Loader(Engine &engine, Renderer &renderer, const std::filesystem::path& basepath)
+    : engine(engine), renderer(renderer), basepath(basepath) {
 }
 
 Scene *Loader::loadGLTF(const std::string &path) {
@@ -57,12 +57,12 @@ void Loader::loadMaterial(Material *material, tinyparser_mitsuba::Object &obj, c
         material->twosided = true;
     } else if (type == "diffuse") {
         bool found = false;
-        for (auto child : obj.anonymousChildren()) {
-            if (child->type() == tinyparser_mitsuba::OT_TEXTURE) {
+        for (auto [name, child] : obj.namedChildren()) {
+            if (name == "reflectance") {
                 found = true;
                 auto filename = child->property("filename").getString();
                 auto path = (basepath / filename).string();
-                auto tex = loadTexture(path);
+                auto tex = loadOrGetTexture(path);
                 material->materialData = DiffuseTextureMaterialData{tex};
                 break;
             }
@@ -85,29 +85,49 @@ Scene *Loader::loadMitsuba(const std::string &path) {
     tinyparser_mitsuba::SceneLoader loader;
     auto outScene = engine.createScene(&renderer);
     auto scene = loader.loadFromFile(path.c_str());
+    int i = 0;
     for (auto obj : scene.anonymousChildren()) {
         if (obj->type() == tinyparser_mitsuba::OT_SHAPE) {
-
+            auto entity = engine.createEntity();
+            std::string filename;
             if (obj->pluginType() == "obj") {
-                auto entity = engine.createEntity();
-                auto filename = obj->property("filename").getString();
-                auto mesh = loadObj((p / filename).string());
-                auto transform = obj->property("toWorle").getTransform();
+                filename = obj->property("filename").getString();
+            } else if (obj->pluginType() == "rectangle") {
+                filename = (basepath / "rect.obj").string();
+            } else if (obj->pluginType() == "cube") {
+                filename = (basepath / "box.obj").string();
+            }
+            auto mesh = loadOrGetMesh((p / filename).string());
+            auto transform = obj->property("to_world").getTransform();
 
-                for (auto child : obj->anonymousChildren()) {
-                    if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-                        auto material = engine.createMaterial();
-                        loadMaterial(material, *child, p);
-                        entity->setMaterial(material);
-                    }
+            for (auto child : obj->anonymousChildren()) {
+                if (child->type() == tinyparser_mitsuba::OT_BSDF) {
+                    auto material = engine.createMaterial();
+                    material->materialData = DiffuseColorMaterialData{ glm::vec3(1.0f) };
+                    loadMaterial(material, *child, p);
+                    entity->setMaterial(material);
                 }
-
-                auto matrix = glm::make_mat4(transform.matrix.data());
-                entity->setTransformMatrix(matrix);
-                entity->setMesh(mesh);
-                outScene->addEntity(entity);
             }
 
+            auto matrix = glm::make_mat4(transform.matrix.data());
+            matrix = glm::transpose(matrix);
+            entity->setTransformMatrix(matrix);
+            entity->setMesh(mesh);
+
+            outScene->addEntity(entity);
+        } else if (obj->type() == tinyparser_mitsuba::OT_SENSOR) {
+            auto transform = obj->property("to_world").getTransform();
+            float fov = obj->property("fov").getNumber();
+            auto matrix = glm::make_mat4(transform.matrix.data());
+            matrix = glm::transpose(matrix);
+            glm::vec4 affine = matrix[3];
+            matrix = glm::inverse(matrix); // TODO: need this?
+            matrix[3] = -1.0f*affine;
+            matrix[2][2] *= -1.0f;
+            matrix[3][3] *= -1.0f;
+
+            outScene->getCamera().view = matrix;
+            outScene->getCamera().setProjectionFov(glm::radians(fov*2.0), 1.0, 0.8f, 12.0f);
         }
     }
     return outScene;
@@ -252,6 +272,90 @@ Handle<HwTexture> Loader::loadTexture(const std::string &path) {
     renderer.getDriver().updateTexture(tex, { .data = (uint32_t *)textureData.data() });
     stbi_image_free(data);
     return tex;
+}
+
+Mesh *sunho3d::Loader::loadOrGetMesh(const std::string &path) {
+    auto it = meshCache.find(path);
+    if (it != meshCache.end()) {
+        return it->second;
+    }
+
+    if (path == "rectangle") {
+        auto mesh = createQuad();
+        meshCache.emplace(path, mesh);
+        return mesh;
+    }
+
+    auto mesh = loadObj(path);
+    meshCache.emplace(path, mesh);
+    return mesh;
+}
+
+Mesh *sunho3d::Loader::createQuad() {
+    Primitive primitive;
+    std::vector<float> v = { -0.5f, 0.5f, 0.0f,
+                             -0.5f, -0.5f, 0.0f,
+                             0.5f, 0.5f, 0.0f,
+                             -0.5f , -0.5f, 0.0f,
+                             0.5f, -0.5f, 0.0f,
+                             0.5f, 0.5f, 0.0f
+    };
+    std::vector<float> vn = { 0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 1.0f,
+                              0.0f, 0.0f, 1.0f
+    };
+    std::vector<float> vt = { 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0 };
+
+    std::vector<uint32_t> indices = { 0, 1, 2, 3, 4, 5 };
+    primitive.attibutes[0] = {
+        .name = "position",
+        .index = 0,
+        .offset = 0,
+        .stride = 12,
+        .type = ElementType::FLOAT3
+    };
+    primitive.attibutes[1] = {
+        .name = "normal", .index = 1, .offset = 0, .stride = 12, .type = ElementType::FLOAT3
+    };
+    primitive.attibutes[2] = {
+        .name = "texcoord",
+        .index = 2,
+        .offset = 0,
+        .stride = 8,
+        .type = ElementType::FLOAT2,
+    };
+
+    auto buffer0 = renderer.getDriver().createBufferObject(4 * v.size(), BufferUsage::VERTEX);
+    renderer.getDriver().updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);
+    auto vbo = renderer.getDriver().createVertexBuffer(1, 6, 1, primitive.attibutes);
+    renderer.getDriver().setVertexBuffer(vbo, 0, buffer0);
+
+    auto ibo = renderer.getDriver().createIndexBuffer(indices.size());
+    renderer.getDriver().updateIndexBuffer(ibo, { .data = (uint32_t *)indices.data() }, 0);
+    primitive.indexBuffer = ibo;
+    primitive.vertexBuffer = vbo;
+    auto quadPrimitive = renderer.getDriver().createPrimitive(PrimitiveMode::TRIANGLES);
+    renderer.getDriver().setPrimitiveBuffer(quadPrimitive, vbo, ibo);
+
+    auto mesh = engine.createMesh();
+    primitive.hwInstance = quadPrimitive;
+    mesh->addPrimitive(primitive);
+
+    return mesh;
+}
+
+Handle<HwTexture> sunho3d::Loader::loadOrGetTexture(const std::string &path) {
+    auto it = textureCache.find(path);
+    if (it != textureCache.end()) {
+        return it->second;
+    }
+    
+    auto texture = loadTexture(path);
+    textureCache.emplace(path, texture);
+    return texture;
 }
 
 void Loader::loadGLTFNode(Scene *scene, tinygltf::Model &model, tinygltf::Node &node,

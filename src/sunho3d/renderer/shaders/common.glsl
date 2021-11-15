@@ -1,5 +1,7 @@
-#define MAX_INSTANCES 32
+#define MAX_INSTANCES 64
 #define M_PI 3.1415926535897932384626433832795
+
+#define RAYS_PER_PROBE 32
 
 struct Vertex {
     vec3 pos;

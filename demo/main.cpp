@@ -16,13 +16,11 @@ int main() {
     sunho3d::Engine engine;
     sunho3d::Window* window = engine.createWindow(1200, 1200);
     sunho3d::Renderer* renderer = engine.createRenderer(window);
-    sunho3d::Loader loader(engine, *renderer);
+    sunho3d::Loader loader(engine, *renderer, basePath() / "assets");
     
     //sunho3d::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
 
-    auto cube = loader.loadObj((basePath() / "assets" / "cube.obj").string());
-    auto cube2 = loader.loadObj((basePath() / "assets" / "cube.obj").string());
-    auto scene = loader.loadMitsuba((basePath() / "assets" / "living-room" / "scene.xml").string());
+    auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
     
 
     scene->ddgi.gridNum = glm::uvec3(12, 12, 12);

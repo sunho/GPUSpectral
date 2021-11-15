@@ -95,5 +95,5 @@ void main() {
         float lightI = 1.0/(dis*dis);
         color += lightI* diffuse * max(dot(light,normal),0.0f);
     }
-    outColor = color;
+    outColor = vec4(vec3(color), 1.0);
 }

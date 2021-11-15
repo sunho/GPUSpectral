@@ -43,8 +43,8 @@ struct Instance {
     InstanceMaterial material;
 };
 
-static constexpr const size_t MAX_INSTANCES = 32;
-static constexpr const size_t RAYS_PER_PROBE = 256;
+static constexpr const size_t MAX_INSTANCES = 64;
+static constexpr const size_t RAYS_PER_PROBE = 32;
 
 struct ForwardRTSceneBuffer {
     glm::uvec2 frameSize;

@@ -1,6 +1,5 @@
 #version 450
 
-#define RAYS_PER_PROBE 256
 #define IRD_MAP_SIZE 8
 #define IRD_MAP_PROBE_COLS 8
 #define FIXED_POINT_PRECISION 1024

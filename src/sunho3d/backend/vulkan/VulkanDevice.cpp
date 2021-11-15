@@ -11,6 +11,7 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount   = VK_TRUE;
    
     vkb::InstanceBuilder builder;
+
     auto instRet = builder.set_app_name("Example Vulkan Application")
                     .require_api_version(VK_API_VERSION_1_2)
                       .request_validation_layers ()
@@ -29,7 +30,6 @@ VulkanDevice::VulkanDevice(sunho3d::Window* window) : semaphorePool(*this) {
     // Init vulkan device
     vkb::PhysicalDeviceSelector selector{ vkbInstance };
     auto physRet = selector.set_surface(wsi->surface)
-                       .add_required_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)

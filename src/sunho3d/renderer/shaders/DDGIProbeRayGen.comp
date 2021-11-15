@@ -1,14 +1,12 @@
 #version 450
 
-#define RAYS_PER_PROBE 256
 
-layout (local_size_x = RAYS_PER_PROBE) in;
 #extension GL_GOOGLE_include_directive : require
 
 #include "common.glsl"
 
 #include "probe.glsl"
-
+layout (local_size_x = RAYS_PER_PROBE) in;
 layout(std140, binding = 0) uniform SceneBuffer {
     uvec2 frameSize;
     uint instanceNum;

@@ -114,6 +114,7 @@ void Renderer::registerPrograms() {
     prog = { GBufferGenVert, GBufferGenVertSize, GBufferGenFrag, GBufferGenFragSize };
     prog.parameterLayout
         .addUniformBuffer(0, 0)
+        .addUniformBuffer(0,1)
         .addTexture(1, 0);
 
     gbufferGenProgram = driver.createProgram(prog);
@@ -573,7 +574,10 @@ void Renderer::ddgiSuite(Scene* scene) {
     sb.instanceNum = sceneData.geometries.size();
     sb.gridNum = scene->ddgi.gridNum;
     sb.sceneSize = scene->ddgi.worldSize;
-    std::vector<TextureHandle> diffuseMap);
+    std::vector<TextureHandle> diffuseMap;
+    diffuseMap.push_back(gbuffer->positionBuffer);
+    std::vector<InstanceMaterial> materials;
+    std::vector<Handle<HwUniformBuffer>> materialBuffers;
 
     for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
         auto& geom = sceneData.geometries[i];
@@ -581,7 +585,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         Instance ginstance = {};
         ginstance.vertexStart = geom.vertexStart;
         ginstance.transform = model;
-        InstanceMaterial material;
+        InstanceMaterial material = {};
         std::visit(overload{
             [&](DiffuseColorMaterialData& data) {
                 material.typeID = MATERIAL_DIFFUSE_COLOR;
@@ -592,7 +596,12 @@ void Renderer::ddgiSuite(Scene* scene) {
                 material.diffuseMapIndex = diffuseMap.size();
                 diffuseMap.push_back(data.diffuseMap);
             },
+            [](auto k) {}
         }, geom.material->materialData);
+        materials.push_back(material);
+        auto materialBuffer = renderGraph.createUniformBufferSC(sizeof(InstanceMaterial));
+        driver.updateUniformBuffer(materialBuffer, { (uint32_t*)&material }, 0);
+        materialBuffers.push_back(materialBuffer);
         sb.instances[i] = ginstance;
         //diffuseMap[i] = geom.material->diffuseMap;
     }
@@ -622,6 +631,7 @@ void Renderer::ddgiSuite(Scene* scene) {
                     this->blasMap.emplace(geom.primitive.getId(), blas);
                 } else {
                     blas = it->second;
+
                 }
                 RTInstance instance = {};
                 instance.blas = blas;
@@ -787,7 +797,7 @@ void Renderer::ddgiSuite(Scene* scene) {
             { normalBuffer, ResourceAccessType::ColorWrite },
             { diffuseBuffer, ResourceAccessType::ColorWrite },
         },
-        .func = [this, scene, probeNum, &sceneData, &inflight, tlas, &diffuseMap, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+        .func = [this, scene, probeNum, &sceneData, &inflight, color, tlas, &materials, &materialBuffers, &diffuseMap, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             auto& camera = scene->getCamera();
 
             PipelineState pipe = {};
@@ -801,7 +811,12 @@ void Renderer::ddgiSuite(Scene* scene) {
                 auto& geom = sceneData.geometries[i];
                 auto& model = sceneData.worldTransforms[i];
                 pipe.bindUniformBuffer(0, 0, this->createTransformBuffer(rg, camera, model));
-                pipe.bindTexture(1, 0, geom.material->diffuseMap);
+                pipe.bindUniformBuffer(0, 1, materialBuffers[i]);
+                if (materials[i].typeID == MATERIAL_DIFFUSE_TEXTURE) {
+                    pipe.bindTexture(1, 0, diffuseMap[materials[i].diffuseMapIndex]);
+                } else {
+                    pipe.bindTexture(1, 0, color);
+                }
                 driver.draw(pipe, geom.primitive);
             }
             driver.endRenderPass();
