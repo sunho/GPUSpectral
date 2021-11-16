@@ -1,6 +1,7 @@
 #include "Scene.h"
 #include "backend/vulkan/VulkanDriver.h"
 #include "renderer/Renderer.h"
+#include <Tracy.hpp>
 using namespace sunho3d;
 
 
@@ -48,7 +49,7 @@ void GVetexBufferContainer::uploadBuffer() {
     BufferDescriptor desc = {};
     desc.data = (uint32_t*)buffer.data();
     desc.size = currentSize;
-    driver.updateBufferObject(gpuBuffer, desc, 0);
+    driver.updateBufferObjectSync(gpuBuffer, desc, 0);
 }
 
 Scene::Scene(Renderer* renderer)
@@ -63,13 +64,14 @@ void Scene::addEntity(Entity* entity) {
 }
 
 void Scene::prepare() {
+    ZoneScopedN("Scene perpare")
     sceneData.geometries.clear();
     sceneData.worldTransforms.clear();
     sceneData.lightBuffer.lightNum = 0;
     sceneData.globalVertexBuffer = globalVertexBufferContainer.getGPUBuffer();
 
     for (auto& entity : entities) {
-        visitEntity(entity, glm::identity<glm::mat4>());
+        visitEntity(entity, glm::identity<glm::mat4>(), glm::identity<glm::mat4>());
     }
 
     for (auto& light : lights) {
@@ -85,8 +87,9 @@ void Scene::prepare() {
     }
 }
 
-void Scene::visitEntity(Entity* entity, const glm::mat4& currentTransform) {
+void Scene::visitEntity(Entity* entity, const glm::mat4& currentTransform, const glm::mat4& currentTransformInvT) {
     glm::mat4 nextTransform = entity->getTransform() * currentTransform;
+    glm::mat4 nextTransformInvT = entity->getTransformInvT() * currentTransformInvT;
     for (auto& prim : entity->getMesh()->getPrimitives()) {
         sceneData.geometries.push_back({
             .material = entity->getMaterial(), 
@@ -94,9 +97,10 @@ void Scene::visitEntity(Entity* entity, const glm::mat4& currentTransform) {
             .vertexStart = globalVertexBufferContainer.getVertexStart(prim)
                                          });
         sceneData.worldTransforms.push_back(nextTransform);
+        sceneData.worldTransformsInvT.push_back(nextTransformInvT);
     }
     for (auto& entity : entity->getNodes()) {
-        visitEntity(entity, nextTransform);
+        visitEntity(entity, nextTransform, nextTransformInvT);
     }
 }
 

@@ -1,5 +1,6 @@
 #include "VulkanPipelineCache.h"
 #include <iostream>
+#include <Tracy.hpp>
 
 void VulkanDescriptorAllocator::init(vk::Device newDevice) {
     device = newDevice;
@@ -116,11 +117,10 @@ void VulkanPipelineCache::tick() {
 }
 
 VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute) {
+    ZoneScopedN("PipelineCache create layout")
     auto it = pipelineLayouts.get(layout);
-    std::cout << hashStruct(layout) << std::endl;
     
     if (it) {
-        std::cout << it->pipelineLayout << std::endl; 
         return *it;
     }
     
@@ -160,6 +160,7 @@ VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayo
 }
 
 void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanProgram &program, const VulkanBindings& bindings) {
+    ZoneScopedN("PipelineCache bind descriptor")
     const bool compute = program.program.type == ProgramType::COMPUTE;
     auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout, program.program.type == ProgramType::COMPUTE);
     DescriptorSets descriptorSets{};
@@ -185,6 +186,7 @@ void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanProg
 }
 
 VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipelineState &state) {
+    ZoneScopedN("PipelineCache create graphics pipeline")
     auto pipelineLayout = getOrCreatePipelineLayout(state.program->program.parameterLayout, false);
     auto it = graphicsPipelines.get(state);
     if (it) {
@@ -337,6 +339,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
 }
 
 VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgram &program) {
+    ZoneScopedN("PipelineCache create compute pipeline")
     auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout, true);
     auto it = computePipelines.get(program.program.hash());
     if (it) {
@@ -358,6 +361,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgr
 }
 
 VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget) {
+    ZoneScopedN("PipelineCache create renderpass")
     auto it = renderpasses.get(renderTarget->attachments);
     if (it) {
         return *it;
@@ -436,6 +440,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
 vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass renderPass,
                                                         VulkanSwapChain swapchain, 
                                                           VulkanRenderTarget *renderTarget) {
+    ZoneScopedN("PipelineCache create frame buffer")
     auto it = framebuffers.get(
         std::make_pair(renderPass, renderTarget->surface ? swapchain.view : nullptr));
     if (it) {

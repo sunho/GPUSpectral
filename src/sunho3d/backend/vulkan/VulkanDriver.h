@@ -7,6 +7,9 @@
 #include <optional>
 #include <vector>
 #include <cassert>
+#include <Tracy.hpp>
+#include <TracyVulkan.hpp>
+
 
 #include "../DriverBase.h"
 #include "../PipelineState.h"
@@ -73,7 +76,6 @@ class VulkanDriver {
 #undef DECL_VOIDCOMMAND
 #undef DECL_COMMAND
 
-
   private:
     void setupDebugMessenger();
     VulkanBindings translateBindingMap(const BindingMap& binds);
@@ -136,6 +138,9 @@ class VulkanDriver {
     std::unique_ptr<VulkanDevice> device;
     std::unique_ptr<VulkanRayTracer> rayTracer;
     DriverContext context;
+    
+    TracyVkCtx tracyContext{ nullptr };
+    std::string profileZoneName;
 };
 
 }  // namespace sunho3d

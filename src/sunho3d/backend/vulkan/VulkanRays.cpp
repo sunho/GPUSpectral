@@ -1,6 +1,7 @@
 #include "VulkanRays.h"
 #include <radeonrays_vlk.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <Tracy.hpp>
 
 VulkanRayTracer::VulkanRayTracer(VulkanDevice& device) : device(device) {
     auto res = rrCreateContextVk(RR_API_VERSION, device.device, device.physicalDevice, device.graphicsQueue, device.queueFamily, &context);
@@ -57,6 +58,7 @@ void VulkanRayTracer::buildBLAS(VulkanRayFrameContext& frame, VulkanBLAS* blas, 
 }
 
 void VulkanRayTracer::buildTLAS(VulkanRayFrameContext& frame, VulkanTLAS* tlas, const VulkanRTSceneDescriptor& descriptor) {
+    ZoneScopedN("rt tlas internal")
     std::vector<RRInstance> instances;
     RRSceneBuildInput sbi = {};
 
@@ -89,7 +91,10 @@ void VulkanRayTracer::buildTLAS(VulkanRayFrameContext& frame, VulkanTLAS* tlas, 
     RRDevicePtr scratch_ptr;
     rrGetDevicePtrFromVkBuffer(context, tempBuffer->buffer, 0, &scratch_ptr);
 
-    res = rrCmdBuildScene(context, &sbi, &options, scratch_ptr, scene_ptr, frame.stream);
+    {
+        ZoneScopedN("rt tlas internal build scene")
+        res = rrCmdBuildScene(context, &sbi, &options, scratch_ptr, scene_ptr, frame.stream);
+    }
     if (res != RR_SUCCESS) {
         throw std::runtime_error("error build scene");
     }

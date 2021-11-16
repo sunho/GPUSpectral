@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <vector>
 
+
+
 using namespace sunho3d;
 
 static void DestroyDebugUtilsMessengerEXT(VkInstance instance,
@@ -34,7 +36,7 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
 VulkanDriver::VulkanDriver(Window *window) {
     device = std::make_unique<VulkanDevice>(window);
     rayTracer = std::make_unique<VulkanRayTracer>(*device);
-    setupDebugMessenger();
+    //setupDebugMessenger();
 }
 
 VulkanDriver::~VulkanDriver() {
@@ -48,13 +50,20 @@ InflightHandle VulkanDriver::beginFrame(FenceHandle handle) {
     auto inflight = handle_cast<VulkanInflight>(inflightHandle);
     context.inflight = inflight;
     inflight->inflightFence = fence->fence;
+    if (!tracyContext) {
+        tracyContext = TracyVkContext(device->physicalDevice, device->device, device->graphicsQueue, inflight->cmd);
+    }
+    
     inflight->cmd.begin(vk::CommandBufferBeginInfo());
+    
     device->wsi->beginFrame(inflight->imageSemaphore);
     return inflightHandle;
 }
 
 void VulkanDriver::endFrame(int) {
     context.inflight->cmd.end();
+    TracyVkCollect(tracyContext, context.inflight->cmd)
+    //TracyVkDestroy(tracyContext)
     std::array<vk::PipelineStageFlags, 1> waitStages = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
     std::array<vk::Semaphore, 1> waitSemaphores = { context.inflight->imageSemaphore };
     std::array<vk::Semaphore, 1> signalSemaphores = { context.inflight->renderSemaphore };
@@ -143,12 +152,18 @@ void VulkanDriver::setVertexBuffer(VertexBufferHandle handle, uint32_t index,
 
 void VulkanDriver::updateIndexBuffer(IndexBufferHandle handle, BufferDescriptor data,
                                      uint32_t offset) {
-    handle_cast<VulkanIndexBuffer>(handle)->buffer->upload(data);
+    handle_cast<VulkanIndexBuffer>(handle)->buffer->uploadSync(data);
+
 }
 
-void VulkanDriver::updateBufferObject(BufferObjectHandle handle, BufferDescriptor data,
+void VulkanDriver::updateStagingBufferObject(BufferObjectHandle handle, BufferDescriptor data,
                                       uint32_t offset) {
     handle_cast<VulkanBufferObject>(handle)->upload(data);
+}
+
+void VulkanDriver::updateBufferObjectSync(BufferObjectHandle handle, BufferDescriptor data,
+                                             uint32_t offset) {
+    handle_cast<VulkanBufferObject>(handle)->uploadSync(data);
 }
 
 Extent2D VulkanDriver::getFrameSize(int dummy) {
@@ -214,21 +229,13 @@ void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle
     handle_cast<VulkanPrimitive>(handle)->vertex = vertex;
 }
 
-void VulkanDriver::updateUniformBuffer(UniformBufferHandle handle, BufferDescriptor data,
-                                       uint32_t offset) {
-    handle_cast<VulkanUniformBuffer>(handle)->buffer->upload(data);
-}
-
-Handle<HwUniformBuffer> VulkanDriver::createUniformBuffer(size_t size) {
-    Handle<HwUniformBuffer> handle = alloc_handle<VulkanUniformBuffer, HwUniformBuffer>();
-    construct_handle<VulkanUniformBuffer>(handle, *device, size);
-    return handle;
-}
-
 void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
+    ZoneScopedN("Draw")
     VulkanPrimitive *prim = handle_cast<VulkanPrimitive>(handle);
     auto& cmd = context.inflight->cmd;
-
+    std::string zonename = profileZoneName + " draw";
+    TracyVkZoneTransient(tracyContext, vkzone, cmd, zonename.c_str(), true)
+   
     const uint32_t bufferCount = prim->vertex->attributeCount;
     vk::Buffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
     vk::DeviceSize offsets[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
@@ -262,13 +269,21 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     cmd.drawIndexed(prim->index->count, 1, 0, 0, 0);
 }
 
+void VulkanDriver::setProfileZoneName(const char* name) {
+    profileZoneName = name;
+}
+
 void VulkanDriver::dispatch(PipelineState pipeline, size_t groupCountX, size_t groupCountY, size_t groupCountZ) {
+    ZoneScopedN("Dispatch")
     auto& cmd = context.inflight->cmd;
+    std::string zonename = (profileZoneName + " dispatch");
+    TracyVkZoneTransient(tracyContext, vkzone, cmd, zonename.c_str(), true)
     VulkanProgram* program = handle_cast<VulkanProgram>(pipeline.program);
     VulkanPipeline vkpipe = device->cache->getOrCreateComputePipeline(*program);
     device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
+        ZoneScopedN("Push constants");
         cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data());
     }
     cmd.dispatch(groupCountX, groupCountY, groupCountZ);
@@ -288,10 +303,6 @@ void VulkanDriver::destroyBufferObject(BufferObjectHandle handle) {
 
 void VulkanDriver::destroyPrimitive(PrimitiveHandle handle) {
     destruct_handle<VulkanPrimitive>(handle);
-}
-
-void VulkanDriver::destroyUniformBuffer(UniformBufferHandle handle) {
-    destruct_handle<VulkanUniformBuffer>(handle);
 }
 
 void VulkanDriver::destroyTexture(TextureHandle handle) {
@@ -322,12 +333,25 @@ Handle<HwTLAS> VulkanDriver::createTLAS(int dummy) {
 void VulkanDriver::buildBLAS(Handle<HwBLAS> handle, Handle<HwPrimitive> primitiveHandle) {
     VulkanBLAS* blas = handle_cast<VulkanBLAS>(handle);
     VulkanPrimitive* primitive = handle_cast<VulkanPrimitive>(primitiveHandle);
+    auto& cmd = context.inflight->cmd;
+    std::string zonename = profileZoneName + " build blas";
+    TracyVkZoneTransient(tracyContext, vkzone, cmd, zonename.c_str(), true)
     rayTracer->buildBLAS(context.inflight->rayFrameContext, blas, primitive);
+}
+
+void VulkanDriver::copyBufferObject(Handle<HwBufferObject> destHandle, Handle<HwBufferObject> srcHandle) {
+    auto& cmd = context.inflight->cmd;
+    VulkanBufferObject* dest = handle_cast<VulkanBufferObject>(destHandle);
+    VulkanBufferObject* src = handle_cast<VulkanBufferObject>(srcHandle);
+    dest->copy(cmd, *src);
 }
 
 void VulkanDriver::buildTLAS(Handle<HwTLAS> handle, RTSceneDescriptor descriptor) {
     VulkanTLAS* tlas = handle_cast<VulkanTLAS>(handle);
     VulkanRTSceneDescriptor desc = {};
+    auto& cmd = context.inflight->cmd;
+    std::string zonename = profileZoneName + " build tlas";
+    TracyVkZoneTransient(tracyContext, vkzone, cmd, zonename.c_str(), true)
     for (size_t i = 0; i < descriptor.count; ++i) {
         VulkanRTInstance instance = {};
         instance.blas = handle_cast<VulkanBLAS>(descriptor.instances[i].blas);
@@ -346,6 +370,10 @@ void VulkanDriver::intersectRays(Handle<HwTLAS> tlasHandle, uint32_t rayCount, H
     VulkanTLAS* tlas = handle_cast<VulkanTLAS>(tlasHandle);
     VulkanBufferObject* rays = handle_cast<VulkanBufferObject>(raysHandle);
     VulkanBufferObject* hits = handle_cast<VulkanBufferObject>(hitsHandle);
+    auto& cmd = context.inflight->cmd;
+    ZoneScopedN("Intersect")
+    std::string zonename = profileZoneName + " intersect";
+    TracyVkZoneTransient(tracyContext, vkzone, cmd, zonename.c_str(), true)
     rayTracer->intersectRays(context.inflight->rayFrameContext, tlas, rayCount, rays, hits);
 }
 
@@ -385,45 +413,58 @@ void VulkanDriver::setupDebugMessenger() {
 }
 
 VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
+    ZoneScopedN("Translate binding map")
     VulkanBindings bindings;
     for (auto [key, binding] : binds) {
         VulkanBinding vb = {};
-        vb.arraySize = binding.handles.size();
         vb.binding = key.binding;
+        vb.arraySize = 0;
         vb.set = key.set;
         vb.type = translateDescriptorType(binding.type);
         switch (binding.type) {
             case ProgramParameterType::UNIFORM: {
                 for (auto handle : binding.handles) {
-                    auto ub = handle_cast<VulkanUniformBuffer>(handle.uniformBuffer);
+                    if (!handle.texture && !handle.buffer) {
+                        break;
+                    }
+                    auto ub = handle_cast<VulkanBufferObject>(handle.buffer);
                     vk::DescriptorBufferInfo bufferInfo{};
                     bufferInfo.offset = 0;
-                    bufferInfo.buffer = ub->buffer->buffer;
-                    bufferInfo.range = ub->buffer->size;
+                    bufferInfo.buffer = ub->buffer;
+                    bufferInfo.range = ub->size;
                     vb.bufferInfo.push_back(bufferInfo);
+                    ++vb.arraySize;
                 }
                 break;
             }
             case ProgramParameterType::STORAGE: {
                 for (auto handle : binding.handles) {
+                    if (!handle.texture && !handle.buffer) {
+                        break;
+                    }
                     auto sb = handle_cast<VulkanBufferObject>(handle.buffer);
                     vk::DescriptorBufferInfo bufferInfo{};
                     bufferInfo.offset = 0;
                     bufferInfo.buffer = sb->buffer;
                     bufferInfo.range = sb->size;
                     vb.bufferInfo.push_back(bufferInfo);
+                    ++vb.arraySize;
                 }
                 break;
             }
             case ProgramParameterType::IMAGE:
             case ProgramParameterType::TEXTURE: {
                 for (auto handle : binding.handles) {
+                    if (!handle.texture && !handle.buffer) {
+                        break;
+                    }
                     auto tex = handle_cast<VulkanTexture>(handle.texture);
                     vk::DescriptorImageInfo imageInfo{};
                     imageInfo.imageLayout = tex->vkImageLayout;
                     imageInfo.imageView = tex->view;
                     imageInfo.sampler = tex->sampler;
                     vb.imageInfo.push_back(imageInfo);
+                    ++vb.arraySize;
                 }
                 break;
             }

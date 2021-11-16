@@ -265,11 +265,11 @@ Mesh *Loader::loadObj(const std::string &path, bool twosided) {
             .type = ElementType::FLOAT2,
         };
         auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
-        driver.updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);
+        driver.updateBufferObjectSync(buffer0, { .data = (uint32_t *)v.data() }, 0);
         auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
-        driver.updateBufferObject(buffer1, { .data = (uint32_t *)vn.data() }, 0);
+        driver.updateBufferObjectSync(buffer1, { .data = (uint32_t *)vn.data() }, 0);
         auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
-        driver.updateBufferObject(buffer2, { .data = (uint32_t *)vt.data() }, 0);
+        driver.updateBufferObjectSync(buffer2, { .data = (uint32_t *)vt.data() }, 0);
 
         auto vbo = driver.createVertexBuffer(3, v.size() / 3, 3, primitive.attibutes);
         driver.setVertexBuffer(vbo, 0, buffer0);
@@ -364,7 +364,7 @@ Mesh *sunho3d::Loader::createQuad() {
     };
 
     auto buffer0 = renderer.getDriver().createBufferObject(4 * v.size(), BufferUsage::VERTEX);
-    renderer.getDriver().updateBufferObject(buffer0, { .data = (uint32_t *)v.data() }, 0);
+    renderer.getDriver().updateBufferObjectSync(buffer0, { .data = (uint32_t *)v.data() }, 0);
     auto vbo = renderer.getDriver().createVertexBuffer(1, 6, 1, primitive.attibutes);
     renderer.getDriver().setVertexBuffer(vbo, 0, buffer0);
 

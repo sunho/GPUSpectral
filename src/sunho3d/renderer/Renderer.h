@@ -45,7 +45,7 @@ struct Instance {
 };
 
 static constexpr const size_t MAX_INSTANCES = 64;
-static constexpr const size_t RAYS_PER_PROBE = 64;
+static constexpr const size_t RAYS_PER_PROBE = 32;
 
 struct ForwardRTSceneBuffer {
     glm::uvec2 frameSize;
@@ -118,7 +118,7 @@ struct GBuffer {
     Handle<HwRenderTarget> renderTarget;
 };
 
-constexpr static size_t MAX_INFLIGHTS = 2; 
+constexpr static size_t MAX_INFLIGHTS = 3; 
 
 class Renderer : public IdResource {
   public:
@@ -137,7 +137,7 @@ class Renderer : public IdResource {
     void rtSuite(Scene* scene);
     void ddgiSuite(Scene* scene);
 
-    Handle<HwUniformBuffer> createTransformBuffer(FrameGraph& rg, const Camera& camera, const glm::mat4& model);
+    Handle<HwBufferObject> createTransformBuffer(FrameGraph& rg, const Camera& camera, const glm::mat4& model, const glm::mat4& modelInvT);
 
     Handle<HwProgram> fowradPassProgram;
     Handle<HwProgram> forwardRTProgram;

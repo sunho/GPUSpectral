@@ -23,7 +23,7 @@ int main() {
     auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
     
 
-    scene->ddgi.gridNum = glm::uvec3(16, 16, 16);
+    scene->ddgi.gridNum = glm::uvec3(8, 8, 8);
     scene->ddgi.worldSize = glm::vec3(1.4f,1.4f,1.4f);
     scene->ddgi.gridOrigin = glm::vec3(0.0f, 1.0f, 0.0f);
     /* auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);

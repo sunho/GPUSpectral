@@ -64,14 +64,6 @@ struct HwBufferObject : public HwBase {
     }
 };
 
-struct HwUniformBuffer : public HwBase {
-    uint32_t size{};
-    HwUniformBuffer() = default;
-    explicit HwUniformBuffer(uint32_t size)
-        : size(size) {
-    }
-};
-
 struct HwPrimitive : public HwBase {
     PrimitiveMode mode{};
     HwPrimitive() = default;

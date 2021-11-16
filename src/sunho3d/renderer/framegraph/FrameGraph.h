@@ -111,6 +111,7 @@ class FrameGraph {
     void addFramePass(FramePass pass);
     ResourceHandle importImage(std::string name, Handle<HwTexture> image);
     ResourceHandle importBuffer(std::string name, Handle<HwBufferObject> buffer);
+    Handle<HwBufferObject> createTempUniformBuffer(void* data, size_t size);
 
 #define SCRATCH_IMPL(RESOURCENAME, METHODNAME)                        \
     template <typename... ARGS>                                       \
@@ -126,7 +127,6 @@ class FrameGraph {
     SCRATCH_IMPL(RenderTarget, createRenderTarget)
     SCRATCH_IMPL(BufferObject, createBufferObject)
     SCRATCH_IMPL(Texture, createTexture)
-    SCRATCH_IMPL(UniformBuffer, createUniformBuffer)
 
 #undef SCRATCH_IMPL
 

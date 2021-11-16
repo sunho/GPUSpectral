@@ -38,12 +38,15 @@ struct BindingIndex {
 union BindingHandle {
     Handle<HwTexture> texture;
     Handle<HwBufferObject> buffer;
-    Handle<HwUniformBuffer> uniformBuffer;
 };
 
 struct Binding {
+    constexpr static size_t MAX_SIZE = 32;
+    Binding() {
+        memset(handles.data(), 0xFF, handles.size() * sizeof(BindingHandle)); // TODO: this is based on internal of HandleBase should change it
+    }
     ProgramParameterType type{};
-    std::vector<BindingHandle> handles;
+    std::array<BindingHandle, MAX_SIZE> handles{};
 };
 
 using BindingMap = std::map<BindingIndex, Binding>;
@@ -63,10 +66,10 @@ struct PipelineState {
         return *this;
     }
 
-    PipelineState& bindUniformBuffer(uint32_t set, uint32_t binding, Handle<HwUniformBuffer> buffer) {
+    PipelineState& bindUniformBuffer(uint32_t set, uint32_t binding, Handle<HwBufferObject> buffer) {
         Binding b = {};
         b.type = ProgramParameterType::UNIFORM;
-        b.handles.push_back({.uniformBuffer = buffer});
+        b.handles[0] = {.buffer = buffer};
         bindings[{ set, binding }] = b;
         return *this;
     }
@@ -75,7 +78,7 @@ struct PipelineState {
         Binding b = {};
         b.type = ProgramParameterType::TEXTURE;
         for (size_t i = 0; i < size; ++i) {
-            b.handles.push_back({ .texture = texture[i] });
+            b.handles[i] = { .texture = texture[i] };
         }
         bindings[{ set, binding }] = b;
         return *this;
@@ -84,7 +87,7 @@ struct PipelineState {
     PipelineState& bindTexture(uint32_t set, uint32_t binding, Handle<HwTexture> texture) {
         Binding b = {};
         b.type = ProgramParameterType::TEXTURE;
-        b.handles.push_back({ .texture = texture });
+        b.handles[0] = { .texture = texture };
         bindings[{ set, binding }] = b;
         return *this;
     }
@@ -92,7 +95,7 @@ struct PipelineState {
      PipelineState& bindStorageImage(uint32_t set, uint32_t binding, Handle<HwTexture> texture) {
         Binding b = {};
         b.type = ProgramParameterType::IMAGE;
-        b.handles.push_back({ .texture = texture });
+        b.handles[0] = { .texture = texture };
         bindings[{ set, binding }] = b;
         return *this;
     }
@@ -100,7 +103,7 @@ struct PipelineState {
     PipelineState& bindStorageBuffer(uint32_t set, uint32_t binding, Handle<HwBufferObject> buffer) {
         Binding b = {};
         b.type = ProgramParameterType::STORAGE;
-        b.handles.push_back({.buffer = buffer});
+        b.handles[0] = {.buffer = buffer};
         bindings[{ set, binding }] = b;
         return *this;
     }

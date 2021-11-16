@@ -48,6 +48,7 @@ void main() {
     vec4 bb = imageLoad(irradianceMap, startOffset + iuv);
     imageStore(irradianceMap, startOffset + iuv, mix(bb,irradiance, 0.05));
     /*
+    
     if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
         float distSG = subgroupInclusiveAdd(dist);
         int disti = int(distSG * FIXED_POINT_PRECISION);

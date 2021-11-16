@@ -1,5 +1,6 @@
 #include "FrameGraph.h"
 #include <stack>
+#include <Tracy.hpp>
 
 
 FrameGraph::FrameGraph(sunho3d::VulkanDriver& driver)
@@ -25,6 +26,14 @@ ResourceHandle FrameGraph::importBuffer(std::string name, Handle<HwBufferObject>
     auto handle = declareResource<Handle<HwBufferObject>>(name, ResourceType::Buffer);
     *getResource<Handle<HwBufferObject>>(handle) = buffer;
     return handle;
+}
+
+Handle<HwBufferObject> FrameGraph::createTempUniformBuffer(void* data, size_t size) {
+    auto buffer = createBufferObjectSC(size, BufferUsage::UNIFORM | BufferUsage::TRANSFER_SRC);
+    auto staging = createBufferObjectSC(size, BufferUsage::STAGING);
+    driver.updateStagingBufferObject(staging, { .data = (uint32_t*)data, .size = size }, 0);
+    driver.copyBufferObject(buffer, staging);
+    return buffer;
 }
 
 
@@ -101,6 +110,7 @@ static Barrier generateImageBarrier(const FramePassResource& prev, const FramePa
 }
 
 void FrameGraph::compile() {
+    ZoneScopedN("Frame graph compile")
     std::unordered_map<size_t, size_t> resourceIdToRp;
     std::vector<BakedPass> bakedPasses(passes.size());
     std::vector<std::vector<size_t>> graph(passes.size());
@@ -219,7 +229,7 @@ void FrameGraph::compile() {
                     auto barrier = generateBufferBarrier(res, res);
                     barrier.srcStage = BarrierStageMask::TOP_OF_PIPE;
                     barrier.srcAccess = BarrierAccessFlag::NONE;
-                    barrier.dstAccess = BarrierAccessFlag::NONE;
+                    barrier.dstAccess = BarrierAccessFlag::SHADER_WRITE;
                     pass.barriers.push_back(barrier);
                 }
             }
@@ -230,6 +240,8 @@ void FrameGraph::compile() {
 void FrameGraph::run() {
     FrameGraphContext context(*this);
     for (auto pass : bakedGraph.passes) {
+        ZoneTransientN(zone, pass.name.c_str(), true)
+        driver.setProfileZoneName(pass.name.c_str());
         for (auto& barrier : pass.barriers) {
             driver.setBarrier(barrier);
         }

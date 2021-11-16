@@ -123,18 +123,6 @@ struct VulkanPrimitive : public HwPrimitive {
     VulkanIndexBuffer *index{};
 };
 
-struct VulkanUniformBuffer : public HwUniformBuffer {
-    VulkanUniformBuffer() = default;
-    explicit VulkanUniformBuffer(VulkanDevice &ctx, uint32_t size)
-        : HwUniformBuffer(size) {
-        buffer = new VulkanBufferObject(ctx, size, BufferUsage::UNIFORM);
-    }
-    ~VulkanUniformBuffer() {
-        delete buffer;
-    }
-    VulkanBufferObject *buffer;
-};
-
 struct VulkanFence : public HwFence {
     VulkanFence() = default;
     explicit VulkanFence(VulkanDevice &device) : fence(device.device.createFence(vk::FenceCreateInfo())) {

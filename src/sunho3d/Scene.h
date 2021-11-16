@@ -35,6 +35,7 @@ struct LightBuffer {
 
 struct SceneData {
     std::vector<glm::mat4> worldTransforms;
+    std::vector<glm::mat4> worldTransformsInvT;
     std::vector<Geometry> geometries;
     LightBuffer lightBuffer;
     Handle<HwBufferObject> globalVertexBuffer;
@@ -84,7 +85,7 @@ class Scene : public IdResource {
     void prepare();
     DDGIConfig ddgi;
   private:
-    void visitEntity(Entity* entity, const glm::mat4& currentTransform);
+    void visitEntity(Entity* entity, const glm::mat4& currentTransform, const glm::mat4& currentTransformInvT);
 
     std::vector<Entity*> entities;
     std::vector<Light*> lights;

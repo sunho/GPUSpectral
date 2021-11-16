@@ -61,6 +61,10 @@ class Entity : public IdResource {
         return transform;
     }
 
+    const glm::mat4 &getTransformInvT() const {
+        return transformInvT;
+    }
+
     Material *getMaterial() const {
         return material;
     }
@@ -78,15 +82,17 @@ class Entity : public IdResource {
     }
 
     void setTransform(const Transform &transform) {
-        this->transform = transform.toMatrix();
+        setTransformMatrix(transform.toMatrix());
     }
 
     void setTransformMatrix(const glm::mat4 &mat) {
         transform = mat;
+        transformInvT = glm::inverse(glm::transpose(mat));
     }
 
   private:
     glm::mat4 transform;
+    glm::mat4 transformInvT;
     std::vector<Entity *> nodes;
     Material *material{};
     Mesh *mesh{};

@@ -2,7 +2,6 @@
 
 #include <numeric>
 
-struct HwUniformBuffer;
 struct HwVertexBuffer;
 struct HwIndexBuffer;
 struct HwProgram;
@@ -61,7 +60,6 @@ struct Handle : public HandleBase {
     }
 };
 
-using UniformBufferHandle = Handle<HwUniformBuffer>;
 using VertexBufferHandle = Handle<HwVertexBuffer>;
 using IndexBufferHandle = Handle<HwIndexBuffer>;
 using ProgramHandle = Handle<HwProgram>;

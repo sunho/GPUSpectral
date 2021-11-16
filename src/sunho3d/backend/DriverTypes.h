@@ -159,7 +159,8 @@ enum class BufferUsage : uint8_t {
     TRANSFER_SRC = 0x4,
     TRANSFER_DST = 0x8,
     STORAGE = 0x10,
-    VERTEX = 0x20
+    VERTEX = 0x20,
+    STAGING = 0x40
 };
 
 static BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {

@@ -67,6 +67,7 @@ void main() {
                     return;
                     continue;
                 }   
+
                 vec3 probePos = probeIDToPos(probeID, sceneBuffer.sceneInfo);
                 vec3 interp = mix(1.0-tt, tt, vec3(offset));
                 float weight = interp.x * interp.y * interp.z;
