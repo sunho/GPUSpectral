@@ -24,6 +24,11 @@
 #include <iostream>
 using namespace sunho3d;
 
+template <class... Ts>
+struct overload : Ts... { using Ts::operator()...; };
+template <class... Ts>
+overload(Ts...) -> overload<Ts...>;
+
 Renderer::Renderer(Window* window)
     : window(window), driver(window) {
     for (size_t i = 0; i < MAX_INFLIGHTS; ++i) {
@@ -400,7 +405,6 @@ void Renderer::run(Scene* scene) {
 }
 
 void Renderer::rtSuite(Scene* scene) {
-    /*
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver.waitFence(inflight.fence);
     if (inflight.handle) {
@@ -408,120 +412,164 @@ void Renderer::rtSuite(Scene* scene) {
     }
     Handle<HwInflight> handle = driver.beginFrame(inflight.fence);
     inflight.handle = handle;
-
+    inflight.rg.reset();
+    inflight.rg = std::make_unique<FrameGraph>(driver);
     FrameGraph& renderGraph = *inflight.rg;
-    renderGraph.reset();
-    inflight.instances.clear();
 
+    inflight.instances.clear();
     scene->prepare();
     SceneData& sceneData = scene->getSceneData();
 
-    auto tlasRef = renderGraph.declareResource<Handle<HwTLAS>>("TLAS");
-    auto hitBufferRef = renderGraph.declareResource<Handle<HwBufferObject>>("Hit Buffer");
-    auto renderedRef = renderGraph.declareResource<Handle<HwTexture>>("Rendered texture");
-    auto sceneBufferRef = renderGraph.declareResource<Handle<HwUniformBuffer>>("RT Scene buffer");
-    renderGraph.addRenderPass("build tlas and scene buffer", { }, { tlasRef, sceneBufferRef }, [this, sceneBufferRef, tlasRef, &inflight, &sceneData, &renderGraph](FrameGraph& fg) {
-        ForwardRTSceneBuffer sceneBuffer = {};
-        auto f = driver.getFrameSize();
-        sceneBuffer.frameSize = glm::uvec2(f.width, f.height);
-        sceneBuffer.instanceNum = sceneData.geometries.size();
-        for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
-            auto& geom = sceneData.geometries[i];
-            auto& model = sceneData.worldTransforms[i];
-            Handle<HwBLAS> blas = driver.createBLAS();
-            auto it = this->blasMap.find(geom.primitive.getId());
-            if (it == this->blasMap.end()) {
-                driver.buildBLAS(blas, geom.primitive);
-                this->blasMap.emplace(geom.primitive.getId(), blas);
-            } else {
-                blas = it->second;
+    ForwardRTSceneBuffer sb = {};
+    auto f = driver.getFrameSize();
+    sb.frameSize = glm::uvec2(f.width, f.height);
+    sb.instanceNum = sceneData.geometries.size();
+    std::vector<TextureHandle> diffuseMap;
+   // diffuseMap.push_back(gbuffer->positionBuffer);
+    std::vector<InstanceMaterial> materials;
+    std::vector<Handle<HwUniformBuffer>> materialBuffers;
+
+    for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
+        auto& geom = sceneData.geometries[i];
+        auto& model = sceneData.worldTransforms[i];
+        Instance ginstance = {};
+        ginstance.vertexStart = geom.vertexStart;
+        ginstance.transform = model;
+        InstanceMaterial material = {};
+        std::visit(overload{
+                       [&](DiffuseColorMaterialData& data) {
+                           material.typeID = MATERIAL_DIFFUSE_COLOR;
+                           material.diffuseColor = data.rgb;
+                       },
+                       [&](DiffuseTextureMaterialData& data) {
+                           material.typeID = MATERIAL_DIFFUSE_TEXTURE;
+                           material.diffuseMapIndex = diffuseMap.size();
+                           //diffuseMap.push_back(data.diffuseMap);
+                       },
+                       [&](EmissionMaterialData& data) {
+                           material.typeID = MATERIAL_EMISSION;
+                           material.diffuseColor = data.radiance;
+                       },
+                       [](auto k) {} },
+                   geom.material->materialData);
+        materials.push_back(material);
+        auto materialBuffer = renderGraph.createUniformBufferSC(sizeof(InstanceMaterial));
+        driver.updateUniformBuffer(materialBuffer, { (uint32_t*)&material }, 0);
+        materialBuffers.push_back(materialBuffer);
+        ginstance.material = material;
+        sb.instances[i] = ginstance;
+        //diffuseMap[i] = geom.material->diffuseMap;
+    }
+
+    auto tlas = driver.createTLAS();
+    auto sceneBuffer = renderGraph.createUniformBufferSC(sizeof(ForwardRTSceneBuffer));
+    driver.updateUniformBuffer(sceneBuffer, { (uint32_t*)&sb }, 0);
+
+    renderGraph.addFramePass({
+        .name = "build tlas",
+        .resources = {},
+        .func = [this, scene, &sceneData, &inflight, tlas](FrameGraph& rg, FrameGraphContext& ctx) {
+            for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
+                auto& geom = sceneData.geometries[i];
+                auto& model = sceneData.worldTransforms[i];
+                Handle<HwBLAS> blas = driver.createBLAS();
+                auto it = this->blasMap.find(geom.primitive.getId());
+                if (it == this->blasMap.end()) {
+                    driver.buildBLAS(blas, geom.primitive);
+                    this->blasMap.emplace(geom.primitive.getId(), blas);
+                } else {
+                    blas = it->second;
+                }
+                RTInstance instance = {};
+                instance.blas = blas;
+                glm::mat4x3 t = {};
+                t[0] = model[0];
+                t[1] = model[1];
+                t[2] = model[2];
+                t[3] = model[3];
+                instance.transfom = t;
+                inflight.instances.push_back(instance);
             }
-            RTInstance instance = {};
-            instance.blas = blas;
-            glm::mat4x3 t = {};
-            t[0] = model[0];
-            t[1] = model[1];
-            t[2] = model[2];
-            t[3] = model[3];
-            instance.transfom = t;
-            inflight.instances.push_back(instance); 
-            Instance ginstance = {};
-            ginstance.vertexStart = geom.vertexStart;
-            ginstance.transform = model;
-            sceneBuffer.instances[i] = ginstance;
-        }
-        RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
-        auto tlas = driver.createTLAS();
-        driver.buildTLAS(tlas, desc);
-        renderGraph.defineResource(tlasRef, tlas);
-
-        auto sb = renderGraph.createUniformBufferSC(sizeof(ForwardRTSceneBuffer));
-        driver.updateUniformBuffer(sb, { (uint32_t*)&sceneBuffer }, 0 );
-        renderGraph.defineResource(sceneBufferRef, sb);
+            RTSceneDescriptor desc = { inflight.instances.data(), inflight.instances.size() };
+            driver.buildTLAS(tlas, desc);
+        },
     });
 
-    renderGraph.addRenderPass("intersect", { tlasRef }, { hitBufferRef }, [this, hitBufferRef, tlasRef, scene, &sceneData, &renderGraph](FrameGraph& fg) {
-        Handle<HwTLAS> tlas = fg.getResource<Handle<HwTLAS>>(tlasRef);
-        auto f = driver.getFrameSize();
-        std::vector<Ray> rays;
-        rays.resize(f.width * f.height);
-        for (size_t i = 0; i < f.height; ++i) {
-            for (size_t j = 0; j < f.width; ++j) {
-                Ray& ray = rays[i * f.width + j];
-                auto dir = scene->getCamera().rayDir(glm::vec2(f.width, f.height), glm::vec2(j,i));
-                dir.y *= -1.0f;
-                ray.origin = scene->getCamera().pos();
-                ray.dir = dir;
-                ray.minTime = 0.001f;
-                ray.maxTime = 100000.0f;
+    auto hb = renderGraph.createBufferObjectSC(f.width * f.height * sizeof(RayHit), BufferUsage::TRANSFER_DST | BufferUsage::STORAGE);
+    auto hitBuffer = renderGraph.importBuffer("hit buffer", hb);
+
+    renderGraph.addFramePass({
+        .name = "intersect",
+        .resources = {
+            { hitBuffer, ResourceAccessType::ComputeWrite },
+        },
+        .func = [this, scene, &sceneData, &inflight, tlas, sceneBuffer, hitBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+            std::vector<Ray> rays;
+            auto f = driver.getFrameSize();
+            rays.resize(f.width * f.height);
+            for (size_t i = 0; i < f.height; ++i) {
+                for (size_t j = 0; j < f.width; ++j) {
+                    Ray& ray = rays[i * f.width + j];
+                    auto dir = scene->getCamera().rayDir(glm::vec2(f.width, f.height), glm::vec2(j, i));
+                    dir.y *= -1.0f;
+                    ray.origin = scene->getCamera().pos();
+                    ray.dir = dir;
+                    ray.minTime = 0.001f;
+                    ray.maxTime = 100000.0f;
+                }
             }
-        }
-        auto rayBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(Ray), BufferUsage::STORAGE);
-        driver.updateBufferObject(rayBuffer, { reinterpret_cast<uint32_t*>(rays.data()) }, 0);
-        auto hitBuffer = renderGraph.createBufferObjectSC(rays.size() * sizeof(RayHit), BufferUsage::TRANSFER_DST | BufferUsage::STORAGE);
-        driver.intersectRays(tlas, f.width * f.height, rayBuffer, hitBuffer);
-        renderGraph.defineResource(hitBufferRef, hitBuffer);
+            auto rayBuffer = rg.createBufferObjectSC(rays.size() * sizeof(Ray), BufferUsage::STORAGE);
+            driver.updateBufferObject(rayBuffer, { reinterpret_cast<uint32_t*>(rays.data()) }, 0);
+            driver.intersectRays(tlas, f.width * f.height, rayBuffer, ctx.unwrapBufferHandle(hitBuffer));
+        },
     });
 
-    renderGraph.addRenderPass("render", { hitBufferRef, sceneBufferRef }, { renderedRef }, [this, &sceneData, renderedRef, sceneBufferRef, hitBufferRef, &renderGraph](FrameGraph& fg) {
-        Handle<HwBufferObject> hitBuffer = fg.getResource<Handle<HwBufferObject>>(hitBufferRef);
-        Handle<HwUniformBuffer> sceneBuffer = fg.getResource<Handle<HwUniformBuffer>>(sceneBufferRef);
-        auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-        RenderAttachments att = {};
-        att.colors[0] = color;
-         
-        PipelineState pipe = {};
-        pipe.program = this->forwardRTProgram;
-        auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att);
-        driver.beginRenderPass(renderTarget, {});
-        pipe.bindStorageBuffer(2, 0, sceneData.globalVertexBuffer);
-        pipe.bindStorageBuffer(2, 1, hitBuffer);
-        pipe.bindUniformBuffer(0, 0, sceneBuffer);
-       
-        driver.draw(pipe, this->quadPrimitive);
-        driver.endRenderPass();
-        renderGraph.defineResource(renderedRef, color);
+    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    RenderAttachments att = {};
+    att.colors[0] = color;
+    auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att);  
+    auto renderedImage = renderGraph.importImage("rendered", color);
+    
+    renderGraph.addFramePass({
+        .name = "render",
+        .resources = {
+            { hitBuffer, ResourceAccessType::ComputeRead },
+        },
+        .func = [this, scene, &sceneData, &inflight, renderTarget, tlas, &diffuseMap, sceneBuffer, hitBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+            DDGIPushConstants constants = {};
+
+            PipelineState pipe = {};
+            pipe.program = this->forwardRTProgram;
+            driver.beginRenderPass(renderTarget, {});
+            pipe.bindStorageBuffer(2, 0, sceneData.globalVertexBuffer);
+            ctx.bindStorageBufferResource(pipe, 2, 1, hitBuffer);
+            pipe.bindUniformBuffer(0, 0, sceneBuffer);
+
+            driver.draw(pipe, this->quadPrimitive);
+            driver.endRenderPass();
+        },
     });
 
-    renderGraph.addRenderPass("blit", { renderedRef }, {}, [this, scene, renderedRef, &renderGraph](FrameGraph& fg) {
-        Handle<HwTexture> rendered = fg.getResource<Handle<HwTexture>>(renderedRef);
-
-        PipelineState pipe = {};
-        pipe.program = this->blitProgram;
-        RenderPassParams params;
-        driver.beginRenderPass(this->surfaceRenderTarget, params);
-        pipe.bindTexture(1,0, rendered);
-        driver.draw(pipe, this->quadPrimitive);
-        driver.endRenderPass();
+    renderGraph.addFramePass({
+        .name = "blit",
+        .resources = {
+            { renderedImage, ResourceAccessType::FragmentRead },
+        },
+        .func = [this, scene, &sceneData, &inflight, tlas, &diffuseMap, renderedImage](FrameGraph& rg, FrameGraphContext& ctx) {
+            PipelineState pipe = {};
+            pipe.program = this->blitProgram;
+            RenderPassParams params;
+            driver.beginRenderPass(this->surfaceRenderTarget, params);
+            ctx.bindTextureResource(pipe, 1, 0, renderedImage);
+            driver.draw(pipe, this->quadPrimitive);
+            driver.endRenderPass();
+        },
     });
+
     renderGraph.submit();
-    driver.endFrame();*/
+    driver.endFrame();
 }
 
-template <class... Ts>
-struct overload : Ts... { using Ts::operator()...; };
-template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
 
 void Renderer::ddgiSuite(Scene* scene) {
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
@@ -574,8 +622,9 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto f = driver.getFrameSize();
     sb.frameSize = glm::uvec2(f.width, f.height);
     sb.instanceNum = sceneData.geometries.size();
-    sb.gridNum = scene->ddgi.gridNum;
-    sb.sceneSize = scene->ddgi.worldSize;
+    sb.sceneInfo.gridNum = scene->ddgi.gridNum;
+    sb.sceneInfo.sceneSize = scene->ddgi.worldSize;
+    sb.sceneInfo.sceneCenter = scene->ddgi.gridOrigin;
     std::vector<TextureHandle> diffuseMap;
     diffuseMap.push_back(gbuffer->positionBuffer);
     std::vector<InstanceMaterial> materials;
@@ -755,7 +804,7 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindTextureResource(pipe, 1, 0, rayGPositionBuffer);
             ctx.bindTextureResource(pipe, 1, 1, rayGNormalBuffer);
             ctx.bindTextureResource(pipe, 1, 2, rayGDiffuseBuffer);
-            ctx.bindStorageImageResource(pipe, 1, 3, rayGEmissionBuffer);
+            ctx.bindTextureResource(pipe, 1, 3, rayGEmissionBuffer);
             ctx.bindTextureResource(pipe, 1, 4, probeTex);
             RenderPassParams params;
             driver.beginRenderPass(radianceRenderTarget, params);

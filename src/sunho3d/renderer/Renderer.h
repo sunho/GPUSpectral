@@ -58,15 +58,21 @@ struct DDGIPushConstants {
     uint32_t globalRngState;
 };
 
+struct DDGISceneInfo {
+    glm::uvec3 gridNum;
+    float pad1;
+    glm::vec3 sceneSize;
+    float pad2;
+    glm::vec3 sceneCenter;
+    float pad3;
+};
+
 struct DDGISceneBuffer {
     glm::uvec2 frameSize;
     uint32_t instanceNum;
     uint32_t pad;
     std::array<Instance, MAX_INSTANCES> instances;
-    glm::uvec3 gridNum;
-    float pad1;
-    glm::vec3 sceneSize;
-    float pad2;
+    DDGISceneInfo sceneInfo;
 };
 
 class Scene;

@@ -1,6 +1,8 @@
 #define MAX_INSTANCES 64
 #define M_PI 3.1415926535897932384626433832795
 
+#define IRD_MAP_SIZE 8
+#define IRD_MAP_PROBE_COLS 8
 #define RAYS_PER_PROBE 64
 
 struct Vertex {
@@ -13,6 +15,12 @@ struct RayHit {
     vec2 bary;
     uint instId;
     uint primId;
+};
+
+struct SceneInfo {
+    uvec3 gridNum;
+    vec3 sceneSize;
+    vec3 sceneCenter;
 };
 
 

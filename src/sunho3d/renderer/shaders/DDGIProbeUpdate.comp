@@ -1,15 +1,14 @@
 #version 450
 
-#define IRD_MAP_SIZE 8
-#define IRD_MAP_PROBE_COLS 8
 #define FIXED_POINT_PRECISION 1024
 
-layout (local_size_x = IRD_MAP_SIZE, local_size_y = IRD_MAP_SIZE) in;
 #extension GL_GOOGLE_include_directive : require
+#include "common.glsl"
+layout (local_size_x = IRD_MAP_SIZE, local_size_y = IRD_MAP_SIZE) in;
+
 #extension GL_KHR_shader_subgroup_ballot: require
 #extension GL_KHR_shader_subgroup_arithmetic : require
 
-#include "common.glsl"
 
 #include "probe.glsl"
 
@@ -29,8 +28,8 @@ shared int reducedDist;
 shared int reducedDistSquare;
 
 void main() {
-    uint probeID = gl_WorkGroupID.x;
-    ivec2 iuv = ivec2( gl_LocalInvocationID.x, gl_LocalInvocationID.y);
+    int probeID = int(gl_WorkGroupID.x);
+    ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
     vec2 uv = vec2(iuv) / IRD_MAP_SIZE;
     vec3 dir = octahedronReverseMap(uv);
     vec4 sumIrradiance = vec4(0.0);
@@ -45,9 +44,9 @@ void main() {
     vec4 irradiance = sumIrradiance / RAYS_PER_PROBE;
     irradiance *= M_PI * 4.0;
     irradiance.a = 1.0;
-    ivec2 startPos = ivec2((probeID % IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE, (probeID/IRD_MAP_PROBE_COLS)*IRD_MAP_SIZE);
-    vec4 bb = imageLoad(irradianceMap, startPos + iuv);
-    imageStore(irradianceMap, startPos + iuv, mix(bb,irradiance, 0.05));
+    ivec2 startOffset = probeIDToIRDTexOffset(probeID);
+    vec4 bb = imageLoad(irradianceMap, startOffset + iuv);
+    imageStore(irradianceMap, startOffset + iuv, mix(bb,irradiance, 0.05));
     /*
     if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
         float distSG = subgroupInclusiveAdd(dist);

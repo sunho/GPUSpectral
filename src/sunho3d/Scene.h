@@ -67,6 +67,7 @@ private:
 struct DDGIConfig {
     glm::uvec3 gridNum{};
     glm::vec3 worldSize{};
+    glm::vec3 gridOrigin{};
 };
 
 class Scene : public IdResource {

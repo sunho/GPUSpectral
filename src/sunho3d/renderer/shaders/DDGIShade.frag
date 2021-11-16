@@ -2,10 +2,9 @@
 
 #define MAX_LIGHTS 64
 #extension GL_GOOGLE_include_directive : require
-#define IRD_MAP_SIZE 8
-#define IRD_MAP_PROBE_COLS 8
 
 #include "common.glsl"
+
 #include "probe.glsl"
 
 layout(location = 0) in vec2 inPos;
@@ -21,8 +20,7 @@ layout(std140, binding = 0) uniform SceneBuffer {
     uvec2 frameSize;
     uint instanceNum;
     Instance instances[MAX_INSTANCES];
-    uvec3 gridNum;
-    vec3 sceneSize;
+    SceneInfo sceneInfo;
 } sceneBuffer;
 
 layout(std140, binding = 1) uniform LightUniformBuffer {
@@ -44,16 +42,17 @@ layout( push_constant ) uniform PushConstants {
 void main() {
     vec2 uv = inPos / 2.0 + 0.5;
 
-    uint numProbe = sceneBuffer.gridNum.x * sceneBuffer.gridNum.y * sceneBuffer.gridNum.z;
+    uint numProbe = sceneBuffer.sceneInfo.gridNum.x * sceneBuffer.sceneInfo.gridNum.y * sceneBuffer.sceneInfo.gridNum.z;
     vec3 pos = vec3(texture(positionBuffer, uv));
     vec3 normal = vec3(texture(normalBuffer, uv));
     vec3 v = normalize(constants.cameraPos - pos);
     vec4 diffuse = texture(diffuseBuffer, uv);
     vec4 color = vec4(0.0);
-    ivec3 grid = posToGrid(pos, sceneBuffer.gridNum, sceneBuffer.sceneSize);
-    vec3 gridSize = sceneBuffer.sceneSize * 2.0 / sceneBuffer.gridNum;
-    int mainProbeID = gridToProbeID(grid, sceneBuffer.gridNum);
-    vec3 mainProbePos = probeIDToPos(mainProbeID, sceneBuffer.gridNum, sceneBuffer.sceneSize);
+    ivec3 grid = posToGrid(pos, sceneBuffer.sceneInfo);
+    vec3 gridSize = sceneBuffer.sceneInfo.sceneSize * 2.0 / vec3(sceneBuffer.sceneInfo.gridNum);
+    int mainProbeID = gridToProbeID(grid, sceneBuffer.sceneInfo);
+    ivec3 grid2 = probIDToGrid(mainProbeID, sceneBuffer.sceneInfo);
+    vec3 mainProbePos = probeIDToPos(mainProbeID, sceneBuffer.sceneInfo);
     vec3 tt = (pos - mainProbePos) / gridSize;
     float sumWeight = 0.01;
     vec4 sumIrradiance = vec4(0.0);
@@ -62,11 +61,13 @@ void main() {
             for (int k = 0; k < 2; ++k) {
                 ivec3 offset = ivec3(i,j,k);
                 ivec3 ogrid = grid + offset;
-                int probeID = gridToProbeID(ogrid, sceneBuffer.gridNum);
-                if (probeID < 0 || probeID > numProbe) {
+                int probeID = gridToProbeID(ogrid, sceneBuffer.sceneInfo);
+                if (ogrid.x < 0 || ogrid.x >= sceneBuffer.sceneInfo.gridNum.x || ogrid.y < 0 || ogrid.y >= sceneBuffer.sceneInfo.gridNum.y || ogrid.z < 0 || ogrid.z >= sceneBuffer.sceneInfo.gridNum.z) {
+                    outColor = vec4(1.0, 0.0, 0.0, 1.0);
+                    return;
                     continue;
                 }   
-                vec3 probePos = probeIDToPos(probeID, sceneBuffer.gridNum, sceneBuffer.sceneSize);
+                vec3 probePos = probeIDToPos(probeID, sceneBuffer.sceneInfo);
                 vec3 interp = mix(1.0-tt, tt, vec3(offset));
                 float weight = interp.x * interp.y * interp.z;
 
@@ -75,7 +76,7 @@ void main() {
                 vec3 lightDir = normalize(-probeToPoint);
                 weight *= max(0.05, dot(lightDir, normal));
 
-                vec2 startOffset = vec2((probeID % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (probeID / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
+                ivec2 startOffset = probeIDToIRDTexOffset(probeID);
                 vec2 uv = octahedronMap(normal);
                 vec2 tuv = (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0);
                 vec4 irradiance = texture(probeIrradianceMap, tuv);
@@ -95,7 +96,7 @@ void main() {
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);
         float dis = length(lightV);
-        float lightI = 4.0/(dis*dis);
+        float lightI = 2.0/(dis*dis);
         color += lightI* diffuse * max(dot(light,normal),0.0f);
     }
     outColor = vec4(vec3(color), 1.0);

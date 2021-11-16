@@ -1,33 +1,43 @@
+
 // probe id
 // probe.id / grid.x
 // id = x + y * max_x + z * max_x*max_y
 // texstart = (x * tile_size, y * tile + z * max_y*tile)
 // pos = (x - max_x/2)
-
-uvec3 probIDToGrid(uint id, uvec3 gridNum) {
-    uint z = id / (gridNum.x * gridNum.y);
-    uint y = (id % (gridNum.x * gridNum.y)) / gridNum.x;
-    uint x = id % gridNum.x;
-    return uvec3(x,y,z);
+ivec3 probIDToGrid(int id, SceneInfo sceneInfo) {
+    ivec3 gridNum = ivec3(sceneInfo.gridNum);
+    int x = id % gridNum.x;
+    int y = (id % (gridNum.x * gridNum.y)) / gridNum.x;
+    int z = id / (gridNum.x * gridNum.y);
+    return ivec3(x,y,z);
 }
 
-ivec3 posToGrid(vec3 pos, uvec3 gridNum, vec3 sceneSize) {
-    vec3 gridSize = sceneSize * 2.0 / gridNum;
-    ivec3 grid = ivec3((pos + sceneSize) / gridSize);
+ivec2 probeIDToIRDTexOffset(int id) {
+    ivec2 startOffset = ivec2((id % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (id / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
+    return startOffset;
+}
+
+int gridToProbeID(ivec3 grid, SceneInfo sceneInfo) {
+    return grid.x + grid.y * int(sceneInfo.gridNum.x) + grid.z * int(sceneInfo.gridNum.y * sceneInfo.gridNum.x);
+}
+
+
+vec3 gridToPos(ivec3 grid, SceneInfo sceneInfo) {
+    vec3 gridSize = sceneInfo.sceneSize * 2.0 / vec3(sceneInfo.gridNum);
+    vec3 ogd = vec3(grid) * gridSize;
+    return ogd - sceneInfo.sceneSize + sceneInfo.sceneCenter;
+}
+
+vec3 probeIDToPos(int id, SceneInfo sceneInfo) {
+    ivec3 grid = probIDToGrid(id, sceneInfo);
+    return gridToPos(grid, sceneInfo);
+}
+
+ivec3 posToGrid(vec3 pos, SceneInfo sceneInfo) {
+    vec3 gridSize = sceneInfo.sceneSize * 2.0 / vec3(sceneInfo.gridNum);
+    ivec3 grid = ivec3((pos + sceneInfo.sceneSize - sceneInfo.sceneCenter) / gridSize);
     return grid;
 }
-
-int gridToProbeID(ivec3 grid, uvec3 gridNum) {
-    return grid.x + grid.y * int(gridNum.x) + grid.z * int(gridNum.y * gridNum.x);
-}
-
-vec3 probeIDToPos(uint id, uvec3 gridNum, vec3 sceneSize) {
-    uvec3 grid = probIDToGrid(id, gridNum);
-    vec3 gridSize = sceneSize * 2.0 / gridNum;
-    vec3 ogd = vec3(grid) * gridSize;
-    return ogd - sceneSize;
-}
-
 
 vec3 octahedronReverseMap(vec2 uv) {
     vec3 position = vec3(2.0 * (uv - 0.5), 0);
