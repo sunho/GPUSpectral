@@ -74,6 +74,16 @@ struct PipelineState {
         return *this;
     }
 
+    PipelineState& bindStorageBufferArray(uint32_t set, uint32_t binding, Handle<HwBufferObject>* buffers, size_t size) {
+        Binding b = {};
+        b.type = ProgramParameterType::STORAGE;
+        for (size_t i = 0; i < size; ++i) {
+            b.handles[i] = { .buffer = buffers[i] };
+        }
+        bindings[{ set, binding }] = b;
+        return *this;
+    }
+
     PipelineState& bindTextureArray(uint32_t set, uint32_t binding, Handle<HwTexture>* texture, size_t size) {
         Binding b = {};
         b.type = ProgramParameterType::TEXTURE;

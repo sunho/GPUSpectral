@@ -43,12 +43,10 @@ void VulkanRayTracer::buildBLAS(VulkanRayFrameContext& frame, VulkanBLAS* blas, 
 
     auto tempBuffer = frame.acquireTemporaryBuffer(geometry_reqs.temporary_build_buffer_size);
     blas->geometry = std::make_unique<VulkanBufferObject>(device, geometry_reqs.result_buffer_size, BufferUsage::STORAGE);
-    
-    RRDevicePtr geometry_ptr;
-    rrGetDevicePtrFromVkBuffer(context, blas->geometry->buffer, 0, &geometry_ptr);
 
-    RRDevicePtr scratch_ptr;
-    rrGetDevicePtrFromVkBuffer(context, tempBuffer->buffer, 0, &scratch_ptr);
+    RRDevicePtr geometry_ptr = getDevicePtr(blas->geometry->buffer);
+    blas->geometryPtr = geometry_ptr;
+    RRDevicePtr scratch_ptr = frame.getTempDevicePtr(tempBuffer->buffer);
 
     
     res = rrCmdBuildGeometry(context, RR_BUILD_OPERATION_BUILD, &gbi, &options, scratch_ptr, geometry_ptr, frame.stream);
@@ -64,9 +62,7 @@ void VulkanRayTracer::buildTLAS(VulkanRayFrameContext& frame, VulkanTLAS* tlas, 
 
     for (auto& o : descriptor.instances) {
         RRInstance instance = {};
-        RRDevicePtr geometry_ptr;
-        rrGetDevicePtrFromVkBuffer(context, o.blas->geometry->buffer, 0, &geometry_ptr);
-        instance.geometry = geometry_ptr;
+        instance.geometry = o.blas->geometryPtr;
         glm::mat3x4 tt = glm::transpose(o.transfom);
         memcpy(&instance.transform, glm::value_ptr(tt), 4*3*4);
         instances.push_back(instance);
@@ -85,11 +81,9 @@ void VulkanRayTracer::buildTLAS(VulkanRayFrameContext& frame, VulkanTLAS* tlas, 
     auto tempBuffer = frame.acquireTemporaryBuffer(reqs.temporary_build_buffer_size);
     tlas->scene = std::make_unique<VulkanBufferObject>(device, reqs.result_buffer_size, BufferUsage::STORAGE);
 
-    RRDevicePtr scene_ptr;
-    rrGetDevicePtrFromVkBuffer(context, tlas->scene->buffer, 0, &scene_ptr);
-
-    RRDevicePtr scratch_ptr;
-    rrGetDevicePtrFromVkBuffer(context, tempBuffer->buffer, 0, &scratch_ptr);
+    RRDevicePtr scene_ptr = getDevicePtr(tlas->scene->buffer);
+    tlas->scenePtr = scene_ptr;
+    RRDevicePtr scratch_ptr = frame.getTempDevicePtr(tempBuffer->buffer);
 
     {
         ZoneScopedN("rt tlas internal build scene")
@@ -101,25 +95,17 @@ void VulkanRayTracer::buildTLAS(VulkanRayFrameContext& frame, VulkanTLAS* tlas, 
 }
 
 void VulkanRayTracer::intersectRays(VulkanRayFrameContext& frame, VulkanTLAS* tlas, uint32_t rayCount, VulkanBufferObject* raysBuffer, VulkanBufferObject* hitBuffer) {
-    RRDevicePtr scene_ptr;
-    rrGetDevicePtrFromVkBuffer(context, tlas->scene->buffer, 0, &scene_ptr);
-
     size_t scratch_size;
     rrGetTraceMemoryRequirements(context, rayCount, &scratch_size);
 
     auto tempBuffer = frame.acquireTemporaryBuffer(scratch_size);
 
-    RRDevicePtr rays_ptr;
-    rrGetDevicePtrFromVkBuffer(context, raysBuffer->buffer, 0, &rays_ptr);
-
-    RRDevicePtr hits_ptr;
-    rrGetDevicePtrFromVkBuffer(context, hitBuffer->buffer, 0, &hits_ptr);
-
-    RRDevicePtr scratch_ptr;
-    rrGetDevicePtrFromVkBuffer(context, tempBuffer->buffer, 0, &scratch_ptr);
+    RRDevicePtr rays_ptr = frame.getTempDevicePtr(raysBuffer->buffer);
+    RRDevicePtr hits_ptr = frame.getTempDevicePtr(hitBuffer->buffer);
+    RRDevicePtr scratch_ptr = frame.getTempDevicePtr(tempBuffer->buffer);
 
     auto res = rrCmdIntersect(context,
-                                 scene_ptr,
+                                 tlas->scenePtr,
                                  RR_INTERSECT_QUERY_CLOSEST,
                                  rays_ptr,
                                  rayCount,
@@ -128,10 +114,17 @@ void VulkanRayTracer::intersectRays(VulkanRayFrameContext& frame, VulkanTLAS* tl
                                  hits_ptr,
                                  scratch_ptr,
                                  frame.stream);
-
+    
     if (res != RR_SUCCESS) {
+        //std::cout << res << std::endl;
         throw std::runtime_error("error writing intersect commands");
     }
+}
+
+RRDevicePtr VulkanRayTracer::getDevicePtr(vk::Buffer buffer) {
+    RRDevicePtr ptr;
+    rrGetDevicePtrFromVkBuffer(context, buffer, 0, &ptr);
+    return ptr;
 }
 
 VulkanRayFrameContext::VulkanRayFrameContext(VulkanRayTracer& tracer, VulkanDevice& device, vk::CommandBuffer cmd) : tracer(tracer), device(device), cmd(cmd) {
@@ -142,7 +135,18 @@ VulkanRayFrameContext::VulkanRayFrameContext(VulkanRayTracer& tracer, VulkanDevi
 }
 
 VulkanRayFrameContext::~VulkanRayFrameContext() {
+    for (auto ptr : ptrs) {
+        rrReleaseDevicePtr(tracer.context, ptr);
+    }
     rrReleaseExternalCommandStream(tracer.context, stream);
+    rrFreeDescriptorSets(tracer.context);
+}
+
+RRDevicePtr VulkanRayFrameContext::getTempDevicePtr(vk::Buffer buffer) {
+    RRDevicePtr ptr;
+    rrGetDevicePtrFromVkBuffer(tracer.context, buffer, 0, &ptr);
+    ptrs.push_back(ptr);
+    return ptr;
 }
 
 VulkanBufferObject* VulkanRayFrameContext::acquireTemporaryBuffer(size_t size) {

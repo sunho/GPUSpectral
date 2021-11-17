@@ -26,8 +26,9 @@ struct Vertex {
 struct Primitive {
     Handle<HwIndexBuffer> indexBuffer;
     Handle<HwVertexBuffer> vertexBuffer;
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+    Handle<HwBufferObject> positionBuffer;
+    Handle<HwBufferObject> normalBuffer;
+    Handle<HwBufferObject> uvBuffer;
     AttributeArray attibutes;
     uint32_t elementCount;
     uint32_t attributeCount;

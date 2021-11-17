@@ -320,13 +320,13 @@ void VulkanDriver::endRenderPass(int dummy) {
 
 Handle<HwBLAS> VulkanDriver::createBLAS(int dummy) {
     Handle<HwBLAS> handle = alloc_handle<VulkanBLAS, HwBLAS>();
-    construct_handle<VulkanBLAS>(handle);
+    construct_handle<VulkanBLAS>(handle, *rayTracer);
     return handle;
 }
 
 Handle<HwTLAS> VulkanDriver::createTLAS(int dummy) {
     Handle<HwTLAS> handle = alloc_handle<VulkanTLAS, HwTLAS>();
-    construct_handle<VulkanTLAS>(handle);
+    construct_handle<VulkanTLAS>(handle, *rayTracer);
     return handle;
 }
 

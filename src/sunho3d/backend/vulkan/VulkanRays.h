@@ -22,14 +22,17 @@ struct VulkanRTSceneDescriptor {
 class VulkanRayTracer {
 public:
     friend class VulkanRayFrameContext;
+    friend class VulkanBLAS;
+    friend class VulkanTLAS;
     VulkanRayTracer(VulkanDevice& device);
     ~VulkanRayTracer();
 
     void buildBLAS(VulkanRayFrameContext& frame, VulkanBLAS* blas, VulkanPrimitive* primitive);
     void buildTLAS(VulkanRayFrameContext& frame, VulkanTLAS* tlas, const VulkanRTSceneDescriptor& descriptor);
     void intersectRays(VulkanRayFrameContext& frame, VulkanTLAS* tlas, uint32_t rayCount, VulkanBufferObject* raysBuffer, VulkanBufferObject* hitBuffer);
+    RRDevicePtr getDevicePtr(vk::Buffer buffer);
 
-private:
+  private:
     VulkanDevice& device;
     RRContext context{};
 };
@@ -39,6 +42,8 @@ public:
     friend class VulkanRayTracer;
     VulkanRayFrameContext(VulkanRayTracer& tracer, VulkanDevice& device, vk::CommandBuffer cmd);
     ~VulkanRayFrameContext();
+
+    RRDevicePtr getTempDevicePtr(vk::Buffer buffer);
     
     VulkanBufferObject* acquireTemporaryBuffer(size_t size);
 
@@ -48,18 +53,31 @@ private:
     vk::CommandBuffer cmd{};
     RRCommandStream stream{};
     std::list<VulkanBufferObject> tempBuffers{};
+    std::list<RRDevicePtr> ptrs{};
 };
 
 struct VulkanBLAS : public HwBLAS {
-    VulkanBLAS() = default;
-    ~VulkanBLAS() = default;
+    VulkanBLAS(VulkanRayTracer& parent) : parent(parent) {
+    
+    }
+    ~VulkanBLAS() {
+        rrReleaseDevicePtr(parent.context, geometryPtr);
+    }
     std::unique_ptr<VulkanBufferObject> geometry{};
+    RRDevicePtr geometryPtr{};
+    VulkanRayTracer& parent;
 };
 
 struct VulkanTLAS : public HwTLAS {
-    VulkanTLAS() = default;
-    ~VulkanTLAS() = default;
+    VulkanTLAS(VulkanRayTracer& parent) : parent(parent) {
+    
+    }
+    ~VulkanTLAS() {
+        rrReleaseDevicePtr(parent.context, scenePtr);
+    }
     std::unique_ptr<VulkanBufferObject> scene{};
+    RRDevicePtr scenePtr{};
+    VulkanRayTracer& parent;
 };
 
 

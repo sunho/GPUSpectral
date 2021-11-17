@@ -200,8 +200,10 @@ Mesh *Loader::loadObj(const std::string &path, bool twosided) {
         std::vector<float> v;
         std::vector<float> vt;
         std::vector<float> vn;
+        std::vector<uint32_t> indices;
+        std::vector<Vertex> vertices;
         for (size_t f = 0; f < shapes[s].mesh.indices.size(); ++f) {
-            primitive.indices.push_back(f);
+            indices.push_back(f);
             auto i0 = shapes[s].mesh.indices[f];
             glm::vec3 pos;
             pos.x = attrib.vertices[3 * i0.vertex_index];
@@ -222,12 +224,12 @@ Mesh *Loader::loadObj(const std::string &path, bool twosided) {
             vn.push_back(normal.x);
             vn.push_back(normal.y);
             vn.push_back(normal.z);
-            primitive.vertices.push_back({.pos = pos, .normal = normal, .uv = uv});
+            vertices.push_back({.pos = pos, .normal = normal, .uv = uv});
         }
         if (twosided) {
-            size_t beforeSize = primitive.vertices.size();
+            size_t beforeSize = vertices.size();
             for (size_t i = 0; i < beforeSize; i+=3) {
-                std::array<Vertex, 3> verts = { primitive.vertices[i], primitive.vertices[i+2], primitive.vertices[i+1] };
+                std::array<Vertex, 3> verts = { vertices[i], vertices[i+2], vertices[i+1] };
                 verts[0].normal *= -1;
                 verts[1].normal *= -1;
                 verts[2].normal *= -1;
@@ -240,11 +242,11 @@ Mesh *Loader::loadObj(const std::string &path, bool twosided) {
                     vn.push_back(verts[j].normal.z);
                     vt.push_back(verts[j].uv.x);
                     vt.push_back(verts[j].uv.y);
-                    primitive.vertices.push_back(verts[j]);
+                    vertices.push_back(verts[j]);
                 }
-                primitive.indices.push_back(i+beforeSize);
-                primitive.indices.push_back(i + 1+ beforeSize);
-                primitive.indices.push_back(i + 2+beforeSize);
+                indices.push_back(i+beforeSize);
+                indices.push_back(i + 1+ beforeSize);
+                indices.push_back(i + 2+beforeSize);
             }
         }
         primitive.attibutes[0] = {
@@ -266,18 +268,21 @@ Mesh *Loader::loadObj(const std::string &path, bool twosided) {
         };
         auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
         driver.updateBufferObjectSync(buffer0, { .data = (uint32_t *)v.data() }, 0);
+        primitive.positionBuffer = buffer0;
         auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
         driver.updateBufferObjectSync(buffer1, { .data = (uint32_t *)vn.data() }, 0);
+        primitive.normalBuffer = buffer1;
         auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX | BufferUsage::STORAGE);
         driver.updateBufferObjectSync(buffer2, { .data = (uint32_t *)vt.data() }, 0);
+        primitive.uvBuffer = buffer2;
 
         auto vbo = driver.createVertexBuffer(3, v.size() / 3, 3, primitive.attibutes);
         driver.setVertexBuffer(vbo, 0, buffer0);
         driver.setVertexBuffer(vbo, 1, buffer1);
         driver.setVertexBuffer(vbo, 2, buffer2);
 
-        auto ibo = driver.createIndexBuffer(primitive.indices.size());
-        driver.updateIndexBuffer(ibo, { .data = (uint32_t *)primitive.indices.data() }, 0);
+        auto ibo = driver.createIndexBuffer(indices.size());
+        driver.updateIndexBuffer(ibo, { .data = (uint32_t *)indices.data() }, 0);
         primitive.indexBuffer = ibo;
         primitive.vertexBuffer = vbo;
         primitive.hwInstance = driver.createPrimitive(PrimitiveMode::TRIANGLES);

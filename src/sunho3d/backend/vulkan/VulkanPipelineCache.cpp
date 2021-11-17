@@ -113,7 +113,7 @@ void VulkanPipelineCache::tick() {
     framebuffers.tick();
     renderpasses.tick();
     ++currentFrame;
-    descriptorAllocators[currentFrame % 3].resetPools();
+    descriptorAllocators[currentFrame % descriptorAllocators.size()].resetPools();
 }
 
 VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute) {

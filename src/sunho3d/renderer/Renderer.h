@@ -39,7 +39,7 @@ struct InstanceMaterial {
 
 struct Instance {
     glm::mat4 transform;
-    uint32_t vertexStart;
+    uint32_t meshIndex;
     float pad[3];
     InstanceMaterial material;
 };
@@ -85,7 +85,7 @@ struct InflightData {
 
     std::vector<RTInstance> instances;
     //ddgi
-
+    Handle<HwTLAS> tlas;
 };
 
 struct DDGIPassContext {

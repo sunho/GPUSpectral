@@ -36,7 +36,7 @@ struct Material {
 
 struct Instance {
     mat4 transform;
-    int vertexStart;
+    int meshIndex;
     Material material;
 };
 

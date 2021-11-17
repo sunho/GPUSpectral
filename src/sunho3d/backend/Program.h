@@ -74,6 +74,12 @@ struct ProgramParameterLayout {
         return *this;
     }
 
+    ProgramParameterLayout& addStorageBufferArray(uint32_t set, uint32_t binding, size_t size) {
+        fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::STORAGE, (uint32_t)size };
+        return *this;
+    }
+
+
     ProgramParameterLayout& addStorageImage(uint32_t set, uint32_t binding) {
         fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::IMAGE, 1 };
         return *this;
