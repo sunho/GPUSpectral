@@ -111,7 +111,7 @@ void main() {
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);
         float dis = length(lightV);
-        float lightI = 20.0/(dis*dis);
+        float lightI = 6.0/(dis*dis);
         color += lightI* diffuse * max(dot(light,normal),0.0f);
     }
     outColor = vec4(vec3(color), 1.0);

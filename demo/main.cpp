@@ -20,17 +20,17 @@ int main() {
     
     //sunho3d::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
 
-    auto scene = loader.loadMitsuba((basePath() / "assets" / "living-room" / "scene.xml").string());
+    auto scene = loader.loadMitsuba((basePath() / "assets" / "staircase2" / "scene.xml").string());
     
 
     scene->ddgi.gridNum = glm::uvec3(32, 16, 32);
-    scene->ddgi.worldSize = glm::vec3(10.0f,5.0f,10.0f);
+    scene->ddgi.worldSize = glm::vec3(15.0f,10.0f,15.0f);
     scene->ddgi.gridOrigin = glm::vec3(0.0f, 1.0f, 0.0f);
     /* auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
     l->setIntensity(0.6);
     l->setTransform({.x=0.5,.y=-0.5,.z=6.0});
     scene->addLight(l);*/
-    glm::vec3 cameraPos = glm::vec3(-1.3, 2.0, -5.3f);
+    glm::vec3 cameraPos = glm::vec3(6.0, 2.0, 1.0f);
     glm::vec3 origin = glm::vec3(-2.0, 1.0, 0.0);
 
     window->run([&](){
