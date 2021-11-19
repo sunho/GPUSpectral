@@ -50,6 +50,7 @@ struct Instance {
     InstanceMaterial material;
 };
 
+#define MAX_MESH_COUNT 64
 static constexpr const size_t MAX_INSTANCES = 64;
 static constexpr const size_t RAYS_PER_PROBE = 32;
 

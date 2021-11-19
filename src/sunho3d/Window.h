@@ -23,9 +23,9 @@ class Window : public IdResource {
     VkSurfaceKHR createSurface(VkInstance instance);
 
     void run(std::function<void()> drawFrame);
-
+    GLFWwindow* window;
   private:
-    GLFWwindow *window;
+
 
     size_t width;
     size_t height;

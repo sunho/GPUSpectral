@@ -52,10 +52,13 @@ Scene *Loader::loadGLTF(const std::string &path) {
 
 void Loader::loadMaterial(Material *material, tinyparser_mitsuba::Object &obj, const std::filesystem:: path &basepath) {
     std::string type = obj.pluginType();
-
+    if (obj.id() == "Floor") {
+        std::cout << " a";
+    }
     if (type == "twosided") {
         material->twosided = true;
-    } else if (type == "diffuse") {
+    }
+    else if (type == "diffuse") {
         bool found = false;
         for (auto [name, child] : obj.namedChildren()) {
             if (name == "reflectance") {
@@ -63,12 +66,28 @@ void Loader::loadMaterial(Material *material, tinyparser_mitsuba::Object &obj, c
                 auto filename = child->property("filename").getString();
                 auto path = (basepath / filename).string();
                 auto tex = loadOrGetTexture(path);
-                material->materialData = DiffuseTextureMaterialData{tex};
+                material->materialData = DiffuseTextureMaterialData{ tex };
                 break;
             }
         }
         if (!found) {
             auto rgb = obj.property("reflectance").getColor();
+            material->materialData = DiffuseColorMaterialData{ glm::vec3(rgb.r, rgb.g, rgb.b) };
+        }
+    } else if (type == "roughplastic") {
+        bool found = false;
+        for (auto [name, child] : obj.namedChildren()) {
+            if (name == "diffuse_reflectance") {
+                found = true;
+                auto filename = child->property("filename").getString();
+                auto path = (basepath / filename).string();
+                auto tex = loadOrGetTexture(path);
+                material->materialData = DiffuseTextureMaterialData{ tex };
+                break;
+            }
+        }
+        if (!found) {
+            auto rgb = obj.property("diffuse_reflectance").getColor();
             material->materialData = DiffuseColorMaterialData{ glm::vec3(rgb.r, rgb.g, rgb.b) };
         }
     }
@@ -101,6 +120,12 @@ Scene *Loader::loadMitsuba(const std::string &path) {
             auto transform = obj->property("to_world").getTransform();
             auto matrix = glm::make_mat4(transform.matrix.data());
             matrix = glm::transpose(matrix);
+            if (obj->property("center").isValid())
+            {
+                auto point = obj->property("center").getVector();
+                matrix[3] = glm::vec4(point.x, point.y, point.z, 1.0);
+            }
+          
             auto material = engine.createMaterial();
             entity->setMaterial(material);
             for (auto child : obj->anonymousChildren()) {
@@ -134,12 +159,15 @@ Scene *Loader::loadMitsuba(const std::string &path) {
             //matrix = glm::inverse(matrix); // TODO: need this?
             matrix[3] = -1.0f*affine;
             matrix[3][3] *= -1.0f;
-            matrix[2][2] *= -1.0f;
+            //matrix[2][2] *= -1.0f;
+            //matrix[1][1] *= -1.0f;
 
 
 
             outScene->getCamera().view = matrix;
-            outScene->getCamera().setProjectionFov(glm::radians(fov*2.0), 1.0, 0.8f, 12.0f);
+            outScene->getCamera().setProjectionFov(glm::radians(fov), 1.0, 0.01f, 25.0f);
+            //outScene->getCamera().proj[2][2] *= -1.0f;
+            //outScene->getCamera().proj[1][1] *= -1.0f;
         }
     }
     return outScene;

@@ -1,7 +1,5 @@
 #version 450
 
-#define MAX_MESH_COUNT 32
-#define MAX_DIFFUSE_MAPS 32
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_nonuniform_qualifier : require
 

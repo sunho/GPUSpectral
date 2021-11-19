@@ -67,6 +67,7 @@ vk::DescriptorSet VulkanDescriptorAllocator::allocate(vk::DescriptorSetLayout la
     //allocate a new pool and retry
     currentPool = grabPool();
     usedPools.push_back(currentPool);
+    allocInfo.descriptorPool = currentPool;
     res = device.allocateDescriptorSets(&allocInfo, &descriptorSet);
     if (res != vk::Result::eSuccess) {
         throw std::runtime_error("pool allocation error");

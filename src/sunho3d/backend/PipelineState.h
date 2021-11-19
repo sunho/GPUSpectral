@@ -41,7 +41,7 @@ union BindingHandle {
 };
 
 struct Binding {
-    constexpr static size_t MAX_SIZE = 32;
+    constexpr static size_t MAX_SIZE = 64;
     Binding() {
         memset(handles.data(), 0xFF, handles.size() * sizeof(BindingHandle)); // TODO: this is based on internal of HandleBase should change it
     }

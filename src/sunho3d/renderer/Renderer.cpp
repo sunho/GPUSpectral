@@ -116,9 +116,9 @@ void Renderer::registerPrograms() {
         .addStorageImage(2, 3)
         .addStorageImage(2, 4)
         .addTextureArray(2, 5, 32)
-        .addStorageBufferArray(1,0,32)
-        .addStorageBufferArray(1, 1, 32)
-        .addStorageBufferArray(1, 2, 32)
+        .addStorageBufferArray(1,0, MAX_MESH_COUNT)
+        .addStorageBufferArray(1, 1, MAX_MESH_COUNT)
+        .addStorageBufferArray(1, 2, MAX_MESH_COUNT)
         .addStorageBuffer(1, 3)
         .addUniformBuffer(0, 0);
     ddgiProbeRayShadeProgram = driver.createProgram(prog);

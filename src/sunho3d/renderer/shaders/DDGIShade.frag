@@ -58,6 +58,8 @@ void main() {
     vec3 tt = (pos - mainProbePos) / gridSize;
     float sumWeight = 0.01;
     vec4 sumIrradiance = vec4(0.0);
+    //outColor = vec4(grid / vec3(sceneBuffer.sceneInfo.gridNum), 0.0);
+    //return;
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             for (int k = 0; k < 2; ++k) {
@@ -109,7 +111,7 @@ void main() {
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);
         float dis = length(lightV);
-        float lightI = 2.0/(dis*dis);
+        float lightI = 20.0/(dis*dis);
         color += lightI* diffuse * max(dot(light,normal),0.0f);
     }
     outColor = vec4(vec3(color), 1.0);
