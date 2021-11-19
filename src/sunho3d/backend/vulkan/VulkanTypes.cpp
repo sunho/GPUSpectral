@@ -257,6 +257,10 @@ vk::AccessFlags translateAccessMask(BarrierAccessFlag flag) {
             return vk::AccessFlagBits::eColorAttachmentWrite;
         case BarrierAccessFlag::DEPTH_STENCIL_WRITE:
             return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case BarrierAccessFlag::TRANSFER_READ:
+            return vk::AccessFlagBits::eTransferRead;
+        case BarrierAccessFlag::TRANSFER_WRITE:
+            return vk::AccessFlagBits::eTransferWrite;
         case BarrierAccessFlag::NONE:
             return {};
     }
@@ -274,6 +278,10 @@ vk::ImageLayout translateImageLayout(ImageLayout layout) {
             return vk::ImageLayout::eReadOnlyOptimalKHR;
         case ImageLayout::SHADER_READ_ONLY_OPTIMAL:
             return vk::ImageLayout::eShaderReadOnlyOptimal;
+        case ImageLayout::TRANSFER_SRC_OPTIMAL:
+            return vk::ImageLayout::eTransferSrcOptimal;
+        case ImageLayout::TRANSFER_DST_OPTIMAL:
+            return vk::ImageLayout::eTransferDstOptimal;
         case ImageLayout::GENERAL:
             return vk::ImageLayout::eGeneral;
     }

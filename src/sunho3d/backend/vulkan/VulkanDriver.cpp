@@ -211,14 +211,28 @@ PrimitiveHandle VulkanDriver::createPrimitive(PrimitiveMode mode) {
 }
 
 TextureHandle VulkanDriver::createTexture(SamplerType type, TextureUsage usage,
-                                          TextureFormat format, uint32_t width, uint32_t height) {
+                                          TextureFormat format, uint8_t levels, uint32_t width, uint32_t height, uint32_t layers) {
     Handle<HwTexture> handle = alloc_handle<VulkanTexture, HwTexture>();
-    construct_handle<VulkanTexture>(handle, *device, type, usage, 1, format, width, height);
+    construct_handle<VulkanTexture>(handle, *device, type, usage, levels, format, width, height, layers);
     return handle;
 }
 
-void VulkanDriver::updateTexture(TextureHandle handle, BufferDescriptor data) {
-    handle_cast<VulkanTexture>(handle)->update2DImage(*device, data);
+void VulkanDriver::copyTextureInitialData(TextureHandle handle, BufferDescriptor data) {
+    handle_cast<VulkanTexture>(handle)->copyInitialData(data);
+}
+
+void VulkanDriver::copyBufferToTexture(TextureHandle handle, ImageSubresource subresource, BufferObjectHandle bufferHandle) {
+    auto& cmd = context.inflight->cmd;
+    VulkanTexture* texture = handle_cast<VulkanTexture>(handle);
+    VulkanBufferObject* buffer = handle_cast<VulkanBufferObject>(bufferHandle);
+    texture->copyBuffer(cmd, buffer->buffer, texture->width, texture->height, subresource);
+}
+
+void VulkanDriver::blitTexture(TextureHandle destHandle, ImageSubresource destSubresource, TextureHandle srcHandle, ImageSubresource srcSubresource) {
+    auto& cmd = context.inflight->cmd;
+    VulkanTexture* dest = handle_cast<VulkanTexture>(destHandle);
+    VulkanTexture* src = handle_cast<VulkanTexture>(srcHandle);
+    dest->blitImage(cmd, *src, dest->width, dest->height, srcSubresource, destSubresource);
 }
 
 void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle vertexBuffer,
@@ -486,11 +500,11 @@ void VulkanDriver::setBarrier(Barrier barrier) {
         imageBarrier.newLayout = translateImageLayout(barrier.finalLayout);
         imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imageBarrier.subresourceRange.aspectMask = decideAsepctFlags(barrier.srcAccess) | decideAsepctFlags(barrier.dstAccess);
+        imageBarrier.subresourceRange.aspectMask = texture->aspect;
         imageBarrier.subresourceRange.baseArrayLayer = 0;
-        imageBarrier.subresourceRange.layerCount = 1;
+        imageBarrier.subresourceRange.layerCount = texture->layers;
         imageBarrier.subresourceRange.baseMipLevel = 0;
-        imageBarrier.subresourceRange.levelCount= 1;
+        imageBarrier.subresourceRange.levelCount= texture->levels;
         imageBarrier.image = texture->image;
         texture->vkImageLayout = translateImageLayout(barrier.finalLayout);
         texture->imageLayout = barrier.finalLayout;

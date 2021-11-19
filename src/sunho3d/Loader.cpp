@@ -308,8 +308,8 @@ Handle<HwTexture> Loader::loadTexture(const std::string &path) {
             textureData.push_back(0xFF);
         }
     }
-    auto tex = renderer.getDriver().createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, width, height);
-    renderer.getDriver().updateTexture(tex, { .data = (uint32_t *)textureData.data() });
+    auto tex = renderer.getDriver().createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, 1, width, height, 1);
+    renderer.getDriver().copyTextureInitialData(tex, { .data = (uint32_t *)textureData.data() });
     stbi_image_free(data);
     return tex;
 }

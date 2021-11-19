@@ -15,6 +15,8 @@
 #include <sunho3d/renderer/shaders/GBufferGenFrag.h>
 #include <sunho3d/renderer/shaders/DeferredRenderVert.h>
 #include <sunho3d/renderer/shaders/DeferredRenderFrag.h>
+#include <sunho3d/renderer/shaders/PointShadowGenVert.h>
+#include <sunho3d/renderer/shaders/PointShadowGenFrag.h>
 #include <sunho3d/utils/HalfFloat/umHalf.h>
 #include <tiny_gltf.h>
 
@@ -121,6 +123,12 @@ void Renderer::registerPrograms() {
         .addUniformBuffer(0, 0);
     ddgiProbeRayShadeProgram = driver.createProgram(prog);
 
+    prog = { PointShadowGenVert, PointShadowGenVertSize, PointShadowGenFrag, PointShadowGenFragSize };
+    prog.parameterLayout
+        .addUniformBuffer(0, 0)
+        .addUniformBuffer(0, 1);
+    pointShadowGenProgram = driver.createProgram(prog);
+
     prog = { GBufferGenVert, GBufferGenVertSize, GBufferGenFrag, GBufferGenFragSize };
     prog.parameterLayout
         .addUniformBuffer(0, 0)
@@ -145,7 +153,8 @@ void Renderer::registerPrograms() {
         .addTexture(1, 1)
         .addTexture(1, 2)
         .addTexture(1, 3)
-        .addTexture(1, 4);
+        .addTexture(1, 4)
+        .addTextureArray(1, 5, MAX_LIGHTS);
     ddgiShadeProgram = driver.createProgram(prog);
 
     prog = { DDGIProbeUpdate, DDGIProbeUpdateSize };
@@ -318,9 +327,9 @@ void Renderer::deferSuite(Scene* scene) {
     renderGraph.addFramePass({ 
         .name = "gbuffer generation",
         .resources = { 
-            {positionBuffer, ResourceAccessType::ColorWrite},
-            {normalBuffer, ResourceAccessType::ColorWrite },
-            {diffuseBuffer, ResourceAccessType::ColorWrite },
+            {{positionBuffer}, ResourceAccessType::ColorWrite},
+            {{normalBuffer}, ResourceAccessType::ColorWrite },
+            {{diffuseBuffer}, ResourceAccessType::ColorWrite },
         },
         .func = [this, scene, &sceneData](FrameGraph& rg, FrameGraphContext& ctx) {
             auto& camera = scene->getCamera();
@@ -344,8 +353,8 @@ void Renderer::deferSuite(Scene* scene) {
         },
     });
 
-    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-    auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, 1, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, 1);
+    auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, 1, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, 1);
     RenderAttachments att = {};
     att.colors[0] = color;
     att.depth = depth;
@@ -355,10 +364,10 @@ void Renderer::deferSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "deferred render",
         .resources = {
-            { positionBuffer, ResourceAccessType::FragmentRead },
-            { normalBuffer, ResourceAccessType::FragmentRead },
-            { diffuseBuffer, ResourceAccessType::FragmentRead },
-            { renderedBuffer, ResourceAccessType::ColorWrite }
+            { {positionBuffer}, ResourceAccessType::FragmentRead },
+            { {normalBuffer}, ResourceAccessType::FragmentRead },
+            { {diffuseBuffer}, ResourceAccessType::FragmentRead },
+            { {renderedBuffer}, ResourceAccessType::ColorWrite }
         },
         .func = [this, scene, &sceneData, renderTarget, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             auto& camera = scene->getCamera();
@@ -379,7 +388,7 @@ void Renderer::deferSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "blit",
         .resources = {
-            { renderedBuffer, ResourceAccessType::FragmentRead },
+            { {renderedBuffer}, ResourceAccessType::FragmentRead },
         },
         .func = [this, scene, &sceneData, renderTarget, renderedBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             PipelineState pipe = {};
@@ -537,7 +546,7 @@ void Renderer::rtSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "intersect",
         .resources = {
-            { hitBuffer, ResourceAccessType::ComputeWrite },
+            { {hitBuffer}, ResourceAccessType::ComputeWrite },
         },
         .func = [this, scene, &sceneData, &inflight, tlas, sceneBuffer, hitBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             std::vector<Ray> rays;
@@ -560,7 +569,7 @@ void Renderer::rtSuite(Scene* scene) {
         },
     });
 
-    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA8, 1, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, 1);
     RenderAttachments att = {};
     att.colors[0] = color;
     auto renderTarget = renderGraph.createRenderTargetSC(HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT, att);  
@@ -569,7 +578,7 @@ void Renderer::rtSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "render",
         .resources = {
-            { hitBuffer, ResourceAccessType::ComputeRead },
+            { {hitBuffer}, ResourceAccessType::ComputeRead },
         },
         .func = [this, scene, &sceneData, &inflight, renderTarget, tlas, 
 &vertexPositionBuffers, &vertexNormalBuffers, &vertexUVBuffers, & diffuseMap, sceneBuffer, hitBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
@@ -592,7 +601,7 @@ void Renderer::rtSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "blit",
         .resources = {
-            { renderedImage, ResourceAccessType::FragmentRead },
+            { {renderedImage}, ResourceAccessType::FragmentRead },
         },
         .func = [this, scene, &sceneData, &inflight, tlas, &diffuseMap, renderedImage](FrameGraph& rg, FrameGraphContext& ctx) {
             PipelineState pipe = {};
@@ -634,11 +643,11 @@ void Renderer::ddgiSuite(Scene* scene) {
     glm::uvec2 probeTexSize = glm::uvec2(IRD_MAP_SIZE * IRD_MAP_PROBE_COLS, IRD_MAP_SIZE * (probeNum / IRD_MAP_PROBE_COLS));
     if (!rayGbuffer) {
         rayGbuffer = std::make_unique<GBuffer>(driver, RAYS_PER_PROBE, probeNum);
-        probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, probeTexSize.x, probeTexSize.y);
-        probeDistTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS));
-        probeDistSquareTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS));
+        probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, probeTexSize.x, probeTexSize.y, 1);
+        probeDistTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS), 1);
+        probeDistSquareTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS), 1);
         std::vector<half> blank(probeTexSize.x * probeTexSize.y*4, 0.0f);
-        driver.updateTexture(probeTexture, { .data = (uint32_t*)blank.data(), .size = 0 });
+        driver.copyTextureInitialData(probeTexture, { .data = (uint32_t*)blank.data(), .size = 0 });
     }
  
     if (!gbuffer) {
@@ -687,7 +696,7 @@ void Renderer::ddgiSuite(Scene* scene) {
         sb.sceneInfo.gridNum = scene->ddgi.gridNum;
         sb.sceneInfo.sceneSize = scene->ddgi.worldSize;
         sb.sceneInfo.sceneCenter = scene->ddgi.gridOrigin;
-        diffuseMap.push_back(gbuffer->positionBuffer);
+        diffuseMap.push_back(rayGbuffer->positionBuffer);
         auto& camera = scene->getCamera();
         glm::mat4 vp = camera.proj * camera.view;
         for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
@@ -754,10 +763,10 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto rayGNormalBuffer = renderGraph.importImage("ray g normal", rayGbuffer->normalBuffer);
     auto rayGDiffuseBuffer = renderGraph.importImage("ray g diffuse", rayGbuffer->diffuseBuffer);
     auto rayGEmissionBuffer = renderGraph.importImage("ray g emission", rayGbuffer->emissionBuffer);
-    auto db = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, RAYS_PER_PROBE, probeNum);
+    auto db = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, RAYS_PER_PROBE, probeNum, 1);
     auto distanceBuffer = renderGraph.importImage("distance buffer", db);
 
-    auto radianceColor = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, RAYS_PER_PROBE, probeNum);
+    auto radianceColor = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, 1, RAYS_PER_PROBE, probeNum, 1);
     RenderAttachments att = {};
     att.colors[0] = radianceColor;
     auto radianceRenderTarget = renderGraph.createRenderTargetSC(RAYS_PER_PROBE, probeNum, att);
@@ -765,6 +774,97 @@ void Renderer::ddgiSuite(Scene* scene) {
     auto probeTex = renderGraph.importImage("probe texture", probeTexture);
     auto probeDistTex = renderGraph.importImage("probe dist texture", probeDistTexture);
     auto probeDistSquareTex = renderGraph.importImage("probe dist square texture", probeDistSquareTexture);
+
+    const size_t SHADOW_MAP_SIZE = 1024;
+    std::vector<ResourceHandle> shadowMapResources;
+    for (size_t i = 0; i < sceneData.lightBuffer.lightNum; ++i) {
+        if (shadowMaps.find(i) != shadowMaps.end()) {
+            shadowMapResources.push_back(renderGraph.importImage("shadow cube map", shadowMaps.at(i)));
+            continue;
+        }
+        auto shadowMapTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::CUBE, TextureFormat::DEPTH32F, 1, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 6);
+        auto shadowMap = renderGraph.importImage("shadow cube map", shadowMapTexture);
+        std::vector<ResourceHandle> cubeFaceResources;
+        float nearPlane = 0.001f;
+        float farPlane = 25.0f;
+        glm::mat4 shadowProj = glm::perspective(glm::radians(90.0f), 1.0f, nearPlane, farPlane);
+        auto& light = sceneData.lightBuffer.lights[i];
+        glm::vec3 lightPos = light.pos;
+        std::vector<glm::mat4> shadowTransforms;
+        shadowTransforms.push_back(shadowProj *
+            glm::lookAt(lightPos, lightPos + glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
+        shadowTransforms.push_back(shadowProj *
+            glm::lookAt(lightPos, lightPos + glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)));
+        shadowTransforms.push_back(shadowProj *
+            glm::lookAt(lightPos, lightPos + glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0)));
+        shadowTransforms.push_back(shadowProj *
+            glm::lookAt(lightPos, lightPos + glm::vec3(0.0, -1.0, 0.0), glm::vec3(0.0, 0.0, -1.0)));
+        shadowTransforms.push_back(shadowProj *
+            glm::lookAt(lightPos, lightPos + glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, -1.0, 0.0)));
+        shadowTransforms.push_back(shadowProj *
+            glm::lookAt(lightPos, lightPos + glm::vec3(0.0, 0.0, -1.0), glm::vec3(0.0, -1.0, 0.0)));
+        for (size_t j = 0; j < 6; ++j) {
+            auto depthBuffer = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::UPLOADABLE, TextureFormat::DEPTH32F, 1, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1);
+            RenderAttachments att = {};
+            att.depth = depthBuffer;
+            auto rt = renderGraph.createRenderTargetSC(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, att);
+            auto shadowFace = renderGraph.importImage("shadow cube face", depthBuffer);
+
+            PointShadowUniformBuffer uniformBuffer;
+            uniformBuffer.lightPos = light.pos;
+            uniformBuffer.farPlane = farPlane;
+            uniformBuffer.lightVP = shadowTransforms[j];
+            auto ub = renderGraph.createTempUniformBuffer((void*)&uniformBuffer, sizeof(PointShadowUniformBuffer));
+
+
+            renderGraph.addFramePass({
+                    .name = "build point shadow face",
+                    .resources = {
+                        {{shadowFace}, ResourceAccessType::DepthWrite },
+                    },
+                    .func = [this, scene, &sceneData, ub, rt, &inflight, &transformBuffers](FrameGraph& rg, FrameGraphContext& ctx) {
+                            PipelineState pipe = {};
+                            pipe.program = this->pointShadowGenProgram;
+                            pipe.depthTest.enabled = 1;
+                            pipe.depthTest.write = 1;
+                            pipe.depthTest.compareOp = CompareOp::LESS;
+                            RenderPassParams params;
+                            driver.beginRenderPass(rt, params);
+                            for (size_t i = 0; i < sceneData.geometries.size(); ++i) {
+                                auto& geom = sceneData.geometries[i];
+                                pipe.bindUniformBuffer(0, 0, transformBuffers[i]);
+                                pipe.bindUniformBuffer(0, 1, ub);
+                                  
+                                driver.draw(pipe, geom.primitive.hwInstance);
+                            }
+                            driver.endRenderPass();
+                    },
+             });
+            cubeFaceResources.push_back(shadowFace);
+        }
+        renderGraph.addFramePass({
+            .name = "blit to shadow cube map",
+            .resources = {
+                {cubeFaceResources, ResourceAccessType::TransferRead },
+                {{shadowMap}, ResourceAccessType::TransferWrite}
+            },
+            .func = [this, scene, &sceneData, cubeFaceResources, shadowMap, &inflight](FrameGraph& rg, FrameGraphContext& ctx) {
+                auto dest = ctx.unwrapTextureHandle(shadowMap);
+                for (size_t i = 0; i < 6; ++i) {
+                    auto tex = ctx.unwrapTextureHandle(cubeFaceResources[i]);
+                    ImageSubresource destIndex{};
+                    destIndex.baseLayer = i;
+                    destIndex.baseLevel = 0;
+                    ImageSubresource srcIndex{};
+                    srcIndex.baseLayer = 0;
+                    srcIndex.baseLevel = 0;
+                    driver.blitTexture(dest, destIndex, tex, srcIndex);
+                }
+            },
+        });
+        shadowMapResources.push_back(shadowMap);
+        shadowMaps.emplace(i, shadowMapTexture);
+    }
 
 
     renderGraph.addFramePass({
@@ -803,7 +903,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "probe ray gens",
         .resources = {
-            { rayBuffer, ResourceAccessType::ComputeWrite },
+            { {rayBuffer}, ResourceAccessType::ComputeWrite },
         },
         .func = [this, scene, &sceneData, &inflight, sceneBuffer, rayBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             glm::uvec3 gridNum = scene->ddgi.gridNum;
@@ -823,8 +923,8 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "intersect",
         .resources = {
-            { rayBuffer, ResourceAccessType::ComputeRead },
-            { hitBuffer, ResourceAccessType::ComputeWrite },
+            { {rayBuffer}, ResourceAccessType::ComputeRead },
+            { {hitBuffer}, ResourceAccessType::ComputeWrite },
         },
         .func = [this, scene, &sceneData, &inflight, sceneBuffer, rayBuffer, hitBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             glm::uvec3 gridNum = scene->ddgi.gridNum;
@@ -838,12 +938,12 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "ray gbuffer gen",
         .resources = {
-            { hitBuffer, ResourceAccessType::ComputeRead },
-            { rayGPositionBuffer, ResourceAccessType::ComputeWrite },
-            { rayGNormalBuffer, ResourceAccessType::ComputeWrite },
-            { rayGDiffuseBuffer, ResourceAccessType::ComputeWrite },
-            { rayGEmissionBuffer, ResourceAccessType::ComputeWrite },
-            { distanceBuffer , ResourceAccessType::ComputeWrite },
+            { {hitBuffer}, ResourceAccessType::ComputeRead },
+            { {rayGNormalBuffer}, ResourceAccessType::ComputeWrite },
+            { {rayGDiffuseBuffer}, ResourceAccessType::ComputeWrite },
+            { {rayGEmissionBuffer}, ResourceAccessType::ComputeWrite },
+            { {distanceBuffer}, ResourceAccessType::ComputeWrite },
+            {{rayGPositionBuffer}, ResourceAccessType::ComputeWrite},
         },
         .func = [this, scene, probeNum, &sceneData, &inflight, &diffuseMap, &vertexPositionBuffers, &vertexNormalBuffers, &vertexUVBuffers, rayGEmissionBuffer, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             DDGIPushConstants constants = {};
@@ -869,14 +969,15 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "ray gbuffer shade",
         .resources = {
-            { rayGPositionBuffer, ResourceAccessType::FragmentRead },
-            { rayGNormalBuffer, ResourceAccessType::FragmentRead },
-            { rayGDiffuseBuffer, ResourceAccessType::FragmentRead },
-            { rayGEmissionBuffer, ResourceAccessType::FragmentRead },
-            { probeTex, ResourceAccessType::FragmentRead },
-            { randianceBuffer , ResourceAccessType::ColorWrite },
+            { {rayGPositionBuffer}, ResourceAccessType::FragmentRead },
+            { {rayGNormalBuffer}, ResourceAccessType::FragmentRead },
+            { {rayGDiffuseBuffer}, ResourceAccessType::FragmentRead },
+            { {rayGEmissionBuffer}, ResourceAccessType::FragmentRead },
+            { {probeTex}, ResourceAccessType::FragmentRead },
+            { shadowMapResources, ResourceAccessType::FragmentRead},
+            { {randianceBuffer}, ResourceAccessType::ColorWrite },
         },
-        .func = [this, scene, probeNum, &sceneData, &inflight, lightUB, rayGEmissionBuffer, & diffuseMap, sceneBuffer, radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer, probeTex](FrameGraph& rg, FrameGraphContext& ctx) {
+        .func = [this, scene, probeNum, &sceneData, &inflight, &shadowMapResources, lightUB, rayGEmissionBuffer, &diffuseMap, sceneBuffer, radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer, probeTex](FrameGraph& rg, FrameGraphContext& ctx) {
             auto& camera = scene->getCamera();
             PipelineState pipe = {};
             pipe.program = this->ddgiShadeProgram;
@@ -887,6 +988,8 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindTextureResource(pipe, 1, 2, rayGDiffuseBuffer);
             ctx.bindTextureResource(pipe, 1, 3, rayGEmissionBuffer);
             ctx.bindTextureResource(pipe, 1, 4, probeTex);
+            auto sms = ctx.unwrapTextureHandleArray(shadowMapResources);
+            pipe.bindTextureArray(1, 5, sms.data(), sms.size());
             RenderPassParams params;
             driver.beginRenderPass(radianceRenderTarget, params);
             driver.draw(pipe, quadPrimitive);
@@ -899,12 +1002,12 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "probe update",
         .resources = {
-            { rayBuffer, ResourceAccessType::ComputeRead },
-            { randianceBuffer, ResourceAccessType::ComputeRead },
-            { distanceBuffer, ResourceAccessType::ComputeRead },
-            { probeTex, ResourceAccessType::ComputeWrite },
-            { probeDistTex, ResourceAccessType::ComputeWrite },
-            { probeDistSquareTex, ResourceAccessType::ComputeWrite },
+            { {rayBuffer}, ResourceAccessType::ComputeRead },
+            { {randianceBuffer}, ResourceAccessType::ComputeRead },
+            { {distanceBuffer}, ResourceAccessType::ComputeRead },
+            { {probeTex}, ResourceAccessType::ComputeWrite },
+            { {probeDistTex}, ResourceAccessType::ComputeWrite },
+            { {probeDistSquareTex}, ResourceAccessType::ComputeWrite },
         },
         .func = [this, scene, probeNum, &sceneData, &inflight, &diffuseMap, rayBuffer, randianceBuffer, distanceBuffer, probeTex, probeDistTex, probeDistSquareTex](FrameGraph& rg, FrameGraphContext& ctx) {
             DDGIPushConstants constants = {};
@@ -921,8 +1024,8 @@ void Renderer::ddgiSuite(Scene* scene) {
         },
     });
     
-    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
-    auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT);
+    auto color = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, 1, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT,1);
+    auto depth = renderGraph.createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F,1, HwTexture::FRAME_WIDTH, HwTexture::FRAME_HEIGHT,1);
     RenderAttachments att2 = {};
     att2.colors[0] = color;
     att2.depth = depth;
@@ -936,13 +1039,12 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "gbuffer gen",
         .resources = {
-            { positionBuffer, ResourceAccessType::ColorWrite },
-            { normalBuffer, ResourceAccessType::ColorWrite },
-            { diffuseBuffer, ResourceAccessType::ColorWrite },
-            { emissionBuffer, ResourceAccessType::ColorWrite },
+            { {positionBuffer}, ResourceAccessType::ColorWrite },
+            { {normalBuffer}, ResourceAccessType::ColorWrite },
+            { {diffuseBuffer}, ResourceAccessType::ColorWrite },
+            { {emissionBuffer}, ResourceAccessType::ColorWrite },
         },
         .func = [this, scene, probeNum, &sceneData, &inflight, color, &materials, &materialBuffers, &transformBuffers, & diffuseMap, sceneBuffer, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
-            ZoneScopedN("A")
             PipelineState pipe = {};
             pipe.program = this->gbufferGenProgram;
             pipe.depthTest.enabled = 1;
@@ -955,10 +1057,9 @@ void Renderer::ddgiSuite(Scene* scene) {
                 pipe.bindUniformBuffer(0, 0, transformBuffers[i]);
                 pipe.bindUniformBuffer(0, 1, materialBuffers[i]);
                 if (materials[i].typeID == MATERIAL_DIFFUSE_TEXTURE) {
-                    ZoneScopedN("C")
                     pipe.bindTexture(1, 0, diffuseMap[materials[i].diffuseMapIndex]);
                 } else {
-                    pipe.bindTexture(1, 0, color);
+                    pipe.bindTexture(1, 0, rayGbuffer->positionBuffer);
                 }
                 driver.draw(pipe, geom.primitive.hwInstance);
             }
@@ -969,14 +1070,15 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "deferred render",
         .resources = {
-            { positionBuffer, ResourceAccessType::FragmentRead },
-            { normalBuffer, ResourceAccessType::FragmentRead },
-            { diffuseBuffer, ResourceAccessType::FragmentRead },
-            { emissionBuffer, ResourceAccessType::FragmentRead },
-            { probeTex, ResourceAccessType::FragmentRead },
-            { renderedImage, ResourceAccessType::ColorWrite },
+            { {positionBuffer}, ResourceAccessType::FragmentRead },
+            { {normalBuffer}, ResourceAccessType::FragmentRead },
+            { {diffuseBuffer}, ResourceAccessType::FragmentRead },
+            { {emissionBuffer}, ResourceAccessType::FragmentRead },
+            { {probeTex}, ResourceAccessType::FragmentRead },
+             { shadowMapResources, ResourceAccessType::FragmentRead},
+            { {renderedImage}, ResourceAccessType::ColorWrite },
         },
-        .func = [this, scene, probeNum, &sceneData, &inflight, emissionBuffer, &diffuseMap, renderTarget, lightUB, sceneBuffer, probeTex, rayBuffer, hitBuffer, distanceBuffer, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
+        .func = [this, scene, probeNum, &sceneData, &inflight, &shadowMapResources, emissionBuffer, &diffuseMap, renderTarget, lightUB, sceneBuffer, probeTex, rayBuffer, hitBuffer, distanceBuffer, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg, FrameGraphContext& ctx) {
             
             auto& camera = scene->getCamera();
             PipelineState pipe = {};
@@ -989,6 +1091,8 @@ void Renderer::ddgiSuite(Scene* scene) {
             ctx.bindTextureResource(pipe, 1, 2, diffuseBuffer);
             ctx.bindTextureResource(pipe, 1, 3, emissionBuffer);
             ctx.bindTextureResource(pipe, 1, 4, probeTex);
+            auto sms = ctx.unwrapTextureHandleArray(shadowMapResources);
+            pipe.bindTextureArray(1, 5, sms.data(), sms.size());
             RenderPassParams params;
             driver.beginRenderPass(renderTarget, params);
             driver.draw(pipe, quadPrimitive);
@@ -999,7 +1103,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     renderGraph.addFramePass({
         .name = "blit",
         .resources = {
-            { renderedImage, ResourceAccessType::FragmentRead },
+            { {renderedImage}, ResourceAccessType::FragmentRead },
         },
         .func = [this, scene, probeNum, &sceneData, &inflight, &diffuseMap, renderedImage](FrameGraph& rg, FrameGraphContext& ctx) {
             PipelineState pipe = {};

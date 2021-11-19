@@ -14,6 +14,8 @@ struct FrameGraphContext;
 using FramePassFunc = std::function<void(FrameGraph& fg, FrameGraphContext& ctx)>;
 
 enum class ResourceAccessType {
+    TransferRead,
+    TransferWrite,
     ComputeWrite,
     DepthWrite,
     ColorWrite,
@@ -26,6 +28,7 @@ static inline bool isWriteAccessType(const ResourceAccessType& access) {
         case ResourceAccessType::ComputeWrite:
         case ResourceAccessType::ColorWrite:
         case ResourceAccessType::DepthWrite:
+        case ResourceAccessType::TransferWrite:
             return true;
         default:
             return false;
@@ -37,6 +40,7 @@ static inline bool isReadAccessType(const ResourceAccessType& access) {
     switch (access) {
         case ResourceAccessType::FragmentRead:
         case ResourceAccessType::ComputeRead:
+        case ResourceAccessType::TransferRead:
             return true;
         default:
             return false;
@@ -84,6 +88,12 @@ class ResourceHandle {
 };
 
 struct FramePassResource {
+    std::vector<ResourceHandle> resource;
+    ResourceAccessType accessType;
+};
+
+
+struct BakedPassResource {
     ResourceHandle resource;
     ResourceAccessType accessType;
 };
@@ -139,9 +149,9 @@ class FrameGraph {
         BakedPass() = default;
         std::string name;
         FramePassFunc func;
-        std::vector<FramePassResource> outputs;
-        std::vector<FramePassResource> inputs;
-        std::unordered_map<uint32_t, FramePassResource> resources;
+        std::vector<BakedPassResource> outputs;
+        std::vector<BakedPassResource> inputs;
+        std::unordered_map<uint32_t, BakedPassResource> resources;
         std::vector<Barrier> barriers;
         std::vector<Barrier> postBarriers;
     };
@@ -194,6 +204,7 @@ struct FrameGraphContext {
 
     Handle<HwTexture> unwrapTextureHandle(ResourceHandle handle);
     Handle<HwBufferObject> unwrapBufferHandle(ResourceHandle handle);
+    std::vector<Handle<HwTexture>> unwrapTextureHandleArray(std::vector<ResourceHandle> handles);
 
 
   private:

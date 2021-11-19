@@ -2,6 +2,7 @@
 
 #define MAX_LIGHTS 64
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_nonuniform_qualifier : require
 
 #include "common.glsl"
 
@@ -34,6 +35,7 @@ layout(set=1,binding = 1) uniform sampler2D normalBuffer;
 layout(set=1,binding = 2) uniform sampler2D diffuseBuffer;
 layout(set=1,binding = 3) uniform sampler2D emissionBuffer;
 layout(set=1,binding = 4) uniform sampler2D probeIrradianceMap;
+layout(set=1,binding = 5) uniform samplerCube pointShadowMaps[MAX_LIGHTS];
 
 layout( push_constant ) uniform PushConstants {
     vec3 cameraPos;
@@ -94,6 +96,16 @@ void main() {
 
     for (int i = 0; i < light.numLights; i++) {
         vec3 lightV = light.light[i].pos - pos;
+        float depth = length(lightV);
+        vec3 p = normalize(-lightV);
+        //p.y *= -1.0;
+        //p.z *= -1.0;
+        //p.x *= -1.0;
+        float dist = texture(pointShadowMaps[nonuniformEXT(i)], vec3(p)).r;
+        dist *= 25.0f;
+        if (depth - 0.01 > dist) {
+            continue;
+        }
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);
         float dis = length(lightV);

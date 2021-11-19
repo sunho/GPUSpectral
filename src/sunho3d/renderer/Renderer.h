@@ -26,6 +26,12 @@ struct TransformBuffer {
     glm::vec4 cameraPos;
 };
 
+struct PointShadowUniformBuffer {
+    glm::mat4 lightVP;
+    glm::vec3 lightPos;
+    float farPlane;
+};
+
 #define MATERIAL_DIFFUSE_TEXTURE 1
 #define MATERIAL_DIFFUSE_COLOR 2
 #define MATERIAL_EMISSION 3
@@ -96,11 +102,11 @@ struct DDGIPassContext {
 
 struct GBuffer {
     GBuffer(VulkanDriver& driver, uint32_t width, uint32_t height) {
-        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
-        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
-        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
-        emissionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, width, height);
-        depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::DEPTH32F, width, height);
+        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        emissionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::DEPTH32F, 1, width, height, 1);
         RenderAttachments atts = {};
         atts.colors[0] = positionBuffer;
         atts.colors[1] = normalBuffer;
@@ -148,6 +154,7 @@ class Renderer : public IdResource {
     Handle<HwProgram> ddgiShadeProgram;
     Handle<HwProgram> ddgiProbeUpdateProgram;
     Handle<HwProgram> deferredRenderProgram;
+    Handle<HwProgram> pointShadowGenProgram;
 
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
@@ -155,6 +162,7 @@ class Renderer : public IdResource {
     std::array<InflightData, MAX_INFLIGHTS> inflights;
     
     std::unordered_map<uint32_t, Handle<HwBLAS> > blasMap;
+    std::unordered_map<uint32_t, Handle<HwTexture>> shadowMaps;
 
     DDGIPassContext ddgiContext;
     std::unique_ptr<GBuffer> gbuffer;

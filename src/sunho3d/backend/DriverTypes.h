@@ -136,7 +136,8 @@ enum class TextureUsage : uint8_t {
     SAMPLEABLE = 0x4,
     UPLOADABLE = 0x8,
     INPUT_ATTACHMENT = 0x10,
-    STORAGE = 0x20
+    STORAGE = 0x20,
+    CUBE = 0x40
 };
 
 static TextureUsage operator|(TextureUsage lhs, TextureUsage rhs) {
@@ -196,6 +197,18 @@ struct BufferDescriptor {
     uint32_t* data;
     size_t size{};
 };
+
+struct ImageSubresource {
+    uint8_t baseLevel{};
+    uint32_t baseLayer{};
+    uint32_t layerCount{ 1 };
+};
+
+struct ImageDescriptor {
+    uint32_t* data{};
+    ImageSubresource subresource{};
+};
+
 
 struct Viewport {
     int32_t left;
@@ -278,7 +291,9 @@ enum class BarrierAccessFlag : uint32_t {
     SHADER_WRITE = 0x1,
     SHADER_READ = 0x2,
     DEPTH_STENCIL_WRITE = 0x4,
-    COLOR_WRITE = 0x8
+    COLOR_WRITE = 0x8,
+    TRANSFER_READ = 0x10,
+    TRANSFER_WRITE = 0x20
 };
 
 enum class ImageLayout {
@@ -287,6 +302,8 @@ enum class ImageLayout {
     SHADER_READ_ONLY_OPTIMAL,
     COLOR_ATTACHMENT_OPTIMAL,
     DEPTH_ATTACHMENT_OPTIMAL,
+    TRANSFER_SRC_OPTIMAL,
+    TRANSFER_DST_OPTIMAL,
     GENERAL
 };
 

@@ -7,17 +7,20 @@
 class VulkanTexture : public HwTexture {
   public:
     VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsage usage, uint8_t levels,
-                  TextureFormat format, uint32_t width, uint32_t height);
+                  TextureFormat format, uint32_t width, uint32_t height, uint32_t layers);
     ~VulkanTexture();
-    void update2DImage(VulkanDevice &device, const BufferDescriptor &data);
-    void copyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, VkImage image, uint32_t width,
-                           uint32_t height, uint32_t miplevel);
+    void copyInitialData(const BufferDescriptor &data);
+    void copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_t width,
+                           uint32_t height, const ImageSubresource& subresource);
+    void blitImage(vk::CommandBuffer cmd, VulkanTexture& srcImage, uint32_t width, uint32_t height, const ImageSubresource& srcSubresource, const ImageSubresource& dstSubresource);
     vk::Image image;
     vk::ImageView view;
     vk::Format vkFormat;
     vk::Sampler sampler;
+    vk::ImageAspectFlags aspect;
     vk::ImageLayout vkImageLayout;
     ImageLayout imageLayout{ImageLayout::GENERAL};
+    uint32_t layers;
 
   private:
     AllocatedImage _image;

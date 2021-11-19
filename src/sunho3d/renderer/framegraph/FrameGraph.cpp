@@ -66,10 +66,14 @@ static std::pair<BarrierStageMask, BarrierAccessFlag> convertAccessTypeToBarrier
             return std::make_pair(BarrierStageMask::FRAGMENT_SHADER, BarrierAccessFlag::SHADER_READ);
         case ResourceAccessType::DepthWrite:
             return std::make_pair(BarrierStageMask::EARLY_FRAGMENT_TESTS | BarrierStageMask::LATE_FRAGMENT_TESTS, BarrierAccessFlag::DEPTH_STENCIL_WRITE);     
+        case ResourceAccessType::TransferRead:
+            return std::make_pair(BarrierStageMask::TRANSFER, BarrierAccessFlag::TRANSFER_READ);
+        case ResourceAccessType::TransferWrite:
+            return std::make_pair(BarrierStageMask::TRANSFER, BarrierAccessFlag::TRANSFER_WRITE);
     }
 }
 
-static Barrier generateBufferBarrier(const FramePassResource& prev, const FramePassResource& current) {
+static Barrier generateBufferBarrier(const BakedPassResource& prev, const BakedPassResource& current) {
     Barrier barrier = {};
     auto src = convertAccessTypeToBarrierStage(prev.accessType);
     barrier.srcStage = src.first;
@@ -92,10 +96,14 @@ static ImageLayout decideImageLayout(const ResourceAccessType& type) {
             return ImageLayout::SHADER_READ_ONLY_OPTIMAL;
         case ResourceAccessType::DepthWrite:
             return ImageLayout::DEPTH_ATTACHMENT_OPTIMAL;
+        case ResourceAccessType::TransferRead:
+            return ImageLayout::TRANSFER_SRC_OPTIMAL;
+        case ResourceAccessType::TransferWrite:
+            return ImageLayout::TRANSFER_DST_OPTIMAL;
     }
 }
 
-static Barrier generateImageBarrier(const FramePassResource& prev, const FramePassResource& current, Handle<HwTexture> image) {
+static Barrier generateImageBarrier(const BakedPassResource& prev, const BakedPassResource& current, Handle<HwTexture> image) {
     Barrier barrier = {};
     auto src = convertAccessTypeToBarrierStage(prev.accessType);
     barrier.srcStage = src.first;
@@ -251,12 +259,15 @@ void FrameGraph::run() {
 
 FrameGraph::BakedPass::BakedPass(FramePass pass) : name(pass.name), func(pass.func) {
     for (auto res : pass.resources) {
-        if (isWriteAccessType(res.accessType)) {
-            outputs.push_back(res);
-        } else {
-            inputs.push_back(res);
+        for (auto r : res.resource) {
+            if (isWriteAccessType(res.accessType)) {
+                outputs.push_back({ r, res.accessType });
+            }
+            else {
+                inputs.push_back({ r, res.accessType });
+            }
+            resources.emplace(r.getId(), BakedPassResource{ r, res.accessType });
         }
-        resources.emplace(res.resource.getId(), res);
     }
 }
 
@@ -286,4 +297,13 @@ Handle<HwTexture> FrameGraphContext::unwrapTextureHandle(ResourceHandle handle) 
 Handle<HwBufferObject> FrameGraphContext::unwrapBufferHandle(ResourceHandle handle) {
     assert(handle.getType() == ResourceType::Buffer);
     return *parent.getResource<Handle<HwBufferObject>>(handle);
+}
+
+std::vector<Handle<HwTexture>> FrameGraphContext::unwrapTextureHandleArray(std::vector<ResourceHandle> handles)
+{
+    std::vector<Handle<HwTexture>> textures;
+    for (auto handle : handles) {
+        textures.push_back(unwrapTextureHandle(handle));
+    }
+    return textures;
 }

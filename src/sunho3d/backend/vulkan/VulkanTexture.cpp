@@ -3,41 +3,43 @@
 #include "VulkanBuffer.h"
 #include <Tracy.hpp>
 
-inline static AllocatedImage createImage(VulkanDevice &device, uint32_t width, uint32_t height, vk::Format format,
-                               vk::ImageTiling tiling, vk::ImageUsageFlags usage) {
+inline static AllocatedImage createImage(VulkanDevice &device, uint8_t levels, uint32_t width, uint32_t height, uint32_t layers, vk::Format format,
+                               vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags createFlags) {
     vk::ImageCreateInfo imageInfo = {};
     imageInfo.imageType = vk::ImageType::e2D;
     imageInfo.extent.width = width;
     imageInfo.extent.height = height;
     imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
+    imageInfo.mipLevels = levels;
+    imageInfo.arrayLayers = layers;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
+    imageInfo.flags = createFlags;
     imageInfo.initialLayout = vk::ImageLayout::eUndefined;
     imageInfo.usage = usage;
     imageInfo.samples = vk::SampleCountFlagBits::e1;
     return device.allocateImage(imageInfo, VMA_MEMORY_USAGE_GPU_ONLY);
 }
 
-static VkImageView createImageView(VulkanDevice &device, vk::Image image, vk::Format format,
+inline static VkImageView createImageView(VulkanDevice &device, vk::Image image, vk::Format format, uint8_t levels, uint32_t layers,
                                    vk::ImageAspectFlags aspectFlags) {
     vk::ImageViewCreateInfo viewInfo = {};
     viewInfo.image = image;
-    viewInfo.viewType = vk::ImageViewType::e2D;
+    // TODO: 
+    viewInfo.viewType = layers == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::eCube;
     viewInfo.format = format;
     viewInfo.subresourceRange.aspectMask = aspectFlags;
     viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.levelCount = levels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
+    viewInfo.subresourceRange.layerCount = layers;
 
     return device.device.createImageView(viewInfo);
 }
 
 VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsage usage,
-                             uint8_t levels, TextureFormat format, uint32_t w, uint32_t h)
-    : HwTexture(type, levels, format, w, h), device(device) {
+                             uint8_t levels, TextureFormat format, uint32_t w, uint32_t h, uint32_t layers)
+    : HwTexture(type, levels, format, w, h), device(device), layers(layers) {
     ZoneScopedN("Texture create")
     if (width == HwTexture::FRAME_WIDTH) {
         width = device.wsi->getExtent().width;
@@ -48,6 +50,7 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
     
     const vk::ImageUsageFlags blittable =  vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc;
     vk::ImageUsageFlags flags{};
+    vk::ImageCreateFlags createFlags{};
     if (usage & TextureUsage::SAMPLEABLE) {
         flags |= vk::ImageUsageFlagBits::eSampled;
     }
@@ -68,28 +71,18 @@ VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsag
         flags |= vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled;
         flags |= blittable;
     }
-    vkFormat = translateTextureFormat(format);
-    vk::ImageAspectFlags aspect = usage & TextureUsage::DEPTH_ATTACHMENT ? vk::ImageAspectFlagBits::eDepth :
-                                                                         vk::ImageAspectFlagBits::eColor;
-
-    /*
-    imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-    if (usage & TextureUsage::DEPTH_ATTACHMENT) {
-        imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    if (usage & TextureUsage::CUBE) {
+        createFlags |= vk::ImageCreateFlagBits::eCubeCompatible;
     }
-    if (usage & TextureUsage::COLOR_ATTACHMENT) {
-        imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    }*/
+    vkFormat = translateTextureFormat(format);
+    aspect = usage & TextureUsage::DEPTH_ATTACHMENT ? vk::ImageAspectFlagBits::eDepth : vk::ImageAspectFlagBits::eColor;
 
-    vkImageLayout = vk::ImageLayout::eGeneral;
+    vkImageLayout = vk::ImageLayout::eUndefined;
+    imageLayout = ImageLayout::NONE;
 
-    _image = createImage(device, width, height, vkFormat, vk::ImageTiling::eOptimal, flags);
+    _image = createImage(device, levels, width, height, layers, vkFormat, vk::ImageTiling::eOptimal, flags, createFlags);
     image = _image.image;
-    view = createImageView(device, image, vkFormat, aspect);
-
-    
-    //if ((usage & TextureUsage::DEPTH_ATTACHMENT) || (usage & TextureUsage::COLOR_ATTACHMENT)) [
-    //}
+    view = createImageView(device, image, vkFormat, levels, layers, aspect);
 
     vk::SamplerCreateInfo samplerInfo{};
     samplerInfo.magFilter = vk::Filter::eLinear;
@@ -119,8 +112,7 @@ VulkanTexture::~VulkanTexture() {
     _image.destroy(device);
 }
 
-void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &data) {
-
+void VulkanTexture::copyInitialData(const BufferDescriptor &data) {
     auto bi = vk::BufferCreateInfo().setSize(width * height * getTextureFormatSize(format)).setUsage(vk::BufferUsageFlagBits::eTransferSrc);
     auto staging = device.allocateBuffer(bi, VMA_MEMORY_USAGE_CPU_ONLY);
     {
@@ -137,7 +129,7 @@ void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &
 		range.levelCount = 1;
 		range.baseArrayLayer = 0;
 		range.layerCount = 1;
-        range.aspectMask = vk::ImageAspectFlagBits::eColor;
+        range.aspectMask = aspect;
 
 		vk::ImageMemoryBarrier imageBarrier_toTransfer = {};
 		imageBarrier_toTransfer.oldLayout = vk::ImageLayout::eUndefined;
@@ -155,7 +147,7 @@ void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &
         copyRegion.bufferRowLength = 0;
         copyRegion.bufferImageHeight = 0;
 
-        copyRegion.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+        copyRegion.imageSubresource.aspectMask = aspect;
         copyRegion.imageSubresource.mipLevel = 0;
         copyRegion.imageSubresource.baseArrayLayer = 0;
         copyRegion.imageSubresource.layerCount = 1;
@@ -166,30 +158,46 @@ void VulkanTexture::update2DImage(VulkanDevice &device, const BufferDescriptor &
         vk::ImageMemoryBarrier imageBarrier_toReadable = imageBarrier_toTransfer;
 
         imageBarrier_toReadable.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-        imageBarrier_toReadable.newLayout = vk::ImageLayout::eGeneral;
+        imageBarrier_toReadable.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
         imageBarrier_toReadable.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
         imageBarrier_toReadable.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
         cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, nullptr, nullptr, imageBarrier_toReadable);
     });
     staging.destroy(device);
+
+    imageLayout = ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+    vkImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
 }
 
-void VulkanTexture::copyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, VkImage image,
-                                      uint32_t width, uint32_t height, uint32_t miplevel) {
-    VkBufferImageCopy region{};
+void VulkanTexture::copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_t width, uint32_t height, const ImageSubresource& subresource) {
+    vk::BufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
-
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = miplevel;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { width, height, 1 };
-    vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    region.imageSubresource.aspectMask = aspect;
+    region.imageSubresource.mipLevel = subresource.baseLevel;
+    region.imageSubresource.baseArrayLayer = subresource.baseLayer;
+    region.imageSubresource.layerCount = subresource.layerCount;
+    region.imageOffset = vk::Offset3D{ 0, 0, 0 };
+    region.imageExtent = vk::Extent3D{ width, height, 1 };
+    cmd.copyBufferToImage(buffer, image, vkImageLayout, 1, &region);
 }
+
+void VulkanTexture::blitImage(vk::CommandBuffer cmd, VulkanTexture& srcImage, uint32_t width, uint32_t height, const ImageSubresource& srcSubresource, const ImageSubresource& dstSubresource) {
+    vk::ImageBlit blit{};
+    blit.srcOffsets[0] = vk::Offset3D{ 0,0,0 };
+    blit.srcOffsets[1] = vk::Offset3D{ (int32_t)width,(int32_t)height,1 };
+    blit.dstOffsets[0] = vk::Offset3D{ 0,0,0 };
+    blit.dstOffsets[1] = vk::Offset3D{ (int32_t)width,(int32_t)height,1 };
+    blit.srcSubresource.aspectMask = aspect;
+    blit.dstSubresource.aspectMask = aspect;
+    blit.srcSubresource.baseArrayLayer = srcSubresource.baseLayer;
+    blit.srcSubresource.mipLevel = srcSubresource.baseLevel;
+    blit.srcSubresource.layerCount = srcSubresource.layerCount;
+    blit.dstSubresource.baseArrayLayer = dstSubresource.baseLayer;
+    blit.dstSubresource.mipLevel = dstSubresource.baseLevel;
+    blit.dstSubresource.layerCount = dstSubresource.layerCount;
+    cmd.blitImage(srcImage.image, srcImage.vkImageLayout, image, vkImageLayout, 1, &blit, vk::Filter::eNearest);
+}
+
