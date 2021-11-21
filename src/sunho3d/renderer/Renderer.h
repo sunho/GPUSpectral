@@ -127,9 +127,10 @@ struct GBuffer {
 
 constexpr static size_t MAX_INFLIGHTS = 3; 
 
+class Engine;
 class Renderer : public IdResource {
   public:
-    Renderer(Window* window);
+    Renderer(Engine& engine, Window* window);
     ~Renderer();
 
     VulkanDriver& getDriver() {
@@ -138,6 +139,8 @@ class Renderer : public IdResource {
     void run(Scene* scene);
 
   private:
+    Handle<HwProgram> loadComputeShader(const std::string& filename);
+    Handle<HwProgram> loadGraphicsShader(const std::string& vertFilename, const std::string& fragFilename);
     void registerPrograms();
     void rasterSuite(Scene* scene);
     void deferSuite(Scene* scene);
@@ -163,7 +166,7 @@ class Renderer : public IdResource {
     std::array<InflightData, MAX_INFLIGHTS> inflights;
     
     std::unordered_map<uint32_t, Handle<HwBLAS> > blasMap;
-    std::unordered_map<uint32_t, Handle<HwTexture>> shadowMaps;
+    std::unordered_map<uint32_t, Handle<HwTexture>> shadowMapCache;
 
     DDGIPassContext ddgiContext;
     std::unique_ptr<GBuffer> gbuffer;
@@ -173,6 +176,7 @@ class Renderer : public IdResource {
     Handle<HwTexture> probeDistSquareTexture;
 
     VulkanDriver driver;
+    Engine& engine;
     Window* window;
 
     size_t currentFrame{0};

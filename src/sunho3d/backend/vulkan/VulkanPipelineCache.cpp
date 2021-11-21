@@ -342,7 +342,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
 VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgram &program) {
     ZoneScopedN("PipelineCache create compute pipeline")
     auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout, true);
-    auto it = computePipelines.get(program.program.hash());
+    auto it = computePipelines.get(program.program.hash);
     if (it) {
         return { *it, pipelineLayout.pipelineLayout };
     }
@@ -355,7 +355,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgr
     createInfo.layout = pipelineLayout.pipelineLayout;
     createInfo.stage = shaderStageInfo;
     vk::Pipeline pipeline = device.device.createComputePipeline(nullptr, createInfo, nullptr);
-    computePipelines.add(program.program.hash(), pipeline);
+    computePipelines.add(program.program.hash, pipeline);
     return {
         pipeline, pipelineLayout.pipelineLayout
     };

@@ -22,8 +22,8 @@
 
 using namespace sunho3d;
 
-Loader::Loader(Engine &engine, Renderer &renderer, const std::filesystem::path& basepath)
-    : engine(engine), renderer(renderer), basepath(basepath) {
+Loader::Loader(Engine &engine, Renderer &renderer)
+    : engine(engine), renderer(renderer) {
 }
 
 Scene *Loader::loadGLTF(const std::string &path) {
@@ -112,9 +112,9 @@ Scene *Loader::loadMitsuba(const std::string &path) {
             if (obj->pluginType() == "obj") {
                 filename = obj->property("filename").getString();
             } else if (obj->pluginType() == "rectangle") {
-                filename = (basepath / "rect.obj").string();
+                filename = engine.assetPath("rect.obj");
             } else if (obj->pluginType() == "cube") {
-                filename = (basepath / "box.obj").string();
+                filename = engine.assetPath("box.obj");
             }
             auto mesh = loadOrGetMesh((p / filename).string());
             auto transform = obj->property("to_world").getTransform();

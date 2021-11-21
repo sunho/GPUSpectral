@@ -11,7 +11,7 @@
 class FrameGraph;
 struct FrameGraphContext;
 
-using FramePassFunc = std::function<void(FrameGraph& fg, FrameGraphContext& ctx)>;
+using FramePassFunc = std::function<void(FrameGraph& fg)>;
 
 enum class ResourceAccessType {
     TransferRead,
@@ -87,25 +87,29 @@ class ResourceHandle {
     ResourceType type{ResourceType::None};
 };
 
-struct FramePassResource {
-    std::vector<ResourceHandle> resource;
-    ResourceAccessType accessType;
-};
-
-
 struct BakedPassResource {
     ResourceHandle resource;
     ResourceAccessType accessType;
 };
 
+struct FramePassTexture {
+    std::vector<Handle<HwTexture>> resource;
+    ResourceAccessType accessType;
+};
+
+struct FramePassBuffer {
+    std::vector<Handle<HwBufferObject>> resource;
+    ResourceAccessType accessType;
+};
+
 struct FramePass {
     std::string name;
-    std::vector<FramePassResource> resources;
+    std::vector<FramePassTexture> textures;
+    std::vector<FramePassBuffer> buffers;
     FramePassFunc func;
 };
 
 struct Resource {
-    std::string name;
     ResourceType type;
     FixedVector<char> data;
 };
@@ -113,14 +117,13 @@ struct Resource {
 class FrameGraph {
   public:
     friend class FrameGraphContext;
+    friend class BakedPass;
     FrameGraph(sunho3d::VulkanDriver& driver);
     ~FrameGraph();
 
     void submit();
 
     void addFramePass(FramePass pass);
-    ResourceHandle importImage(std::string name, Handle<HwTexture> image);
-    ResourceHandle importBuffer(std::string name, Handle<HwBufferObject> buffer);
     Handle<HwBufferObject> createTempUniformBuffer(void* data, size_t size);
 
 #define SCRATCH_IMPL(RESOURCENAME, METHODNAME)                        \
@@ -145,7 +148,7 @@ class FrameGraph {
 
   private:
     struct BakedPass {
-        explicit BakedPass(FramePass pass);
+        explicit BakedPass(FrameGraph& fg, FramePass pass);
         BakedPass() = default;
         std::string name;
         FramePassFunc func;
@@ -169,9 +172,8 @@ class FrameGraph {
     }
 
     template <typename T>
-    ResourceHandle declareResource(const std::string& name, ResourceType type) {
+    ResourceHandle declareResource(ResourceType type) {
         Resource resource = {
-            .name = name,
             .type = type,
             .data = FixedVector<char>(sizeof(T)),
         };
@@ -179,7 +181,29 @@ class FrameGraph {
         return ResourceHandle(nextId++, type);
     }
 
+    ResourceHandle getOrRegisterTextureResource(Handle<HwTexture> tex) {
+        if (registeredTextures.find(tex.getId()) != registeredTextures.end()) {
+            return registeredTextures.at(tex.getId());
+        }
+        auto res = declareResource<Handle<HwTexture>>(ResourceType::Image);
+        *getResource<Handle<HwTexture>>(res) = tex;
+        registeredTextures.emplace(tex.getId(), res);
+        return res;
+    }
+
+    ResourceHandle getOrRegisterBufferResource(Handle<HwBufferObject> buf) {
+        if (registeredBuffers.find(buf.getId()) != registeredBuffers.end()) {
+            return registeredBuffers.at(buf.getId());
+        }
+        auto res = declareResource<Handle<HwBufferObject>>(ResourceType::Buffer);
+        *getResource<Handle<HwBufferObject>>(res) = buf;
+        registeredBuffers.emplace(buf.getId(), res);
+        return res;
+    }
+
     std::unordered_map<uint32_t, Resource> resources;
+    std::unordered_map<HandleBase::HandleId, ResourceHandle> registeredTextures;
+    std::unordered_map<HandleBase::HandleId, ResourceHandle> registeredBuffers;
     std::vector<FramePass> passes;
     BakedGraph bakedGraph;
     uint32_t nextId{ 1 };
@@ -191,22 +215,4 @@ class FrameGraph {
 
     std::vector<std::function<void()>> destroyers;
     sunho3d::VulkanDriver& driver;
-};
-
-struct FrameGraphContext {
-    FrameGraphContext(FrameGraph& parent)
-        : parent(parent) {
-    }
-
-    void bindTextureResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle);
-    void bindStorageImageResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle);
-    void bindStorageBufferResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle);
-
-    Handle<HwTexture> unwrapTextureHandle(ResourceHandle handle);
-    Handle<HwBufferObject> unwrapBufferHandle(ResourceHandle handle);
-    std::vector<Handle<HwTexture>> unwrapTextureHandleArray(std::vector<ResourceHandle> handles);
-
-
-  private:
-    FrameGraph& parent;
 };

@@ -118,5 +118,6 @@
         "*.inc": "cpp",
         "future": "cpp",
         "*.hlsl": "cpp"
-    }
+    },
+    "cmake.configureOnOpen": true
 }

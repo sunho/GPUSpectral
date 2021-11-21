@@ -24,23 +24,12 @@ set(SOURCE_LIST
     backend/vulkan/VulkanTexture.cpp
     backend/vulkan/VulkanRays.h
     backend/vulkan/VulkanRays.cpp
-    renderer/shaders/ForwardPhong.frag
-    renderer/shaders/ForwardPhong.vert
-    renderer/shaders/DisplayTexture.frag
-    renderer/shaders/DisplayTexture.vert
-    renderer/shaders/ForwardRT.frag
-    renderer/shaders/ForwardRT.vert
-    renderer/shaders/common.glsl
-    renderer/shaders/DDGIProbeRayGen.comp
-    renderer/shaders/DDGIProbeRayShade.comp
-    renderer/shaders/DDGIProbeUpdate.comp
-    renderer/shaders/DDGIShade.vert
-    renderer/shaders/DDGIShade.frag
     renderer/framegraph/FrameGraph.h
     renderer/framegraph/FrameGraph.cpp
     renderer/framegraph/Resource.h
     renderer/Renderer.h
     renderer/Renderer.cpp
+    utils/Log.h
     utils/ResourceList.h
     utils/FixedVector.h
     utils/Hash.h
@@ -69,7 +58,8 @@ set(SOURCE_LIST
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
 add_library(sunho3d ${SOURCE_LIST}) 
-target_link_libraries(sunho3d PUBLIC TracyClient tinyparser_mitsuba VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader radeonrays)
+target_link_libraries(sunho3d PUBLIC spirv-cross-core TracyClient tinyparser_mitsuba VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader radeonrays)
+target_link_libraries(sunho3d PRIVATE shaderc)
 target_include_directories(sunho3d PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 add_executable(embedfile utils/EmbedFile.c)
@@ -105,24 +95,3 @@ function(add_shader TARGET SHADENAME SHADER)
     file(WRITE ${CHEAD} "#pragma once\nextern \"C\" const char ${SHADENAME}[]; extern \"C\" const size_t ${SHADENAME}Size;")
 
 endfunction(add_shader)
-
-add_shader(sunho3d ForwardPhongVert ForwardPhong.vert)
-add_shader(sunho3d ForwardPhongFrag ForwardPhong.frag)
-
-add_shader(sunho3d DisplayTextureVert DisplayTexture.vert)
-add_shader(sunho3d DisplayTextureFrag DisplayTexture.frag)
-
-add_shader(sunho3d ForwardRTVert ForwardRT.vert)
-add_shader(sunho3d ForwardRTFrag ForwardRT.frag)
-
-add_shader(sunho3d DDGIProbeRayGen DDGIProbeRayGen.comp)
-add_shader(sunho3d DDGIProbeRayShade DDGIProbeRayShade.comp)
-add_shader(sunho3d DDGIProbeUpdate DDGIProbeUpdate.comp)
-add_shader(sunho3d DDGIShadeVert DDGIShade.vert)
-add_shader(sunho3d DDGIShadeFrag DDGIShade.frag)
-add_shader(sunho3d GBufferGenVert GBufferGen.vert)
-add_shader(sunho3d GBufferGenFrag GBufferGen.frag)
-add_shader(sunho3d DeferredRenderVert DeferredRender.vert)
-add_shader(sunho3d DeferredRenderFrag DeferredRender.frag)
-add_shader(sunho3d PointShadowGenVert PointShadowGen.vert)
-add_shader(sunho3d PointShadowGenFrag PointShadowGen.frag)

@@ -56,6 +56,8 @@ struct DriverContext {
     vk::RenderPass currentRenderPass{};
     Viewport viewport{};
     VulkanInflight* inflight{};
+    TracyVkCtx tracyContext{ nullptr };
+    std::string profileSectionName;
 };
 
 class VulkanDriver {
@@ -79,6 +81,7 @@ class VulkanDriver {
   private:
     void setupDebugMessenger();
     VulkanBindings translateBindingMap(const BindingMap& binds);
+    std::string profileZoneName(std::string zoneName);
     
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL
@@ -89,13 +92,13 @@ class VulkanDriver {
     VkDebugUtilsMessengerEXT debugMessenger;
 
     template <typename Dp, typename B>
-    Handle<B> alloc_handle() {
+    Handle<B> allocHandle() {
         handles[nextId] = HandleData(sizeof(Dp));
         return Handle<B>(nextId++);
     }
 
     template <typename Dp, typename B>
-    Dp *handle_cast(Handle<B> handle) noexcept {
+    Dp *handleCast(Handle<B> handle) noexcept {
         if (!handle)
             return nullptr;
         auto iter = handles.find(handle.getId());
@@ -105,7 +108,7 @@ class VulkanDriver {
     }
 
     template <typename Dp, typename B>
-    const Dp *handle_const_cast(const Handle<B> &handle) noexcept {
+    const Dp *handleConstCast(const Handle<B> &handle) noexcept {
         if (!handle)
             return nullptr;
         auto iter = handles.find(handle.getId());
@@ -114,7 +117,7 @@ class VulkanDriver {
     }
 
     template <typename Dp, typename B, typename... ARGS>
-    Dp *construct_handle(Handle<B> &handle, ARGS &&... args) noexcept {
+    Dp *constructHandle(Handle<B> &handle, ARGS &&... args) noexcept {
         if (!handle)
             return nullptr;
         auto iter = handles.find(handle.getId());
@@ -125,7 +128,7 @@ class VulkanDriver {
     }
 
     template <typename Dp, typename B>
-    void destruct_handle(const Handle<B> &handle) noexcept {
+    void destructHandle(const Handle<B> &handle) noexcept {
         auto iter = handles.find(handle.getId());
         HandleData &data = iter->second;
         reinterpret_cast<Dp *>(data.data())->~Dp();
@@ -138,9 +141,6 @@ class VulkanDriver {
     std::unique_ptr<VulkanDevice> device;
     std::unique_ptr<VulkanRayTracer> rayTracer;
     DriverContext context;
-    
-    TracyVkCtx tracyContext{ nullptr };
-    std::string profileZoneName;
 };
 
 }  // namespace sunho3d
