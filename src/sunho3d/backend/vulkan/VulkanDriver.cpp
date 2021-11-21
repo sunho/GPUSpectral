@@ -361,14 +361,14 @@ CompiledCode VulkanDriver::compileCode(const char* path) {
     core.SetMessageConsumer([](spv_message_level_t, const char*, const spv_position_t&, const char* message) {
         Log("Shader validation error: {}", message);
     });
-
+    /*
     spvtools::ValidatorOptions opts;
     opts.SetScalarBlockLayout(true);
     if (!core.Validate(compiledCode.data(), compiledCode.size(), opts))
     {
         Log("validation error");
         throw std::runtime_error("shader validation error");
-    }
+    }*/
     return compiledCode;
 }
 

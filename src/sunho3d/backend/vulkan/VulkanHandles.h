@@ -38,7 +38,7 @@ struct VulkanProgram : public HwProgram {
     VkShaderModule fragment;
     VkShaderModule compute;
 private:
-    void parseParameterLayout();
+    void parseParameterLayout(const CompiledCode& code);
 };
 
 struct VulkanAttachment {

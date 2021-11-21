@@ -59,8 +59,8 @@ set(SOURCE_LIST
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
 add_library(sunho3d ${SOURCE_LIST}) 
-target_link_libraries(sunho3d PUBLIC spirv-cross-core TracyClient tinyparser_mitsuba VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader radeonrays)
-target_link_libraries(sunho3d PRIVATE shaderc)
+target_link_libraries(sunho3d PUBLIC TracyClient tinyparser_mitsuba VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader radeonrays)
+target_link_libraries(sunho3d PRIVATE spirv-cross-core shaderc)
 target_include_directories(sunho3d PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 add_executable(embedfile utils/EmbedFile.c)

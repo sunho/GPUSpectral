@@ -703,7 +703,7 @@ void Renderer::ddgiSuite(Scene* scene) {
     std::vector<Handle<HwTexture>> shadowMaps;
     for (size_t i = 0; i < sceneData.lightBuffer.lightNum; ++i) {
         if (shadowMapCache.find(i) != shadowMapCache.end()) {
-            shadowMaps.push_back(shadowMaps.at(i));
+            shadowMaps.push_back(shadowMapCache.at(i));
             continue;
         }
         auto shadowMap = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::CUBE, TextureFormat::DEPTH32F, 1, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 6);
