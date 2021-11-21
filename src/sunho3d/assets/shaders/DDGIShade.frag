@@ -1,4 +1,5 @@
 #version 450
+#pragma shader_stage(fragment)
 
 #define MAX_LIGHTS 64
 #extension GL_GOOGLE_include_directive : require

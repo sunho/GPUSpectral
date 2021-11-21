@@ -1,7 +1,7 @@
 #include "VulkanHandles.h"
 #include <spirv_cross/spirv_cross.hpp>
 
-inline static VkShaderModule createShaderModule(VulkanDevice& device, const char* code,
+inline static VkShaderModule createShaderModule(VulkanDevice& device, const uint32_t* code,
     uint32_t codeSize) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -12,17 +12,18 @@ inline static VkShaderModule createShaderModule(VulkanDevice& device, const char
     if (vkCreateShaderModule(device.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
     }
+
     return shaderModule;
 }
 
 VulkanProgram::VulkanProgram(VulkanDevice& device, const Program& program)
     : HwProgram(program) {
     if (program.type == ProgramType::PIPELINE) {
-        vertex = createShaderModule(device, program.vertex().data(), program.vertex().size());
-        fragment = createShaderModule(device, program.frag().data(), program.frag().size());
+        vertex = createShaderModule(device, program.vertex().data(), program.vertex().size() * 4);
+        fragment = createShaderModule(device, program.frag().data(), program.frag().size() * 4);
     }
     else {
-        compute = createShaderModule(device, program.compute().data(), program.compute().size());
+        compute = createShaderModule(device, program.compute().data(), program.compute().size() * 4);
     }
     parseParameterLayout();
 }

@@ -92,7 +92,7 @@ struct ProgramParameterLayout {
 };
 
 using ProgramHash = uint64_t;
-using CompiledCode = FixedVector<char>;
+using CompiledCode = std::vector<uint32_t>;
 
 struct ProgramParameter {
     uint32_t set{};
@@ -106,13 +106,13 @@ struct Program {
         : type(ProgramType::PIPELINE) {
         codes[0] = vertCode;
         codes[1] = fragCode;
-        hash = hashBuffer<char>(codes[0].data(), codes[0].size()) ^ hashBuffer<char>(codes[1].data(), codes[1].size());
+        hash = hashBuffer<uint32_t>(codes[0].data(), codes[0].size()) ^ hashBuffer<uint32_t>(codes[1].data(), codes[1].size());
     }
 
     Program(CompiledCode compCode)
         : type(ProgramType::COMPUTE) {
         codes[0] = compCode;
-        hash = hashBuffer<char>(codes[0].data(), codes[0].size());
+        hash = hashBuffer<uint32_t>(codes[0].data(), codes[0].size());
     }
 
     const CompiledCode& vertex() const {

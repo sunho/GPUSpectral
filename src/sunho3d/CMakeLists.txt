@@ -31,6 +31,7 @@ set(SOURCE_LIST
     renderer/Renderer.cpp
     utils/Log.h
     utils/ResourceList.h
+    utils/Util.h
     utils/FixedVector.h
     utils/Hash.h
     utils/GCPool.h

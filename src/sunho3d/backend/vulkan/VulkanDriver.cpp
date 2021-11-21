@@ -1,14 +1,17 @@
 #include "VulkanDriver.h"
 
 #include <shaderc/shaderc.hpp>
+#include <spirv-tools/libspirv.hpp>
 #include <GLFW/glfw3.h>
 #include <sunho3d/utils/Log.h>
+#include <sunho3d/utils/Util.h>
 
 #include <iostream>
 #include <map>
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <filesystem>
 #include <fstream>
 
 
@@ -309,6 +312,30 @@ std::string sunho3d::VulkanDriver::profileZoneName(std::string zoneName) {
     return std::format("[{}] {}", context.profileSectionName, zoneName);
 }
 
+static inline void preprocessShader(std::string& preprocessedSource, const std::string& source, const std::filesystem::path& basePath) {
+    auto lines = Split(source, "\n");
+
+    unsigned line_index = 1;
+    for (auto& line : lines) {
+        if (line.find("#include \"") == 0) {
+            auto includePath = line.substr(10);
+            if (!includePath.empty() && includePath.back() == '"')
+                includePath.pop_back();
+
+            auto path = basePath / includePath;
+            std::ifstream file(path);
+            std::string includedSource((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+            preprocessShader(preprocessedSource, includedSource, basePath);
+        } else {
+            preprocessedSource += line;
+            preprocessedSource += '\n';
+        }
+
+        line_index++;
+    }
+}
+
 CompiledCode VulkanDriver::compileCode(const char* path) {
     shaderc::SpvCompilationResult result;
     shaderc::Compiler compiler;
@@ -317,8 +344,10 @@ CompiledCode VulkanDriver::compileCode(const char* path) {
 
     std::ifstream file(path);
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-    result = compiler.CompileGlslToSpv(content, shaderc_glsl_infer_from_source, path, options);
+    std::filesystem::path basePath = std::filesystem::path(path).parent_path();
+    std::string preprocessedSource;
+    preprocessShader(preprocessedSource, content, basePath);
+    result = compiler.CompileGlslToSpv(preprocessedSource, shaderc_glsl_infer_from_source, path, options);
 
     if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
         std::string message = result.GetErrorMessage();
@@ -326,7 +355,21 @@ CompiledCode VulkanDriver::compileCode(const char* path) {
         throw std::runtime_error("shader compilation error");
     }
 
-    return CompiledCode(result.cbegin(), result.cend());
+    auto compiledCode = CompiledCode(result.begin(), result.end());
+    spvtools::SpirvTools core(SPV_ENV_VULKAN_1_2);
+
+    core.SetMessageConsumer([](spv_message_level_t, const char*, const spv_position_t&, const char* message) {
+        Log("Shader validation error: {}", message);
+    });
+
+    spvtools::ValidatorOptions opts;
+    opts.SetScalarBlockLayout(true);
+    if (!core.Validate(compiledCode.data(), compiledCode.size(), opts))
+    {
+        Log("validation error");
+        throw std::runtime_error("shader validation error");
+    }
+    return compiledCode;
 }
 
 void VulkanDriver::destroyVertexBuffer(VertexBufferHandle handle) {

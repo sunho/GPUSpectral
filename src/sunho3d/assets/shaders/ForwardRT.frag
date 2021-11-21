@@ -1,4 +1,6 @@
 #version 450
+#pragma shader_stage(fragment)
+
 #define MAX_MESH_COUNT 32
 #define MAX_INSTANCES 32
 

@@ -1,5 +1,7 @@
 #version 450
 
+#pragma shader_stage(compute)
+
 #define FIXED_POINT_PRECISION 1024
 
 #extension GL_GOOGLE_include_directive : require

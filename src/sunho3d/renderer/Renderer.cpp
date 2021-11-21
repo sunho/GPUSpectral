@@ -102,7 +102,7 @@ void Renderer::registerPrograms() {
     gbufferGenProgram = loadGraphicsShader("shaders/GBufferGen.vert", "shaders/GBufferGen.frag");
     deferredRenderProgram = loadGraphicsShader("shaders/DeferredRender.vert", "shaders/DeferredRender.frag");
     ddgiShadeProgram = loadGraphicsShader("shaders/DDGIShade.vert", "shaders/DDGIShade.frag");
-    ddgiProbeUpdateProgram = loadComputeShader("DDGIProbeUpdate.comp");
+    ddgiProbeUpdateProgram = loadComputeShader("shaders/DDGIProbeUpdate.comp");
 }
 
 Renderer::~Renderer() {

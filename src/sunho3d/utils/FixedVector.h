@@ -19,7 +19,7 @@ struct FixedVector {
     }
 
     template <typename It>
-    FixedVector(It it, It end) : size_(std::distance(it, end)), data_(new T[size_]){
+    FixedVector(It it, It end) : size_(std::distance(it, end) * sizeof(T)), data_(new T[size_]){
         std::copy(it, end, data_);
     }
 

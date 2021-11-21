@@ -1,4 +1,5 @@
 #version 450
+#pragma shader_stage(compute)
 
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_nonuniform_qualifier : require
