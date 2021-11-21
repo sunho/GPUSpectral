@@ -37,8 +37,8 @@ struct VulkanPipelineState {
     DepthTest depthTest;
 
     bool operator==(const VulkanPipelineState &other) const {
-        return attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && program->program.hash() == other.program->program.hash()
-        && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
+        return attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && program->program.hash == other.program->program.hash
+            && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
 };
 
@@ -169,7 +169,6 @@ class VulkanPipelineCache {
         std::size_t operator()(const ProgramHash &k) const {
             return k;
         }
-        
     };
 
     GCPool<ProgramHash, VkPipeline, KeyHasher> computePipelines;

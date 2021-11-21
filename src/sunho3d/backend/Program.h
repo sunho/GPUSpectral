@@ -5,8 +5,7 @@
 #include <vector>
 #include <variant>
 #include <sunho3d/utils/Hash.h>
-
-using ProgramCode = std::vector<char>;
+#include <sunho3d/utils/FixedVector.h>
 
 enum class ProgramType {
     PIPELINE,
@@ -54,6 +53,11 @@ struct ProgramParameterLayout {
         return *this;
     }
 
+    ProgramParameterLayout& addUniformBufferArray(uint32_t set, uint32_t binding, size_t size) {
+        fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::UNIFORM, (uint32_t)size };
+        return *this;
+    }
+
     ProgramParameterLayout& addStorageBuffer(uint32_t set, uint32_t binding) {
         fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::STORAGE, 1 };
         return *this;
@@ -85,6 +89,11 @@ struct ProgramParameterLayout {
         return *this;
     }
 
+    ProgramParameterLayout& addStorageImageArray(uint32_t set, uint32_t binding, size_t size) {
+        fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::IMAGE, (uint32_t)size };
+        return *this;
+    }
+
     bool operator==(const ProgramParameterLayout& other) const {
         return fields == other.fields;
     }
@@ -93,6 +102,7 @@ struct ProgramParameterLayout {
 };
 
 using ProgramHash = uint64_t;
+using CompiledCode = std::vector<uint32_t>;
 
 struct ProgramParameter {
     uint32_t set{};
@@ -102,39 +112,35 @@ struct ProgramParameter {
 };
 
 struct Program {
-    Program(const char* vertCode, size_t vertSize, const char* fragCode, size_t fragSize)
+    Program(CompiledCode vertCode, CompiledCode fragCode)
         : type(ProgramType::PIPELINE) {
-        codes[0] = std::vector(vertCode, vertCode + vertSize);
-		codes[1] = std::vector(fragCode, fragCode + fragSize);
-        _hash = hashBuffer<char>(codes[0].data(), codes[0].size()) ^ hashBuffer<char>(codes[1].data(), codes[1].size());
+        codes[0] = vertCode;
+        codes[1] = fragCode;
+        hash = hashBuffer<uint32_t>(codes[0].data(), codes[0].size()) ^ hashBuffer<uint32_t>(codes[1].data(), codes[1].size());
     }
 
-    Program(const char* compCode, size_t compSize)
+    Program(CompiledCode compCode)
         : type(ProgramType::COMPUTE) {
-        codes[0] = std::vector(compCode, compCode + compSize);
-        _hash = hashBuffer<char>(codes[0].data(), codes[0].size());
+        codes[0] = compCode;
+        hash = hashBuffer<uint32_t>(codes[0].data(), codes[0].size());
     }
 
-    const ProgramCode& vertex() const {
+    const CompiledCode& vertex() const {
         return codes[0];
     }
     
-    const ProgramCode& frag() const {
+    const CompiledCode& frag() const {
         return codes[1];
     }
     
-    const ProgramCode& compute() const {
+    const CompiledCode& compute() const {
         return codes[0];
-    }
-
-    ProgramHash hash() const {
-        return _hash;
     }
 
     ProgramParameterLayout parameterLayout;
     ProgramType type;
+    ProgramHash hash;
   private:
-    ProgramHash _hash;
-    std::array<ProgramCode, 2> codes;
+    std::array<CompiledCode, 2> codes;
 };
 

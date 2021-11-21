@@ -74,21 +74,49 @@ struct PipelineState {
         return *this;
     }
 
-    PipelineState& bindStorageBufferArray(uint32_t set, uint32_t binding, Handle<HwBufferObject>* buffers, size_t size) {
+    template <typename It>
+    PipelineState& bindStorageBufferArray(uint32_t set, uint32_t binding, It it, It end) {
         Binding b = {};
         b.type = ProgramParameterType::STORAGE;
-        for (size_t i = 0; i < size; ++i) {
-            b.handles[i] = { .buffer = buffers[i] };
+        size_t i = 0;
+        for (; it != end; ++it) {
+            b.handles[i++] = { .buffer = *it };
         }
         bindings[{ set, binding }] = b;
         return *this;
     }
 
-    PipelineState& bindTextureArray(uint32_t set, uint32_t binding, Handle<HwTexture>* texture, size_t size) {
+    template <typename Arr>
+    PipelineState& bindStorageBufferArray(uint32_t set, uint32_t binding, const Arr& array) {
+        Binding b = {};
+        b.type = ProgramParameterType::STORAGE;
+        size_t i = 0;
+        for (size_t i = 0; i < array.size(); ++i) {
+            b.handles[i] = { .buffer = array[i] };
+        }
+        bindings[{ set, binding }] = b;
+        return *this;
+    }
+
+    template <typename It>
+    PipelineState& bindTextureArray(uint32_t set, uint32_t binding, It it, It end) {
         Binding b = {};
         b.type = ProgramParameterType::TEXTURE;
-        for (size_t i = 0; i < size; ++i) {
-            b.handles[i] = { .texture = texture[i] };
+        size_t i = 0;
+        for (; it != end; ++it) {
+            b.handles[i++] = { .texture = *it };
+        }
+        bindings[{ set, binding }] = b;
+        return *this;
+    }
+
+    template <typename Arr>
+    PipelineState& bindTextureArray(uint32_t set, uint32_t binding, const Arr& array) {
+        Binding b = {};
+        b.type = ProgramParameterType::TEXTURE;
+        size_t i = 0;
+        for (size_t i = 0; i < array.size(); ++i) {
+            b.handles[i] = { .texture = array[i] };
         }
         bindings[{ set, binding }] = b;
         return *this;

@@ -18,6 +18,11 @@ struct FixedVector {
         memcpy(data_, other.data_, size_ * sizeof(T));
     }
 
+    template <typename It>
+    FixedVector(It it, It end) : size_(std::distance(it, end) * sizeof(T)), data_(new T[size_]){
+        std::copy(it, end, data_);
+    }
+
     FixedVector &operator=(const FixedVector &other) {
         size_ = other.size_;
         data_ = new T[size_];
@@ -25,14 +30,20 @@ struct FixedVector {
         return *this;
     }
 
-    FixedVector(FixedVector &&other) {
-        std::swap(data_, other.data_);
-        std::swap(size_, other.size_);
+    FixedVector(FixedVector &&other) : data_(other.data_), size_(other.size_) {
+        other.data_ = nullptr;
+        other.size_ = 0;
     }
 
     FixedVector &operator=(FixedVector &&other) {
-        std::swap(data_, other.data_);
-        std::swap(size_, other.size_);
+        delete[] data_;
+
+        data_ = other.data_;
+        size_ = other.size_;
+
+        other.data_ = nullptr;
+        other.size_ = 0;
+
         return *this;
     }
 

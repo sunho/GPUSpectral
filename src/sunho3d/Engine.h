@@ -4,6 +4,7 @@
 
 #include <list>
 #include <memory>
+#include <filesystem>
 
 #include "Entity.h"
 #include "renderer/Renderer.h"
@@ -14,7 +15,7 @@
 namespace sunho3d {
 class Engine {
   public:
-    Engine();
+    Engine(const std::filesystem::path& assetBasePath);
     ~Engine();
 
     Window *createWindow(size_t width, size_t height);
@@ -23,6 +24,8 @@ class Engine {
     Renderer *createRenderer(Window *window);
     Scene *createScene(Renderer *renderer);
     Material *createMaterial();
+    std::string assetPath(const std::string& assetName);
+
 
   private:
     ResourceList<Window> windows;
@@ -31,6 +34,8 @@ class Engine {
     ResourceList<Scene> scenes;
     ResourceList<Material> materials;
     ResourceList<Mesh> meshes;
+
+    std::filesystem::path assetBasePath;
 };
 
 }  // namespace sunho3d

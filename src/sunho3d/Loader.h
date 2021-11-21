@@ -29,7 +29,7 @@ struct Material;
 
 class Loader {
   public:
-    explicit Loader(Engine &engine, Renderer &renderer, const std::filesystem::path& basepath);
+    explicit Loader(Engine &engine, Renderer &renderer);
     Scene *loadGLTF(const std::string &path);
     Scene *loadMitsuba(const std::string &path);
     Mesh *loadObj(const std::string &path, bool twosided=false);
@@ -47,7 +47,6 @@ class Loader {
     Engine &engine;
     std::map<std::string, Mesh *> meshCache;
     std::map<std::string, Handle<HwTexture>> textureCache;
-    std::filesystem::path basepath;
     Renderer &renderer;
 };
 

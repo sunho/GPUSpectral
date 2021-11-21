@@ -16,18 +16,6 @@ void FrameGraph::addFramePass(FramePass pass) {
     passes.push_back(pass);
 }
 
-ResourceHandle FrameGraph::importImage(std::string name, Handle<HwTexture> image) {
-    auto handle = declareResource<Handle<HwTexture>>(name, ResourceType::Image);
-    *getResource<Handle<HwTexture>>(handle) = image;
-    return handle;
-}
-
-ResourceHandle FrameGraph::importBuffer(std::string name, Handle<HwBufferObject> buffer) {
-    auto handle = declareResource<Handle<HwBufferObject>>(name, ResourceType::Buffer);
-    *getResource<Handle<HwBufferObject>>(handle) = buffer;
-    return handle;
-}
-
 Handle<HwBufferObject> FrameGraph::createTempUniformBuffer(void* data, size_t size) {
     auto buffer = createBufferObjectSC(size, BufferUsage::UNIFORM | BufferUsage::TRANSFER_SRC);
     auto staging = createBufferObjectSC(size, BufferUsage::STAGING);
@@ -123,7 +111,7 @@ void FrameGraph::compile() {
     std::vector<BakedPass> bakedPasses(passes.size());
     std::vector<std::vector<size_t>> graph(passes.size());
     for (size_t i = 0; i < passes.size(); ++i) {
-        bakedPasses[i] = BakedPass(passes[i]);
+        bakedPasses[i] = BakedPass(*this, passes[i]);
     }
 
     for (size_t i = 0; i < bakedPasses.size(); ++i) {
@@ -246,64 +234,41 @@ void FrameGraph::compile() {
 }
 
 void FrameGraph::run() {
-    FrameGraphContext context(*this);
     for (auto pass : bakedGraph.passes) {
         ZoneTransientN(zone, pass.name.c_str(), true)
-        driver.setProfileZoneName(pass.name.c_str());
+        driver.setProfileSectionName(pass.name.c_str());
         for (auto& barrier : pass.barriers) {
             driver.setBarrier(barrier);
         }
-        pass.func(*this, context);
+        pass.func(*this);
     }
 }
 
-FrameGraph::BakedPass::BakedPass(FramePass pass) : name(pass.name), func(pass.func) {
-    for (auto res : pass.resources) {
-        for (auto r : res.resource) {
-            if (isWriteAccessType(res.accessType)) {
-                outputs.push_back({ r, res.accessType });
+FrameGraph::BakedPass::BakedPass(FrameGraph& fg, FramePass pass) : name(pass.name), func(pass.func) {
+    for (auto buf : pass.buffers) {
+        for (auto b : buf.resource) {
+            auto res = fg.getOrRegisterBufferResource(b);
+            if (isWriteAccessType(buf.accessType)) {
+                outputs.push_back({ res, buf.accessType });
             }
             else {
-                inputs.push_back({ r, res.accessType });
+                inputs.push_back({ res, buf.accessType });
             }
-            resources.emplace(r.getId(), BakedPassResource{ r, res.accessType });
+            resources.emplace(res.getId(), BakedPassResource{ res, buf.accessType });
         }
     }
-}
 
-void FrameGraphContext::bindTextureResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
-    assert(handle.getType() == ResourceType::Image);
-    Handle<HwTexture> texture = *parent.getResource<Handle<HwTexture>>(handle);
-    pipe.bindTexture(set, binding, texture);
-}
-
-void FrameGraphContext::bindStorageImageResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
-    assert(handle.getType() == ResourceType::Image);
-    Handle<HwTexture> texture = *parent.getResource<Handle<HwTexture>>(handle);
-    pipe.bindStorageImage(set, binding, texture);
-}
-
-void FrameGraphContext::bindStorageBufferResource(PipelineState& pipe, uint32_t set, uint32_t binding, ResourceHandle handle) {
-    assert(handle.getType() == ResourceType::Buffer);
-    Handle<HwBufferObject> buffer = *parent.getResource<Handle<HwBufferObject>>(handle);
-    pipe.bindStorageBuffer(set, binding, buffer);
-}
-
-Handle<HwTexture> FrameGraphContext::unwrapTextureHandle(ResourceHandle handle) {
-    assert(handle.getType() == ResourceType::Image);
-    return *parent.getResource<Handle<HwTexture>>(handle);
-}
-
-Handle<HwBufferObject> FrameGraphContext::unwrapBufferHandle(ResourceHandle handle) {
-    assert(handle.getType() == ResourceType::Buffer);
-    return *parent.getResource<Handle<HwBufferObject>>(handle);
-}
-
-std::vector<Handle<HwTexture>> FrameGraphContext::unwrapTextureHandleArray(std::vector<ResourceHandle> handles)
-{
-    std::vector<Handle<HwTexture>> textures;
-    for (auto handle : handles) {
-        textures.push_back(unwrapTextureHandle(handle));
+    for (auto tex : pass.textures) {
+        for (auto t : tex.resource) {
+            auto res = fg.getOrRegisterTextureResource(t);
+            if (isWriteAccessType(tex.accessType)) {
+                outputs.push_back({ res, tex.accessType });
+            }
+            else {
+                inputs.push_back({ res, tex.accessType });
+            }
+            resources.emplace(res.getId(), BakedPassResource{ res, tex.accessType });
+        }
     }
-    return textures;
+
 }

@@ -34,3 +34,18 @@ url=git@github.com:sunho/RadeonRays_SDK.git
 [submodule "external/TinyParser-Mitsuba"]
 	path = external/TinyParser-Mitsuba
 	url = https://github.com/PearCoding/TinyParser-Mitsuba.git
+[submodule "external/SPIRV-Cross"]
+	path = external/SPIRV-Cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "external/shaderc"]
+	path = external/shaderc
+	url = https://github.com/google/shaderc.git
+[submodule "external/SPIRV-Tools"]
+	path = external/SPIRV-Tools
+	url = https://github.com/KhronosGroup/SPIRV-Tools.git
+[submodule "external/SPIRV-Headers"]
+	path = external/SPIRV-Headers
+	url = https://github.com/KhronosGroup/SPIRV-Headers.git
+[submodule "external/glslang"]
+	path = external/glslang
+	url = https://github.com/KhronosGroup/glslang.git

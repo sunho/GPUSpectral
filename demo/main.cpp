@@ -13,10 +13,10 @@ std::filesystem::path basePath() {
 }
 
 int main() {
-    sunho3d::Engine engine;
+    sunho3d::Engine engine(basePath() / "assets");
     sunho3d::Window* window = engine.createWindow(1200, 1200);
     sunho3d::Renderer* renderer = engine.createRenderer(window);
-    sunho3d::Loader loader(engine, *renderer, basePath() / "assets");
+    sunho3d::Loader loader(engine, *renderer);
     
     //sunho3d::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
 

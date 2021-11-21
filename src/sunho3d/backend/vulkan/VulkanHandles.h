@@ -15,7 +15,7 @@ static constexpr const size_t VULKAN_VERTEX_BUFFERS_MAX = 12;
 
 struct VulkanVertexBuffer : public HwVertexBuffer {
     VulkanVertexBuffer() = default;
-    explicit VulkanVertexBuffer(uint32_t vertexCount, uint8_t attributeCount,
+    VulkanVertexBuffer(uint32_t vertexCount, uint8_t attributeCount,
                                 const AttributeArray &attributes)
         : HwVertexBuffer(vertexCount, attributeCount, attributes) {
     }
@@ -24,45 +24,21 @@ struct VulkanVertexBuffer : public HwVertexBuffer {
 
 struct VulkanIndexBuffer : public HwIndexBuffer {
     explicit VulkanIndexBuffer(VulkanDevice &device, uint32_t count)
-        : HwIndexBuffer(count) {
-        buffer = new VulkanBufferObject(device, count * 4, BufferUsage::INDEX | BufferUsage::STORAGE);
+        : HwIndexBuffer(count), buffer(std::make_unique<VulkanBufferObject>(device, count * 4, BufferUsage::INDEX | BufferUsage::STORAGE)) {
     }
 
-    ~VulkanIndexBuffer() {
-        delete buffer;
-    }
-    VulkanBufferObject *buffer;
+    std::unique_ptr<VulkanBufferObject> buffer;
 };
-
-static VkShaderModule createShaderModule(VulkanDevice &device, const char *code,
-                                         uint32_t codeSize) {
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = codeSize;
-    createInfo.pCode = reinterpret_cast<const uint32_t *>(code);
-    
-    VkShaderModule shaderModule;
-    if (vkCreateShaderModule(device.device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create shader module!");
-    }
-    return shaderModule;
-}
 
 struct VulkanProgram : public HwProgram {
     VulkanProgram() = default;
-    explicit VulkanProgram(VulkanDevice &device, const Program &program)
-        : HwProgram(program) {
-        if (program.type == ProgramType::PIPELINE) {
-            vertex = createShaderModule(device, program.vertex().data(), program.vertex().size());
-            fragment = createShaderModule(device, program.frag().data(), program.frag().size());
-        } else {
-            compute = createShaderModule(device, program.compute().data(), program.compute().size());
-        }
-    }
+    explicit VulkanProgram(VulkanDevice& device, const Program& program);
 
     VkShaderModule vertex;
     VkShaderModule fragment;
     VkShaderModule compute;
+private:
+    void parseParameterLayout(const CompiledCode& code);
 };
 
 struct VulkanAttachment {
@@ -82,33 +58,9 @@ struct VulkanAttachments {
 };
 
 struct VulkanRenderTarget : public HwRenderTarget {
-    VulkanRenderTarget()
-        : HwRenderTarget(0, 0), surface(true), attachmentCount(1) {
-    }
-    explicit VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachments attachments)
-        : HwRenderTarget(w, h), attachments(attachments), surface(false) {
-        for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
-            if (attachments.colors[i].valid)
-                ++attachmentCount;
-        }
-    }
-    vk::Extent2D getExtent(VulkanDevice& device) {
-        if (surface) {
-            return device.wsi->getExtent();
-        }
-        auto out = vk::Extent2D();
-        if (width == HwTexture::FRAME_WIDTH) {
-            out.width = device.wsi->getExtent().width;
-        } else {
-            out.width = width;
-        }
-        if (height == HwTexture::FRAME_HEIGHT) {
-            out.height = device.wsi->getExtent().height;
-        } else {
-            out.height = height;
-        }
-        return out;
-    }
+    VulkanRenderTarget();
+    VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachments attachments);
+    vk::Extent2D getExtent(VulkanDevice& device) const;
 
     bool surface;
     VulkanAttachments attachments;
