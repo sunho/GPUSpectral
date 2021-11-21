@@ -1,0 +1,75 @@
+#version 450
+
+#pragma shader_stage(compute)
+
+#define FIXED_POINT_PRECISION 1024
+
+#extension GL_GOOGLE_include_directive : require
+#include "common.glsl"
+layout (local_size_x = IRD_MAP_SIZE, local_size_y = IRD_MAP_SIZE) in;
+
+#extension GL_KHR_shader_subgroup_ballot: require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+
+
+#include "probe.glsl"
+
+layout(std140, set=0, binding = 0) buffer RayBuffer {
+    Ray rays[];
+} rayBuffer;
+
+layout(set=1,binding = 0) uniform sampler2D radianceBuffer;
+layout(set=1,binding = 1) uniform sampler2D distanceBuffer;
+layout (set=2,binding = 0, rgba16f) uniform image2D irradianceMap;
+layout (set=2,binding = 1, rgba16f) uniform writeonly image2D distanceMap;
+layout (set=2,binding = 2, rgba16f) uniform writeonly image2D distanceSquareMap;
+
+shared int sampleCount;
+shared ivec4 reducedIrradiance;
+shared int reducedDist;
+shared int reducedDistSquare;
+
+void main() {
+    int probeID = int(gl_WorkGroupID.x);
+    ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
+    vec2 uv = vec2(iuv) / IRD_MAP_SIZE;
+    vec3 dir = octahedronReverseMap(uv);
+    vec4 sumIrradiance = vec4(0.0);
+    for (int i = 0; i < RAYS_PER_PROBE; i++) {
+        uint rayID = i;
+        Ray ray = rayBuffer.rays[probeID * RAYS_PER_PROBE + rayID];
+        vec4 radiance = texelFetch(radianceBuffer, ivec2(rayID, probeID), 0);
+        float dist = texelFetch(distanceBuffer, ivec2(rayID, probeID), 0).x;
+        if (dist == 0.0) radiance = vec4(0.3);
+        sumIrradiance += max(0.0, dot(dir, ray.dir))* radiance;
+    }
+    vec4 irradiance = sumIrradiance / RAYS_PER_PROBE;
+    irradiance *= M_PI * 4.0;
+    irradiance.a = 1.0;
+    ivec2 startOffset = probeIDToIRDTexOffset(probeID);
+    vec4 bb = imageLoad(irradianceMap, startOffset + iuv);
+    imageStore(irradianceMap, startOffset + iuv, mix(bb,irradiance, 0.05));
+    /*
+    
+    if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
+        float distSG = subgroupInclusiveAdd(dist);
+        int disti = int(distSG * FIXED_POINT_PRECISION);
+        float distSquare = dist * dist;
+        float distSquareSG = subgroupInclusiveAdd(distSquare);
+        int distSquarei = int(distSquareSG * FIXED_POINT_PRECISION);
+        if (gl_SubgroupID == 0) {
+            atomicAdd(reducedDist, disti);
+            atomicAdd(reducedDistSquare, distSquarei);
+        }
+        barrier();
+        if (gl_LocalInvocationIndex == 0) {
+            float dist = float(reducedDist) / FIXED_POINT_PRECISION;
+            dist /= max(sampleCount,1);
+            float distSquare = float(reducedDistSquare) / FIXED_POINT_PRECISION;
+            distSquare /= max(sampleCount,1);
+            imageStore(distanceMap, ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(dist));
+            imageStore(distanceSquareMap,  ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(distSquare));
+        }
+    }*/
+
+}
