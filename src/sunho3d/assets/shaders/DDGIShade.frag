@@ -18,12 +18,9 @@ struct Light {
     vec2 RI;
 };
 
-layout(std140, binding = 0) uniform SceneBuffer {
-    uvec2 frameSize;
-    uint instanceNum;
-    Instance instances[MAX_INSTANCES];
-    SceneInfo sceneInfo;
-} sceneBuffer;
+layout(std140, binding = 0) uniform _SceneBuffer{
+    SceneBuffer sceneBuffer;
+};
 
 layout(std140, binding = 1) uniform LightUniformBuffer {
     Light light[MAX_LIGHTS];

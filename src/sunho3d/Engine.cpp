@@ -2,7 +2,7 @@
 
 using namespace sunho3d;
 
-Engine::Engine(const std::filesystem::path& assetBasePath) : assetBasePath(assetBasePath) {
+Engine::Engine(const std::filesystem::path& basePath, const std::filesystem::path& assetBasePath) : assetBasePath(assetBasePath), basePath(basePath) {
 }
 
 Engine::~Engine() {

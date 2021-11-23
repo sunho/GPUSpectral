@@ -39,7 +39,7 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
     }
 }
 
-VulkanDriver::VulkanDriver(Window *window) {
+VulkanDriver::VulkanDriver(Window *window, const std::filesystem::path& basePath) : basePath(basePath) {
     device = std::make_unique<VulkanDevice>(window);
     rayTracer = std::make_unique<VulkanRayTracer>(*device);
     //setupDebugMessenger();
@@ -312,9 +312,9 @@ std::string sunho3d::VulkanDriver::profileZoneName(std::string zoneName) {
     return std::format("[{}] {}", context.profileSectionName, zoneName);
 }
 
-static inline void preprocessShader(std::string& preprocessedSource, const std::string& source, const std::filesystem::path& basePath) {
+static inline void preprocessShader(std::string& preprocessedSource, const std::string& source, const std::filesystem::path& basePath, uint64_t& hash) {
     auto lines = Split(source, "\n");
-
+    hash ^= hashBuffer<char>(source.data(), source.size());
     unsigned line_index = 1;
     for (auto& line : lines) {
         if (line.find("#include \"") == 0) {
@@ -326,7 +326,7 @@ static inline void preprocessShader(std::string& preprocessedSource, const std::
             std::ifstream file(path);
             std::string includedSource((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-            preprocessShader(preprocessedSource, includedSource, basePath);
+            preprocessShader(preprocessedSource, includedSource, basePath, hash);
         } else {
             preprocessedSource += line;
             preprocessedSource += '\n';
@@ -344,11 +344,28 @@ CompiledCode VulkanDriver::compileCode(const char* path) {
 
     std::ifstream file(path);
     std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    std::filesystem::path basePath = std::filesystem::path(path).parent_path();
-    std::string preprocessedSource;
-    preprocessShader(preprocessedSource, content, basePath);
-    result = compiler.CompileGlslToSpv(preprocessedSource, shaderc_glsl_infer_from_source, path, options);
+    auto filePath = std::filesystem::path(path);
+    std::filesystem::path shadersFolderPath = filePath.parent_path();
 
+    std::string preprocessedSource;
+    uint64_t hash = 0x53FF53530053FFFF;
+    preprocessShader(preprocessedSource, content, shadersFolderPath, hash);
+    
+    std::string cacheName = filePath.filename().string() + std::to_string(hash) + ".spv";
+    if (!std::filesystem::is_directory(basePath / "shader_cache")) {
+        std::filesystem::create_directory(basePath / "shader_cache");
+    }
+
+    auto cachePath = basePath / "shader_cache" / cacheName;
+    std::ifstream cacheFile(cachePath, std::ifstream::binary);
+    if (cacheFile.is_open()) {
+        std::vector<uint8_t> cacheFileContent((std::istreambuf_iterator<char>(cacheFile)), std::istreambuf_iterator<char>());
+        CompiledCode compiledCode(cacheFileContent.size() / 4);
+        memcpy(compiledCode.data(), cacheFileContent.data(), cacheFileContent.size());
+        return compiledCode;
+    }
+
+    result = compiler.CompileGlslToSpv(preprocessedSource, shaderc_glsl_infer_from_source, path, options);
     if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
         std::string message = result.GetErrorMessage();
         Log("Shader compilation error: {}", message);
@@ -356,11 +373,16 @@ CompiledCode VulkanDriver::compileCode(const char* path) {
     }
 
     auto compiledCode = CompiledCode(result.begin(), result.end());
-    spvtools::SpirvTools core(SPV_ENV_VULKAN_1_2);
+
+    std::ofstream cacheFileWrite;
+    cacheFileWrite.open(cachePath, std::ios::out | std::ios::binary);
+    cacheFileWrite.write((const char*)compiledCode.data(), compiledCode.size() * 4);
+    cacheFileWrite.close();
+    /*spvtools::SpirvTools core(SPV_ENV_VULKAN_1_2);
 
     core.SetMessageConsumer([](spv_message_level_t, const char*, const spv_position_t&, const char* message) {
         Log("Shader validation error: {}", message);
-    });
+    });*/
     /*
     spvtools::ValidatorOptions opts;
     opts.SetScalarBlockLayout(true);

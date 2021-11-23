@@ -9,6 +9,7 @@
 #include <cassert>
 #include <Tracy.hpp>
 #include <TracyVulkan.hpp>
+#include <filesystem>
 
 
 #include "../DriverBase.h"
@@ -62,7 +63,7 @@ struct DriverContext {
 
 class VulkanDriver {
   public:
-    VulkanDriver(Window *window);
+    VulkanDriver(Window *window, const std::filesystem::path& basePath);
     ~VulkanDriver();
 
     VulkanDriver(const VulkanDriver &) = delete;
@@ -134,6 +135,8 @@ class VulkanDriver {
         reinterpret_cast<Dp *>(data.data())->~Dp();
         handles.erase(handle.getId());
     }
+
+    std::filesystem::path basePath;
 
     std::map<HandleBase::HandleId, HandleData> handles;
     HandleBase::HandleId nextId{ 0 };

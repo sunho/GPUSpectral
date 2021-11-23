@@ -29,6 +29,7 @@ set(SOURCE_LIST
     renderer/framegraph/Resource.h
     renderer/Renderer.h
     renderer/Renderer.cpp
+    renderer/RendererDDGI.cpp
     utils/Log.h
     utils/ResourceList.h
     utils/Util.h

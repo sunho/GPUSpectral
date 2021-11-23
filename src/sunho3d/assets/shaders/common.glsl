@@ -93,3 +93,10 @@ vec3 ACESFilm(vec3 x)
     float e = 0.14;
     return clamp((x*(a*x+b))/(x*(c*x+d)+e),0.0,1.0);
 }
+
+struct SceneBuffer {
+    uvec2 frameSize;
+    uint instanceNum;
+    Instance instances[MAX_INSTANCES];
+    SceneInfo sceneInfo;
+};

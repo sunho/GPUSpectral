@@ -15,7 +15,7 @@
 namespace sunho3d {
 class Engine {
   public:
-    Engine(const std::filesystem::path& assetBasePath);
+    Engine(const std::filesystem::path& basePath, const std::filesystem::path& assetBasePath);
     ~Engine();
 
     Window *createWindow(size_t width, size_t height);
@@ -25,6 +25,8 @@ class Engine {
     Scene *createScene(Renderer *renderer);
     Material *createMaterial();
     std::string assetPath(const std::string& assetName);
+    std::filesystem::path getBasePath() { return basePath;  }
+
 
 
   private:
@@ -34,7 +36,8 @@ class Engine {
     ResourceList<Scene> scenes;
     ResourceList<Material> materials;
     ResourceList<Mesh> meshes;
-
+    
+    std::filesystem::path basePath;
     std::filesystem::path assetBasePath;
 };
 

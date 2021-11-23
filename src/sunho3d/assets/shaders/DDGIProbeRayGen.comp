@@ -7,13 +7,9 @@
 #include "probe.glsl"
 
 layout (local_size_x = RAYS_PER_PROBE) in;
-layout(std140, binding = 0) uniform SceneBuffer {
-    uvec2 frameSize;
-    uint instanceNum;
-    Instance instances[MAX_INSTANCES];
-    SceneInfo sceneInfo;
-} sceneBuffer;
-
+layout(std140, binding = 0) uniform _SceneBuffer{
+    SceneBuffer sceneBuffer;
+};
 
 layout( push_constant ) uniform PushConstants {
     uint globalRngState;

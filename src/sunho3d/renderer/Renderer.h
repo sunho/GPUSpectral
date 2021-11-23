@@ -54,13 +54,6 @@ struct Instance {
 static constexpr const size_t MAX_INSTANCES = 64;
 static constexpr const size_t RAYS_PER_PROBE = 32;
 
-struct ForwardRTSceneBuffer {
-    glm::uvec2 frameSize;
-    uint32_t instanceNum;
-    uint32_t pad;
-    std::array<Instance, MAX_INSTANCES> instances;
-};
-
 struct DDGIPushConstants {
     uint32_t globalRngState;
 };
@@ -74,7 +67,7 @@ struct DDGISceneInfo {
     float pad3;
 };
 
-struct DDGISceneBuffer {
+struct SceneBuffer {
     glm::uvec2 frameSize;
     uint32_t instanceNum;
     uint32_t pad;
@@ -83,22 +76,47 @@ struct DDGISceneBuffer {
 };
 
 class Scene;
+struct SceneData;
+struct LightData;
 class Renderer;
 
 struct InflightData {
     Handle<HwFence> fence;
     Handle<HwInflight> handle{};
+    Handle<HwTLAS> tlas{};
     std::unique_ptr<FrameGraph> rg;
 
+
+    Handle<HwBufferObject> sceneBuffer;
+    Handle<HwBufferObject> lightBuffer;
     std::vector<RTInstance> instances;
-    //ddgi
-    Handle<HwTLAS> tlas;
+    std::vector<Handle<HwBufferObject>> materialBuffers;
+    std::vector<Handle<HwBufferObject>> transformBuffers;
+    std::vector<TextureHandle> diffuseMap;
+    std::vector<Handle<HwTexture>> shadowMaps;
+    std::vector<InstanceMaterial> materials;
+    std::vector<Handle<HwBufferObject>> vertexPositionBuffers;
+    std::vector<Handle<HwBufferObject>> vertexNormalBuffers;
+    std::vector<Handle<HwBufferObject>> vertexUVBuffers;
+
+    void reset(VulkanDriver& driver) {
+        instances.clear();
+        materialBuffers.clear();
+        transformBuffers.clear();
+        diffuseMap.clear();
+        materials.clear();
+        vertexPositionBuffers.clear();
+        vertexNormalBuffers.clear();
+        vertexUVBuffers.clear();
+        shadowMaps.clear();
+    }
 };
 
-struct DDGIPassContext {
-    Handle<HwTexture> probeIrradiance;
-    Handle<HwTexture> probeMeanDistance;
-    float hysteresis{ 0.75 };
+struct InflightContext {
+    FrameGraph* rg;
+    InflightData* data;
+    SceneData* sceneData;
+    Scene* scene;
 };
 
 struct GBuffer {
@@ -142,10 +160,11 @@ class Renderer : public IdResource {
     Handle<HwProgram> loadComputeShader(const std::string& filename);
     Handle<HwProgram> loadGraphicsShader(const std::string& vertFilename, const std::string& fragFilename);
     void registerPrograms();
-    void rasterSuite(Scene* scene);
-    void deferSuite(Scene* scene);
-    void rtSuite(Scene* scene);
-    void ddgiSuite(Scene* scene);
+    void deferSuite(InflightContext& ctx);
+    void rtSuite(InflightContext& ctx);
+    void ddgiSuite(InflightContext& ctx);
+    void prepareSceneData(InflightContext& context);
+    Handle<HwTexture> buildPointShadowMap(InflightContext& ctx, LightData light);
 
     Handle<HwBufferObject> createTransformBuffer(FrameGraph& rg, const Camera& camera, const glm::mat4& model, const glm::mat4& modelInvT);
 
@@ -165,10 +184,9 @@ class Renderer : public IdResource {
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
     
-    std::unordered_map<uint32_t, Handle<HwBLAS> > blasMap;
+    std::unordered_map<uint32_t, Handle<HwBLAS> > blasCache;
     std::unordered_map<uint32_t, Handle<HwTexture>> shadowMapCache;
 
-    DDGIPassContext ddgiContext;
     std::unique_ptr<GBuffer> gbuffer;
     std::unique_ptr<GBuffer> rayGbuffer;
     Handle<HwTexture> probeTexture;
