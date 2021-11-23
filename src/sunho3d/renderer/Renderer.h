@@ -159,6 +159,9 @@ class Renderer : public IdResource {
   private:
     Handle<HwProgram> loadComputeShader(const std::string& filename);
     Handle<HwProgram> loadGraphicsShader(const std::string& vertFilename, const std::string& fragFilename);
+    void registerComputeShader(const std::string& shaderName, const std::string& filename);
+    void registerGraphicsShader(const std::string& shaderName, const std::string& vertFilename, const std::string& fragFilename);
+    Handle<HwProgram> getShaderProgram(const std::string& shaderName);
     void registerPrograms();
     void deferSuite(InflightContext& ctx);
     void rtSuite(InflightContext& ctx);
@@ -167,17 +170,6 @@ class Renderer : public IdResource {
     Handle<HwTexture> buildPointShadowMap(InflightContext& ctx, LightData light);
 
     Handle<HwBufferObject> createTransformBuffer(FrameGraph& rg, const Camera& camera, const glm::mat4& model, const glm::mat4& modelInvT);
-
-    Handle<HwProgram> fowradPassProgram;
-    Handle<HwProgram> forwardRTProgram;
-    Handle<HwProgram> blitProgram;
-    Handle<HwProgram> gbufferGenProgram;
-    Handle<HwProgram> ddgiProbeRayGenProgram;
-    Handle<HwProgram> ddgiProbeRayShadeProgram;
-    Handle<HwProgram> ddgiShadeProgram;
-    Handle<HwProgram> ddgiProbeUpdateProgram;
-    Handle<HwProgram> deferredRenderProgram;
-    Handle<HwProgram> pointShadowGenProgram;
 
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
@@ -192,6 +184,8 @@ class Renderer : public IdResource {
     Handle<HwTexture> probeTexture;
     Handle<HwTexture> probeDistTexture;
     Handle<HwTexture> probeDistSquareTexture;
+
+    std::unordered_map<std::string, Handle<HwProgram> > programs;
 
     VulkanDriver driver;
     Engine& engine;

@@ -62,17 +62,29 @@ Handle<HwProgram> Renderer::loadGraphicsShader(const std::string& vertFilename, 
     return driver.createProgram(prog);
 }
 
+void Renderer::registerComputeShader(const std::string& shaderName, const std::string& filename)  {
+    programs.emplace(shaderName, loadComputeShader(filename));
+}
+
+void Renderer::registerGraphicsShader(const std::string& shaderName, const std::string& vertFilename, const std::string& fragFilename) {
+    programs.emplace(shaderName, loadGraphicsShader(vertFilename, fragFilename));
+}
+
+Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
+    return programs.at(shaderName);
+}
+
 void Renderer::registerPrograms() {
-    fowradPassProgram = loadGraphicsShader("shaders/ForwardPhong.vert", "shaders/ForwardPhong.frag");
-    blitProgram = loadGraphicsShader("shaders/DisplayTexture.vert", "shaders/DisplayTexture.frag");
-    forwardRTProgram = loadGraphicsShader("shaders/ForwardRT.vert", "shaders/ForwardRT.frag");
-    ddgiProbeRayGenProgram = loadComputeShader("shaders/DDGIProbeRayGen.comp");
-    ddgiProbeRayShadeProgram = loadComputeShader("shaders/DDGIProbeRayShade.comp");
-    pointShadowGenProgram = loadGraphicsShader("shaders/PointShadowGen.vert", "shaders/PointShadowGen.frag");
-    gbufferGenProgram = loadGraphicsShader("shaders/GBufferGen.vert", "shaders/GBufferGen.frag");
-    deferredRenderProgram = loadGraphicsShader("shaders/DeferredRender.vert", "shaders/DeferredRender.frag");
-    ddgiShadeProgram = loadGraphicsShader("shaders/DDGIShade.vert", "shaders/DDGIShade.frag");
-    ddgiProbeUpdateProgram = loadComputeShader("shaders/DDGIProbeUpdate.comp");
+    registerGraphicsShader("ForwardPhong", "shaders/ForwardPhong.vert", "shaders/ForwardPhong.frag");
+    registerGraphicsShader("DisplayTexture", "shaders/DisplayTexture.vert", "shaders/DisplayTexture.frag");
+    registerGraphicsShader("ForwardRT", "shaders/ForwardRT.vert", "shaders/ForwardRT.frag");
+    registerComputeShader("DDGIProbeRayGen", "shaders/DDGIProbeRayGen.comp");
+    registerComputeShader("DDGIProbeRayShade", "shaders/DDGIProbeRayShade.comp");
+    registerGraphicsShader("PointShadowGen", "shaders/PointShadowGen.vert", "shaders/PointShadowGen.frag");
+    registerGraphicsShader("GBufferGen", "shaders/GBufferGen.vert", "shaders/GBufferGen.frag");
+    registerGraphicsShader("DeferredRender", "shaders/DeferredRender.vert", "shaders/DeferredRender.frag");
+    registerGraphicsShader("DDGIShade", "shaders/DDGIShade.vert", "shaders/DDGIShade.frag");
+    registerComputeShader("DDGIProbeUpdate", "shaders/DDGIProbeUpdate.comp");
 }
 
 Renderer::~Renderer() {
@@ -278,7 +290,7 @@ Handle<HwTexture> Renderer::buildPointShadowMap(InflightContext& ctx, LightData 
             },
             .func = [this, ctx, sceneData, ub, rt](FrameGraph& rg) {
                 PipelineState pipe = {};
-                pipe.program = this->pointShadowGenProgram;
+                pipe.program = getShaderProgram("PointShadowGen");
                 pipe.depthTest.enabled = 1;
                 pipe.depthTest.write = 1;
                 pipe.depthTest.compareOp = CompareOp::LESS;
@@ -337,7 +349,7 @@ void Renderer::deferSuite(InflightContext& ctx) {
             auto& camera = ctx.scene->getCamera();
 
             PipelineState pipe = {};
-            pipe.program = this->gbufferGenProgram;
+            pipe.program = getShaderProgram("GBufferGen");
             pipe.depthTest.enabled = 1;
             pipe.depthTest.write = 1;
             pipe.depthTest.compareOp = CompareOp::LESS;
@@ -373,7 +385,7 @@ void Renderer::deferSuite(InflightContext& ctx) {
         .func = [this, ctx, renderTarget, positionBuffer, normalBuffer, diffuseBuffer](FrameGraph& rg) {
             auto& camera = ctx.scene->getCamera();
             PipelineState pipe = {};
-            pipe.program = this->deferredRenderProgram;
+            pipe.program = getShaderProgram("DeferredRender");
             pipe.bindUniformBuffer(0, 0, ctx.data->lightBuffer);
             pipe.bindTexture(1, 0, positionBuffer);
             pipe.bindTexture(1, 1, normalBuffer);
@@ -392,7 +404,7 @@ void Renderer::deferSuite(InflightContext& ctx) {
         },
         .func = [this, ctx, renderTarget, renderedBuffer](FrameGraph& rg) {
             PipelineState pipe = {};
-            pipe.program = this->blitProgram;
+            pipe.program = getShaderProgram("DisplayTexture");
             RenderPassParams params;
             driver.beginRenderPass(this->surfaceRenderTarget, params);
             pipe.bindTexture(1, 0, renderedBuffer);
@@ -446,7 +458,7 @@ void Renderer::rtSuite(InflightContext& ctx) {
             DDGIPushConstants constants = {};
 
             PipelineState pipe = {};
-            pipe.program = this->forwardRTProgram;
+            pipe.program = getShaderProgram("ForwardRT");
             driver.beginRenderPass(renderTarget, {});
             pipe.bindStorageBufferArray(1, 0, ctx.data->vertexPositionBuffers);
             pipe.bindStorageBufferArray(1, 1, ctx.data->vertexNormalBuffers);
@@ -466,7 +478,7 @@ void Renderer::rtSuite(InflightContext& ctx) {
         },
         .func = [this, renderedImage](FrameGraph& rg) {
             PipelineState pipe = {};
-            pipe.program = this->blitProgram;
+            pipe.program = getShaderProgram("DisplayTexture");
             RenderPassParams params;
             driver.beginRenderPass(this->surfaceRenderTarget, params);
             pipe.bindTexture(1, 0, renderedImage);
@@ -523,7 +535,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             pipe.bindUniformBuffer(0, 0, ctx.data->sceneBuffer);
             pipe.bindStorageBuffer(1, 0, rayBuffer);
             pipe.copyPushConstants(&constants, sizeof(constants));
-            pipe.program = ddgiProbeRayGenProgram;
+            pipe.program = getShaderProgram("DDGIProbeRayGen");
             driver.dispatch(pipe, probeNum, 1, 1);
         },
     });
@@ -570,7 +582,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             pipe.bindStorageBufferArray(1, 2, ctx.data->vertexUVBuffers);
             pipe.bindStorageBuffer(1, 3, hitBuffer);
             pipe.copyPushConstants(&constants, sizeof(constants));
-            pipe.program = ddgiProbeRayShadeProgram;
+            pipe.program = getShaderProgram("DDGIProbeRayShade");
             driver.dispatch(pipe, probeNum, 1, 1);
         },
     });
@@ -589,7 +601,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
         .func = [this, ctx, probeNum, rayGEmissionBuffer,  radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg) {
             auto& camera = ctx.scene->getCamera();
             PipelineState pipe = {};
-            pipe.program = this->ddgiShadeProgram;
+            pipe.program = getShaderProgram("DDGIShade");
             pipe.bindUniformBuffer(0, 0, ctx.data->sceneBuffer);
             pipe.bindUniformBuffer(0, 1, ctx.data->lightBuffer);
             pipe.bindTexture(1, 0, rayGPositionBuffer);
@@ -628,7 +640,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             pipe.bindStorageImage(2, 0, probeTexture);
             pipe.bindStorageImage(2, 1, probeDistTexture);
             pipe.bindStorageImage(2, 2, probeDistSquareTexture);
-            pipe.program = ddgiProbeUpdateProgram;
+            pipe.program = getShaderProgram("DDGIProbeUpdate");
             driver.dispatch(pipe, probeNum, 1, 1);
         },
     });
@@ -654,7 +666,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
         },
         .func = [this, ctx, probeNum, renderedImage, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg) {
             PipelineState pipe = {};
-            pipe.program = this->gbufferGenProgram;
+            pipe.program = getShaderProgram("GBufferGen");
             pipe.depthTest.enabled = 1;
             pipe.depthTest.write = 1;
             pipe.depthTest.compareOp = CompareOp::LESS;
@@ -690,7 +702,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             
             auto& camera = ctx.scene->getCamera();
             PipelineState pipe = {};
-            pipe.program = this->ddgiShadeProgram;
+            pipe.program = getShaderProgram("DDGIShade");
 
             pipe.bindUniformBuffer(0, 0, ctx.data->sceneBuffer);
             pipe.bindUniformBuffer(0, 1, ctx.data->lightBuffer);
@@ -714,7 +726,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
         },
         .func = [this,  probeNum, renderedImage](FrameGraph& rg) {
             PipelineState pipe = {};
-            pipe.program = this->blitProgram;
+            pipe.program = getShaderProgram("DisplayTexture");
             RenderPassParams params;
             driver.beginRenderPass(this->surfaceRenderTarget, params);
             pipe.bindTexture(1, 0, renderedImage);
