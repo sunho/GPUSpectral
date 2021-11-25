@@ -1,0 +1,50 @@
+#version 450
+
+#pragma shader_stage(compute)
+
+#define FIXED_POINT_PRECISION 1024
+
+#extension GL_GOOGLE_include_directive : require
+#include "common.glsl"
+layout (local_size_x = DEPTH_MAP_SIZE, local_size_y = DEPTH_MAP_SIZE) in;
+
+#extension GL_KHR_shader_subgroup_ballot: require
+#extension GL_KHR_shader_subgroup_arithmetic : require
+
+#include "probe.glsl"
+
+layout(std140, set=0, binding = 0) buffer RayBuffer {
+    Ray rays[];
+} rayBuffer;
+
+layout(set=1,binding = 0) uniform sampler2D distanceBuffer;
+layout (set=2,binding = 0, rgba16f) uniform image2D depthMap;
+
+shared int sampleCount;
+shared ivec4 reducedIrradiance;
+shared int reducedDist;
+shared int reducedDistSquare;
+
+void main() {
+    int probeID = int(gl_WorkGroupID.x);
+    ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
+    vec2 uv = vec2(iuv) / DEPTH_MAP_SIZE;
+    vec3 dir = octahedronReverseMap(uv);
+    vec2 sumDistance = vec2(0.0);
+    float sumWeight = 0.0;
+    for (int i = 0; i < RAYS_PER_PROBE; i++) {
+        uint rayID = i;
+        Ray ray = rayBuffer.rays[probeID * RAYS_PER_PROBE + rayID];
+        float dist = texelFetch(distanceBuffer, ivec2(rayID, probeID), 0).x;
+        float weight = dot(dir, ray.dir);
+        if (weight < 0.02) continue;
+        sumDistance += vec2(dist, dist * dist) * weight;
+        sumWeight += 1.0;
+    }
+    if (sumWeight < 0.02) return;
+    vec2 dist = sumDistance / sumWeight;
+    ivec2 startOffset = probeIDToDepthTexOffset(probeID);
+    ivec2 storeUv = startOffset + iuv;
+    vec4 bb = imageLoad(depthMap, storeUv);
+    imageStore(depthMap, storeUv, mix(bb, vec4(dist,0.0,0.0), 0.05));
+}

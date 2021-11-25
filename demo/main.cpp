@@ -12,6 +12,9 @@ std::filesystem::path basePath() {
     return out.parent_path();
 }
 
+
+
+
 int main() {
     sunho3d::Engine engine(basePath(), basePath() / "assets");
     sunho3d::Window* window = engine.createWindow(1200, 1200);
@@ -59,6 +62,6 @@ int main() {
         scene->getCamera().lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
         renderer->run(scene);
     });
-    
+   
     return 0;
 }

@@ -20,8 +20,6 @@ layout(std140, set=0, binding = 0) buffer RayBuffer {
 layout(set=1,binding = 0) uniform sampler2D radianceBuffer;
 layout(set=1,binding = 1) uniform sampler2D distanceBuffer;
 layout (set=2,binding = 0, rgba16f) uniform image2D irradianceMap;
-layout (set=2,binding = 1, rgba16f) uniform writeonly image2D distanceMap;
-layout (set=2,binding = 2, rgba16f) uniform writeonly image2D distanceSquareMap;
 
 shared int sampleCount;
 shared ivec4 reducedIrradiance;
@@ -43,32 +41,9 @@ void main() {
         sumIrradiance += max(0.0, dot(dir, ray.dir))* radiance;
     }
     vec4 irradiance = sumIrradiance / RAYS_PER_PROBE;
-    irradiance *= M_PI * 2.0;
+    irradiance *= M_PI * 4.0; // inverse of pdf which is stradian of unit sphere
     irradiance.a = 1.0;
     ivec2 startOffset = probeIDToIRDTexOffset(probeID);
     vec4 bb = imageLoad(irradianceMap, startOffset + iuv);
     imageStore(irradianceMap, startOffset + iuv, mix(bb,irradiance, 0.05));
-    /*
-    
-    if (gl_WorkGroupID.y == 0 && gl_WorkGroupID.z == 0) {
-        float distSG = subgroupInclusiveAdd(dist);
-        int disti = int(distSG * FIXED_POINT_PRECISION);
-        float distSquare = dist * dist;
-        float distSquareSG = subgroupInclusiveAdd(distSquare);
-        int distSquarei = int(distSquareSG * FIXED_POINT_PRECISION);
-        if (gl_SubgroupID == 0) {
-            atomicAdd(reducedDist, disti);
-            atomicAdd(reducedDistSquare, distSquarei);
-        }
-        barrier();
-        if (gl_LocalInvocationIndex == 0) {
-            float dist = float(reducedDist) / FIXED_POINT_PRECISION;
-            dist /= max(sampleCount,1);
-            float distSquare = float(reducedDistSquare) / FIXED_POINT_PRECISION;
-            distSquare /= max(sampleCount,1);
-            imageStore(distanceMap, ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(dist));
-            imageStore(distanceSquareMap,  ivec2(probeID % IRD_MAP_PROBE_COLS, probeID / IRD_MAP_PROBE_COLS), vec4(distSquare));
-        }
-    }*/
-
 }

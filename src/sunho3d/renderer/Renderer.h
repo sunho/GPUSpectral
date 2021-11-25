@@ -7,11 +7,14 @@
 #include "../Window.h"
 #include "../backend/vulkan/VulkanDriver.h"
 #include "../utils/ResourceList.h"
+#include "../Loader.h"
 
 namespace sunho3d {
 
 #define IRD_MAP_SIZE 8
 #define IRD_MAP_PROBE_COLS 8
+#define DEPTH_MAP_SIZE 24
+#define DEPTH_MAP_PROBE_COLS 16
 
 struct MaterialBuffer {
     glm::vec4 specular;
@@ -89,6 +92,7 @@ struct InflightData {
 
     Handle<HwBufferObject> sceneBuffer;
     Handle<HwBufferObject> lightBuffer;
+    SceneBuffer cpuSceneBuffer;
     std::vector<RTInstance> instances;
     std::vector<Handle<HwBufferObject>> materialBuffers;
     std::vector<Handle<HwBufferObject>> transformBuffers;
@@ -182,13 +186,14 @@ class Renderer : public IdResource {
     std::unique_ptr<GBuffer> gbuffer;
     std::unique_ptr<GBuffer> rayGbuffer;
     Handle<HwTexture> probeTexture;
-    Handle<HwTexture> probeDistTexture;
-    Handle<HwTexture> probeDistSquareTexture;
+    Handle<HwTexture> probeDepthTexture;
+    Mesh* cube;
 
     std::unordered_map<std::string, Handle<HwProgram> > programs;
 
     VulkanDriver driver;
     Engine& engine;
+    Loader loader;
     Window* window;
 
     size_t currentFrame{0};

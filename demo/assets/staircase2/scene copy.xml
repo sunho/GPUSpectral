@@ -251,6 +251,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="disk" >
 		<transform name="toWorld" >
@@ -261,6 +264,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="disk" >
 		<transform name="toWorld" >
@@ -271,6 +277,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="disk" >
 		<transform name="toWorld" >
@@ -281,6 +290,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="disk" >
 		<transform name="toWorld" >
@@ -291,6 +303,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="rectangle" >
 		<transform name="toWorld" >
@@ -301,6 +316,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="rectangle" >
 		<transform name="toWorld" >
@@ -311,6 +329,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="rectangle" >
 		<transform name="toWorld" >
@@ -321,6 +342,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="rectangle" >
 		<transform name="toWorld" >
@@ -331,6 +355,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.5, 1.5, 1.5"/>
+		</emitter>
 	</shape>
 	<shape type="rectangle" >
 		<transform name="toWorld" >
@@ -341,6 +368,9 @@
 				<rgb name="reflectance" value="0, 0, 0"/>
 			</bsdf>
 		</bsdf>
+		<emitter type="area" >
+			<rgb name="radiance" value="1.59891, 1.59891, 1.59891"/>
+		</emitter>
 	</shape>
 	<shape type="rectangle" >
 		<transform name="toWorld" >

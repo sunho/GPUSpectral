@@ -17,6 +17,11 @@ ivec2 probeIDToIRDTexOffset(int id) {
     return startOffset;
 }
 
+ivec2 probeIDToDepthTexOffset(int id) {
+    ivec2 startOffset = ivec2((id % DEPTH_MAP_PROBE_COLS) * DEPTH_MAP_SIZE, (id / DEPTH_MAP_PROBE_COLS) * DEPTH_MAP_SIZE);
+    return startOffset;
+}
+
 int gridToProbeID(ivec3 grid, SceneInfo sceneInfo) {
     return grid.x + grid.y * int(sceneInfo.gridNum.x) + grid.z * int(sceneInfo.gridNum.y * sceneInfo.gridNum.x);
 }

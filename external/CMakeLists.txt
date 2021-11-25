@@ -26,6 +26,7 @@ add_library(tinyobjloader INTERFACE)
 target_include_directories(tinyobjloader INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/tinyobjloader)
 
 set(TRACY_CALLSTACK ON CACHE BOOL "" FORCE)
+set(TRACY_ENABLE OFF CACHE BOOL "" FORCE)
 add_subdirectory(tracy)
 
 function(add_vulkan_library LIBNAME DEBUGLIBPATH RELEASELIBPATH)

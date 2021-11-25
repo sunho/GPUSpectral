@@ -16,7 +16,7 @@ template <class... Ts>
 overload(Ts...) -> overload<Ts...>;
 
 Renderer::Renderer(Engine& engine, Window* window)
-    : engine(engine), window(window), driver(window, engine.getBasePath()) {
+    : engine(engine), window(window), driver(window, engine.getBasePath()), loader(engine, *this) {
     for (size_t i = 0; i < MAX_INFLIGHTS; ++i) {
         inflights[i].fence = driver.createFence();
         inflights[i].rg = std::make_unique<FrameGraph>(driver);
@@ -43,6 +43,8 @@ Renderer::Renderer(Engine& engine, Window* window)
     primitive.vertexBuffer = vbo;
     quadPrimitive = driver.createPrimitive(PrimitiveMode::TRIANGLES);
     driver.setPrimitiveBuffer(quadPrimitive, vbo, ibo);
+
+    cube = loader.loadObj(engine.assetPath("cube.obj"));
 
     surfaceRenderTarget = driver.createDefaultRenderTarget();
     
@@ -84,7 +86,9 @@ void Renderer::registerPrograms() {
     registerGraphicsShader("GBufferGen", "shaders/GBufferGen.vert", "shaders/GBufferGen.frag");
     registerGraphicsShader("DeferredRender", "shaders/DeferredRender.vert", "shaders/DeferredRender.frag");
     registerGraphicsShader("DDGIShade", "shaders/DDGIShade.vert", "shaders/DDGIShade.frag");
-    registerComputeShader("DDGIProbeUpdate", "shaders/DDGIProbeUpdate.comp");
+    registerComputeShader("DDGIProbeDepthUpdate", "shaders/DDGIProbeDepthUpdate.comp");
+    registerComputeShader("DDGIProbeIrradianceUpdate", "shaders/DDGIProbeIrradianceUpdate.comp");
+    registerGraphicsShader("ProbeDebug", "shaders/ProbeDebug.vert", "shaders/ProbeDebug.frag");
 }
 
 Renderer::~Renderer() {
@@ -193,6 +197,7 @@ void Renderer::prepareSceneData(InflightContext& ctx) {
             auto tb = ctx.rg->createTempUniformBuffer((void*)&transformBuffer, sizeof(TransformBuffer));
             ctx.data->transformBuffers.push_back(tb);
         }
+        ctx.data->cpuSceneBuffer = sb;
         ctx.data->sceneBuffer = ctx.rg->createTempUniformBuffer((void*)&sb, sizeof(SceneBuffer));
     }
 
@@ -488,18 +493,48 @@ void Renderer::rtSuite(InflightContext& ctx) {
     });
 }
 
+glm::ivec3 probIDToGrid(int id, DDGISceneInfo sceneInfo) {
+    glm::ivec3 gridNum = glm::ivec3(sceneInfo.gridNum);
+    int x = id % gridNum.x;
+    int y = (id % (gridNum.x * gridNum.y)) / gridNum.x;
+    int z = id / (gridNum.x * gridNum.y);
+    return glm::ivec3(x, y, z);
+}
+
+glm::vec3 gridToPos(glm::ivec3 grid, DDGISceneInfo sceneInfo) {
+    glm::vec3 gridSize = sceneInfo.sceneSize * 2.0f / glm::vec3(sceneInfo.gridNum);
+    glm::vec3 ogd = glm::vec3(grid) * gridSize;
+    return ogd - sceneInfo.sceneSize + sceneInfo.sceneCenter;
+}
+
+glm::vec3 probeIDToPos(int id, DDGISceneInfo sceneInfo) {
+    glm::ivec3 grid = probIDToGrid(id, sceneInfo);
+    return gridToPos(grid, sceneInfo);
+}
+
+struct ProbeDebugUniformBuffer {
+    glm::mat4 MVP;
+    glm::mat4 model;
+    DDGISceneInfo sceneInfo;
+    int probeId;
+};
+
 
 void Renderer::ddgiSuite(InflightContext& ctx) {
     glm::uvec3 gridNum = ctx.scene->ddgi.gridNum;
     size_t probeNum = gridNum.x * gridNum.y * gridNum.z;
     glm::uvec2 probeTexSize = glm::uvec2(IRD_MAP_SIZE * IRD_MAP_PROBE_COLS, IRD_MAP_SIZE * (probeNum / IRD_MAP_PROBE_COLS));
+    glm::uvec2 depthTexSize = glm::uvec2(DEPTH_MAP_SIZE * DEPTH_MAP_PROBE_COLS, DEPTH_MAP_SIZE * (probeNum / DEPTH_MAP_PROBE_COLS));
     if (!rayGbuffer) {
         rayGbuffer = std::make_unique<GBuffer>(driver, RAYS_PER_PROBE, probeNum);
         probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, probeTexSize.x, probeTexSize.y, 1);
-        probeDistTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS), 1);
-        probeDistSquareTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, IRD_MAP_PROBE_COLS, (probeNum / IRD_MAP_PROBE_COLS), 1);
+        probeDepthTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, depthTexSize.x, depthTexSize.y, 1);
+
         std::vector<half> blank(probeTexSize.x * probeTexSize.y*4, 0.0f);
         driver.copyTextureInitialData(probeTexture, { .data = (uint32_t*)blank.data(), .size = 0 });
+
+        std::vector<half> blank2(depthTexSize.x * depthTexSize.y * 4, 0.0f);
+        driver.copyTextureInitialData(probeDepthTexture, { .data = (uint32_t*)blank2.data(), .size = 0 });
     }
  
     if (!gbuffer) {
@@ -587,6 +622,8 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
         },
     });
 
+
+
     ctx.rg->addFramePass({
         .name = "ray gbuffer shade",
         .textures = {
@@ -609,7 +646,8 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             pipe.bindTexture(1, 2, rayGDiffuseBuffer);
             pipe.bindTexture(1, 3, rayGEmissionBuffer);
             pipe.bindTexture(1, 4, probeTexture);
-            pipe.bindTextureArray(1, 5, ctx.data->shadowMaps);
+            pipe.bindTexture(1, 5, probeDepthTexture);
+            pipe.bindTextureArray(1, 6, ctx.data->shadowMaps);
             RenderPassParams params;
             driver.beginRenderPass(radianceRenderTarget, params);
             driver.draw(pipe, quadPrimitive);
@@ -619,13 +657,11 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
 
     // Third pass: probe update (compute)
     ctx.rg->addFramePass({
-        .name = "probe update",
+        .name = "probe irradiance update",
         .textures = {
             { {randianceBuffer}, ResourceAccessType::ComputeRead },
             { {distanceBuffer}, ResourceAccessType::ComputeRead },
             { {probeTexture}, ResourceAccessType::ComputeWrite },
-            { {probeDistTexture}, ResourceAccessType::ComputeWrite },
-            { {probeDistSquareTexture}, ResourceAccessType::ComputeWrite },
         },
         .buffers = {
             { {rayBuffer}, ResourceAccessType::ComputeRead },
@@ -638,9 +674,28 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             pipe.bindTexture(1, 0, randianceBuffer);
             pipe.bindTexture(1, 1, distanceBuffer);
             pipe.bindStorageImage(2, 0, probeTexture);
-            pipe.bindStorageImage(2, 1, probeDistTexture);
-            pipe.bindStorageImage(2, 2, probeDistSquareTexture);
-            pipe.program = getShaderProgram("DDGIProbeUpdate");
+            pipe.program = getShaderProgram("DDGIProbeIrradianceUpdate");
+            driver.dispatch(pipe, probeNum, 1, 1);
+        },
+    });
+
+    ctx.rg->addFramePass({
+        .name = "probe depth update",
+        .textures = {
+            { {distanceBuffer}, ResourceAccessType::ComputeRead },
+            { {probeDepthTexture}, ResourceAccessType::ComputeWrite },
+        },
+        .buffers = {
+            { {rayBuffer}, ResourceAccessType::ComputeRead },
+        },
+        .func = [this, probeNum, rayBuffer, randianceBuffer, distanceBuffer](FrameGraph& rg) {
+            DDGIPushConstants constants = {};
+            constants.globalRngState = rand();
+            PipelineState pipe = {};
+            pipe.bindStorageBuffer(0, 0, rayBuffer);
+            pipe.bindTexture(1, 0, distanceBuffer);
+            pipe.bindStorageImage(2, 0, probeDepthTexture);
+            pipe.program = getShaderProgram("DDGIProbeDepthUpdate");
             driver.dispatch(pipe, probeNum, 1, 1);
         },
     });
@@ -656,6 +711,23 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
     auto diffuseBuffer = gbuffer->diffuseBuffer;
     auto emissionBuffer = gbuffer->emissionBuffer;
     
+    std::vector<Handle<HwBufferObject>> probeUniformBuffers;
+    DDGISceneInfo sceneInfo = ctx.data->cpuSceneBuffer.sceneInfo;
+    for (size_t i = 0; i < probeNum; ++i) {
+        glm::vec3 pos = probeIDToPos(i, sceneInfo);
+        glm::vec3 gridSize = sceneInfo.sceneSize * 2.0f / glm::vec3(sceneInfo.gridNum);
+        auto scaler = glm::scale(glm::identity<glm::mat4>(), gridSize * 0.1f);
+        auto model = glm::translate(glm::identity<glm::mat4>(), pos) * scaler;
+        auto mvp = ctx.scene->getCamera().proj * ctx.scene->getCamera().view * model;
+        ProbeDebugUniformBuffer ub = {};
+        ub.model = model;
+        ub.MVP = mvp;
+        ub.probeId = i;
+        ub.sceneInfo = sceneInfo;
+        auto ubo = ctx.rg->createTempUniformBuffer(&ub, sizeof(ProbeDebugUniformBuffer));
+        probeUniformBuffers.push_back(ubo);
+    }
+
     ctx.rg->addFramePass({
         .name = "gbuffer gen",
         .textures = {
@@ -664,7 +736,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             { {diffuseBuffer}, ResourceAccessType::ColorWrite },
             { {emissionBuffer}, ResourceAccessType::ColorWrite },
         },
-        .func = [this, ctx, probeNum, renderedImage, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg) {
+        .func = [this, ctx, probeUniformBuffers, probeNum, renderedImage, rayBuffer, hitBuffer, distanceBuffer, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg) {
             PipelineState pipe = {};
             pipe.program = getShaderProgram("GBufferGen");
             pipe.depthTest.enabled = 1;
@@ -683,6 +755,14 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
                 }
                 driver.draw(pipe, geom.primitive.hwInstance);
             }
+            pipe.bindings.clear();
+            pipe.program = getShaderProgram("ProbeDebug");
+            for (size_t i = 0; i < probeNum; ++i) {
+                pipe.bindUniformBuffer(0, 0, probeUniformBuffers[i]);
+                pipe.bindTexture(1, 0, probeTexture);
+                pipe.bindTexture(1, 1, probeDepthTexture);
+                driver.draw(pipe, cube->getPrimitives().front().hwInstance);
+            }
             driver.endRenderPass();
         },
     });
@@ -695,6 +775,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             { {diffuseBuffer}, ResourceAccessType::FragmentRead },
             { {emissionBuffer}, ResourceAccessType::FragmentRead },
             { {probeTexture}, ResourceAccessType::FragmentRead },
+            { {probeDepthTexture}, ResourceAccessType::FragmentRead},
              { ctx.data->shadowMaps, ResourceAccessType::FragmentRead},
             { {renderedImage}, ResourceAccessType::ColorWrite },
         },
@@ -711,7 +792,8 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             pipe.bindTexture(1, 2, diffuseBuffer);
             pipe.bindTexture(1, 3, emissionBuffer);
             pipe.bindTexture(1, 4, probeTexture);
-            pipe.bindTextureArray(1, 5, ctx.data->shadowMaps);
+            pipe.bindTexture(1, 5, probeDepthTexture);
+            pipe.bindTextureArray(1, 6, ctx.data->shadowMaps);
             RenderPassParams params;
             driver.beginRenderPass(renderTarget, params);
             driver.draw(pipe, quadPrimitive);

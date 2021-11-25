@@ -19,8 +19,6 @@ layout(std140, set=1, binding = 0) buffer RayBuffer {
     Ray rays[];
 } rayBuffer;
 
-
-
 void main() {
     int probeID = int(gl_WorkGroupID.x);
     uint rayID = gl_LocalInvocationID.x;
