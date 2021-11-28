@@ -55,7 +55,7 @@ struct Instance {
 
 #define MAX_MESH_COUNT 64
 static constexpr const size_t MAX_INSTANCES = 64;
-static constexpr const size_t RAYS_PER_PROBE = 32;
+static constexpr const size_t RAYS_PER_PROBE = 64;
 
 struct DDGIPushConstants {
     uint32_t globalRngState;

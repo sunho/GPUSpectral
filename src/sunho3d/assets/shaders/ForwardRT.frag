@@ -101,6 +101,6 @@ void main() {
         vec3 pos = bary.x * p1 + bary.y * p2 + bary.z * p0;
         //nor.z *= -1.0;
         vec2 uv = bary.x * v1.uv + bary.y * v2.uv + bary.z * v0.uv;
-        outColor = vec4(pos, 1.0);
+        outColor = vec4(nor, 1.0);
     }
 }

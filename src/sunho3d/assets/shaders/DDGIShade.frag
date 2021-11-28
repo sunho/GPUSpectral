@@ -59,7 +59,7 @@ void main() {
     vec4 sumIrradiance = vec4(0.0);
     //outColor = vec4(grid / vec3(sceneBuffer.sceneInfo.gridNum), 0.0);
     //return;
-    
+
     for (int i = 0; i < 2; ++i) {
         for (int j = 0; j < 2; ++j) {
             for (int k = 0; k < 2; ++k) {
@@ -85,7 +85,7 @@ void main() {
                 weight *= max(0.05, dot(lightDir, normal));
 
                 // visibility testing
-                ivec2 depthStartOffset = probeIDToIRDTexOffset(probeID);
+                ivec2 depthStartOffset = probeIDToDepthTexOffset(probeID);
                 vec2 depthUv = octahedronMap(lightDir);
                 vec2 depthTuv = (depthStartOffset + depthUv * DEPTH_MAP_SIZE) / textureSize(probeDepthMap,0);
                 vec4 dist = texture(probeDepthMap, depthTuv);

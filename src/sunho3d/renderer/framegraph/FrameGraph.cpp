@@ -17,7 +17,7 @@ void FrameGraph::addFramePass(FramePass pass) {
 }
 
 Handle<HwBufferObject> FrameGraph::createTempUniformBuffer(void* data, size_t size) {
-    auto buffer = createBufferObjectSC(size, BufferUsage::UNIFORM | BufferUsage::TRANSFER_SRC);
+    auto buffer = createBufferObjectSC(size, BufferUsage::UNIFORM | BufferUsage::TRANSFER_DST);
     auto staging = createBufferObjectSC(size, BufferUsage::STAGING);
     driver.updateStagingBufferObject(staging, { .data = (uint32_t*)data, .size = size }, 0);
     driver.copyBufferObject(buffer, staging);
@@ -223,9 +223,9 @@ void FrameGraph::compile() {
                     pass.barriers.push_back(barrier);
                 } else {
                     auto barrier = generateBufferBarrier(res, res);
-                    barrier.srcStage = BarrierStageMask::TOP_OF_PIPE;
-                    barrier.srcAccess = BarrierAccessFlag::NONE;
-                    barrier.dstAccess = BarrierAccessFlag::SHADER_WRITE;
+                    barrier.srcStage = BarrierStageMask::TRANSFER;
+                    barrier.srcAccess = BarrierAccessFlag::TRANSFER_WRITE;
+                    barrier.dstAccess = BarrierAccessFlag::SHADER_READ;
                     pass.barriers.push_back(barrier);
                 }
             }

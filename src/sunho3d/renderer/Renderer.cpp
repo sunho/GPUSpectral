@@ -756,13 +756,13 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
                 driver.draw(pipe, geom.primitive.hwInstance);
             }
             pipe.bindings.clear();
-            pipe.program = getShaderProgram("ProbeDebug");
+            /*pipe.program = getShaderProgram("ProbeDebug");
             for (size_t i = 0; i < probeNum; ++i) {
                 pipe.bindUniformBuffer(0, 0, probeUniformBuffers[i]);
                 pipe.bindTexture(1, 0, probeTexture);
                 pipe.bindTexture(1, 1, probeDepthTexture);
                 driver.draw(pipe, cube->getPrimitives().front().hwInstance);
-            }
+            }*/
             driver.endRenderPass();
         },
     });
@@ -800,6 +800,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             driver.endRenderPass();
         },
     });
+
     
     ctx.rg->addFramePass({
         .name = "blit",

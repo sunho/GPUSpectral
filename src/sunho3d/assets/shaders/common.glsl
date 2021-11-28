@@ -7,7 +7,7 @@
 #define IRD_MAP_PROBE_COLS 8
 #define DEPTH_MAP_SIZE 24
 #define DEPTH_MAP_PROBE_COLS 16
-#define RAYS_PER_PROBE 32
+#define RAYS_PER_PROBE 64
 
 struct Vertex {
     vec3 pos;

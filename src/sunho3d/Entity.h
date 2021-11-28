@@ -88,7 +88,7 @@ class Entity : public IdResource {
 
     void setTransformMatrix(const glm::mat4 &mat) {
         transform = mat;
-        transformInvT = glm::inverse(glm::transpose(mat));
+        transformInvT = glm::inverse(glm::transpose(glm::mat3(mat)));
     }
 
   private:

@@ -19,6 +19,6 @@ layout(binding = 0) uniform TransformUniformBuffer {
 void main() {
     gl_Position = transform.MVP*vec4(inPosition, 1.0);
     uv = inTex;
-    normal = vec3(transform.invModelT*vec4(inNormal,0.0));
+    normal = vec3(mat3(transpose(inverse(transform.model))) * inNormal);
     pos = vec3(transform.model*vec4(inPosition,1.0));
 }

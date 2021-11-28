@@ -26,6 +26,8 @@ shared int reducedDist;
 shared int reducedDistSquare;
 
 void main() {
+    float depthSharpness = 5.0;
+    float maxDist = 10.0;
     int probeID = int(gl_WorkGroupID.x);
     ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
     vec2 uv = vec2(iuv) / DEPTH_MAP_SIZE;
@@ -36,15 +38,19 @@ void main() {
         uint rayID = i;
         Ray ray = rayBuffer.rays[probeID * RAYS_PER_PROBE + rayID];
         float dist = texelFetch(distanceBuffer, ivec2(rayID, probeID), 0).x;
-        float weight = dot(dir, ray.dir);
-        if (weight < 0.02) continue;
+        if (dist == 0.0) dist = maxDist;
+        if (dist > maxDist) dist = maxDist;
+        float weight = pow(max(0.0, dot(dir, ray.dir)), depthSharpness);
         sumDistance += vec2(dist, dist * dist) * weight;
-        sumWeight += 1.0;
+        sumWeight += weight;
     }
-    if (sumWeight < 0.02) return;
     vec2 dist = sumDistance / sumWeight;
     ivec2 startOffset = probeIDToDepthTexOffset(probeID);
     ivec2 storeUv = startOffset + iuv;
+    if (sumWeight < 0.02) {
+        imageStore(depthMap, storeUv, vec4(0.0, 0.0,1.0, 0.0));
+    }
+
     vec4 bb = imageLoad(depthMap, storeUv);
     imageStore(depthMap, storeUv, mix(bb, vec4(dist,0.0,0.0), 0.05));
 }

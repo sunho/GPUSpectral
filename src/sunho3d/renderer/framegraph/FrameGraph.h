@@ -125,6 +125,7 @@ class FrameGraph {
 
     void addFramePass(FramePass pass);
     Handle<HwBufferObject> createTempUniformBuffer(void* data, size_t size);
+    Handle<HwBufferObject> createPermenantUniformBuffer(void* data, size_t size);
 
 #define SCRATCH_IMPL(RESOURCENAME, METHODNAME)                        \
     template <typename... ARGS>                                       \
