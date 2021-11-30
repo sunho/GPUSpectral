@@ -20,11 +20,11 @@ int main() {
     
 
     //sunho3d::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
-    
+    /*
     auto scene = loader.loadMitsuba((basePath() / "assets" / "staircase2" / "scene.xml").string());
-    scene->ddgi.gridNum = glm::uvec3(32, 16, 32);
-    scene->ddgi.worldSize = glm::vec3(15.0f,10.0f,15.0f);
-    scene->ddgi.gridOrigin = glm::vec3(0.0f, 1.0f, 0.0f);
+    scene->ddgi.gridNum = glm::uvec3(32, 32, 32);
+    scene->ddgi.worldSize = glm::vec3(15.0f,15.0f,15.0f);
+    scene->ddgi.gridOrigin = glm::vec3(0.0f, 4.0f, 0.0f);
     glm::vec3 cameraPos = glm::vec3(6.0, 2.0, 1.0f);
     glm::vec3 origin = glm::vec3(-2.0, 1.0, 0.0);
 
@@ -54,10 +54,9 @@ int main() {
         scene->getCamera().lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
         renderer->run(scene);
     });
-   
+   */
 
-    /*
-
+    
     auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
     scene->ddgi.gridNum = glm::uvec3(16, 16, 16);
     scene->ddgi.worldSize = glm::vec3(1.5f, 1.5f, 1.5f);
@@ -90,6 +89,11 @@ int main() {
         }
         scene->getCamera().lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
         renderer->run(scene);
-    });*/
+    });
+    
+
+
+
+
     return 0;
 }

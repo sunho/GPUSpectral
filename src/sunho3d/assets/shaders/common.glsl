@@ -5,8 +5,13 @@
 #define MAX_MESH_COUNT 64
 #define IRD_MAP_SIZE 8
 #define IRD_MAP_PROBE_COLS 8
+#define IRD_MAP_BORDER 1
+#define IRD_MAP_TEX_SIZE 10
+
 #define DEPTH_MAP_SIZE 24
 #define DEPTH_MAP_PROBE_COLS 16
+#define DEPTH_MAP_BORDER 1
+#define DEPTH_MAP_TEX_SIZE 26
 #define RAYS_PER_PROBE 64
 
 struct Vertex {

@@ -112,7 +112,7 @@ VulkanTexture::~VulkanTexture() {
     _image.destroy(device);
 }
 
-void VulkanTexture::copyInitialData(const BufferDescriptor &data) {
+void VulkanTexture::copyInitialData(const BufferDescriptor &data, ImageLayout finalLayout) {
     auto bi = vk::BufferCreateInfo().setSize(width * height * getTextureFormatSize(format)).setUsage(vk::BufferUsageFlagBits::eTransferSrc);
     auto staging = device.allocateBuffer(bi, VMA_MEMORY_USAGE_CPU_ONLY);
     {
@@ -158,7 +158,7 @@ void VulkanTexture::copyInitialData(const BufferDescriptor &data) {
         vk::ImageMemoryBarrier imageBarrier_toReadable = imageBarrier_toTransfer;
 
         imageBarrier_toReadable.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-        imageBarrier_toReadable.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+        imageBarrier_toReadable.newLayout = translateImageLayout(finalLayout);
         imageBarrier_toReadable.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
         imageBarrier_toReadable.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
@@ -166,8 +166,8 @@ void VulkanTexture::copyInitialData(const BufferDescriptor &data) {
     });
     staging.destroy(device);
 
-    imageLayout = ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-    vkImageLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    imageLayout = finalLayout;
+    vkImageLayout = translateImageLayout(finalLayout);
 }
 
 void VulkanTexture::copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_t width, uint32_t height, const ImageSubresource& subresource) {

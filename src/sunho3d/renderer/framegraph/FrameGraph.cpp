@@ -1,6 +1,7 @@
 #include "FrameGraph.h"
 #include <stack>
 #include <Tracy.hpp>
+#include <iostream>
 
 
 FrameGraph::FrameGraph(sunho3d::VulkanDriver& driver)
@@ -170,7 +171,7 @@ void FrameGraph::compile() {
                     if (type == ResourceType::Image) {
                         auto res = pass.resources.at(iter->first);
                         // hack: we should do this translation in vulkanrenderpass.attachments
-                        if (prevRes.accessType == ResourceAccessType::ColorWrite) {
+                        if (prevRes.accessType == ResourceAccessType::ColorWrite || prevRes.accessType == ResourceAccessType::DepthWrite) {
                             auto image = *getResource<Handle<HwTexture>>(res.resource);
                             Barrier barrier = {};
                             auto src = convertAccessTypeToBarrierStage(prevRes.accessType);
@@ -240,7 +241,9 @@ void FrameGraph::run() {
         for (auto& barrier : pass.barriers) {
             driver.setBarrier(barrier);
         }
+        std::cout << "pass start name: " << pass.name << std::endl;
         pass.func(*this);
+        std::cout << "pass end name: " << pass.name << std::endl;
     }
 }
 

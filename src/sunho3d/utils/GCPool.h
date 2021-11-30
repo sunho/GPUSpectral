@@ -7,7 +7,7 @@
 template <typename K, typename V, typename Hasher>
 class GCPool {
   public:
-    const static constexpr uint32_t INITIAL_REF_COUNT = 4;
+    const static constexpr uint32_t INITIAL_REF_COUNT = 8;
     template <typename G>
     struct Holder {
         uint32_t refCount;
@@ -22,7 +22,7 @@ class GCPool {
     std::optional<V> get(K key) {
         auto it = objs.find(key);
         if (it != objs.end()) {
-            ++it->second.refCount;
+            it->second.refCount = INITIAL_REF_COUNT;
             return it->second.value;
         }
         return std::nullopt;

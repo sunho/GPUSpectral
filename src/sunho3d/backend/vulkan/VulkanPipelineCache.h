@@ -146,7 +146,7 @@ class VulkanPipelineCache {
     using DescriptorSets = std::array<vk::DescriptorSet, ProgramParameterLayout::MAX_SET>;
 
     VulkanDescriptorAllocator &currentDescriptorAllocator() {
-        return descriptorAllocators[currentFrame % 3];
+        return descriptorAllocators[currentFrame % descriptorAllocators.size()];
     }
     PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute);
    
@@ -176,7 +176,7 @@ class VulkanPipelineCache {
     GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, KeyHasher> framebuffers;
     GCPool<VulkanAttachments, VkRenderPass, KeyHasher> renderpasses;
     GCPool<ProgramParameterLayout, PipelineLayout, KeyHasher> pipelineLayouts;
-    std::array<VulkanDescriptorAllocator, 4> descriptorAllocators;
+    std::array<VulkanDescriptorAllocator, 2> descriptorAllocators;
     size_t currentFrame{0};
 	VkDescriptorPool descriptorPool;
 

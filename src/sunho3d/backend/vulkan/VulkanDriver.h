@@ -10,7 +10,7 @@
 #include <Tracy.hpp>
 #include <TracyVulkan.hpp>
 #include <filesystem>
-
+#include <iostream>
 
 #include "../DriverBase.h"
 #include "../PipelineState.h"
@@ -81,7 +81,7 @@ class VulkanDriver {
 
   private:
     void setupDebugMessenger();
-    VulkanBindings translateBindingMap(const BindingMap& binds);
+    VulkanBindings translateBindingMap(const ProgramParameterLayout& layout, const BindingMap& binds);
     std::string profileZoneName(std::string zoneName);
     
 
@@ -130,6 +130,7 @@ class VulkanDriver {
 
     template <typename Dp, typename B>
     void destructHandle(const Handle<B> &handle) noexcept {
+        //std::cout << "destruct " << handle.getId() << std::endl;
         auto iter = handles.find(handle.getId());
         HandleData &data = iter->second;
         reinterpret_cast<Dp *>(data.data())->~Dp();
@@ -143,6 +144,8 @@ class VulkanDriver {
 
     std::unique_ptr<VulkanDevice> device;
     std::unique_ptr<VulkanRayTracer> rayTracer;
+    std::unique_ptr<VulkanTexture> dummyTex;
+    std::unique_ptr<VulkanBufferObject> dummyBuf;
     DriverContext context;
 };
 

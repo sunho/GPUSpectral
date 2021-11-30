@@ -42,7 +42,11 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
 VulkanDriver::VulkanDriver(Window *window, const std::filesystem::path& basePath) : basePath(basePath) {
     device = std::make_unique<VulkanDevice>(window);
     rayTracer = std::make_unique<VulkanRayTracer>(*device);
-    //setupDebugMessenger();
+    dummyTex = std::make_unique<VulkanTexture>(*device, SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT, 1, TextureFormat::RGBA8, 1, 1, 1);
+    uint32_t zero = 0;
+    dummyTex->copyInitialData({ .data = &zero }, ImageLayout::GENERAL);
+    dummyBuf = std::make_unique<VulkanBufferObject>(*device, 1, BufferUsage::UNIFORM | BufferUsage::STORAGE);
+    setupDebugMessenger();
 }
 
 VulkanDriver::~VulkanDriver() {
@@ -180,7 +184,7 @@ Extent2D VulkanDriver::getFrameSize(int dummy) {
 void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassParams params) {
     auto& cmd = context.inflight->cmd;
     VulkanRenderTarget *rt = handleCast<VulkanRenderTarget>(renderTarget);
-
+    std::cout << "id:" << renderTarget.getId() << "rt count:" << rt->attachmentCount << " surface:" << rt->surface << std::endl;
     vk::RenderPass renderPass = device->cache->getOrCreateRenderPass(device->wsi->currentSwapChain(), rt);
     vk::Framebuffer frameBuffer = device->cache->getOrCreateFrameBuffer(renderPass, device->wsi->currentSwapChain(), rt);
 
@@ -278,7 +282,7 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     };
 
     VulkanPipeline vkpipe = device->cache->getOrCreateGraphicsPipeline(state);
-    device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
+    device->cache->bindDescriptor(cmd, *program, translateBindingMap(program->program.parameterLayout, pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
         cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data()); 
@@ -295,7 +299,7 @@ void VulkanDriver::dispatch(PipelineState pipeline, size_t groupCountX, size_t g
 
     VulkanProgram* program = handleCast<VulkanProgram>(pipeline.program);
     VulkanPipeline vkpipe = device->cache->getOrCreateComputePipeline(*program);
-    device->cache->bindDescriptor(cmd, *program, translateBindingMap(pipeline.bindings));
+    device->cache->bindDescriptor(cmd, *program, translateBindingMap(program->program.parameterLayout, pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
         ZoneScopedN("Push constants");
@@ -517,7 +521,7 @@ void VulkanDriver::setupDebugMessenger() {
     }
 }
 
-VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
+VulkanBindings VulkanDriver::translateBindingMap(const ProgramParameterLayout& layout, const BindingMap & binds) {
     ZoneScopedN("Translate binding map")
     VulkanBindings bindings;
     for (auto [key, binding] : binds) {
@@ -526,6 +530,7 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
         vb.arraySize = 0;
         vb.set = key.set;
         vb.type = translateDescriptorType(binding.type);
+        auto& field = layout.fields[key.set * ProgramParameterLayout::MAX_BINDINGS + key.binding];
         switch (binding.type) {
             case ProgramParameterType::UNIFORM: {
                 for (auto handle : binding.handles) {
@@ -540,6 +545,15 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
                     vb.bufferInfo.push_back(bufferInfo);
                     ++vb.arraySize;
                 }
+                /*size_t rem = field.arraySize() - vb.arraySize;
+                for (size_t t = 0; t < rem; ++t) {
+                    vk::DescriptorBufferInfo bufferInfo{};
+                    bufferInfo.offset = 0;
+                    bufferInfo.buffer = dummyBuf->buffer;
+                    bufferInfo.range = dummyBuf->size;
+                    vb.bufferInfo.push_back(bufferInfo);
+                    ++vb.arraySize;
+                }*/
                 break;
             }
             case ProgramParameterType::STORAGE: {
@@ -555,6 +569,15 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
                     vb.bufferInfo.push_back(bufferInfo);
                     ++vb.arraySize;
                 }
+                /*size_t rem = field.arraySize() - vb.arraySize;
+                for (size_t t = 0; t < rem; ++t) {
+                    vk::DescriptorBufferInfo bufferInfo{};
+                    bufferInfo.offset = 0;
+                    bufferInfo.buffer = dummyBuf->buffer;
+                    bufferInfo.range = dummyBuf->size;
+                    vb.bufferInfo.push_back(bufferInfo);
+                    ++vb.arraySize;
+                }*/
                 break;
             }
             case ProgramParameterType::IMAGE:
@@ -570,6 +593,17 @@ VulkanBindings VulkanDriver::translateBindingMap(const BindingMap & binds) {
                     imageInfo.sampler = tex->sampler;
                     vb.imageInfo.push_back(imageInfo);
                     ++vb.arraySize;
+                }
+                if (vb.imageInfo.empty()) {
+                    size_t rem = field.arraySize() - vb.arraySize;
+                    for (size_t t = 0; t < rem; ++t) {
+                        vk::DescriptorImageInfo imageInfo{};
+                        imageInfo.imageLayout = dummyTex->vkImageLayout;
+                        imageInfo.imageView = dummyTex->view;
+                        imageInfo.sampler = dummyTex->sampler;
+                        vb.imageInfo.push_back(imageInfo);
+                        ++vb.arraySize;
+                    }
                 }
                 break;
             }

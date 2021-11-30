@@ -81,14 +81,13 @@ void main() {
                 // back face cull
                 vec3 probeToPoint = pos-probePos;
                 vec3 lightDir = normalize(-probeToPoint);
-                float distToProbe = length(probeToPoint);
-                weight *= max(0.05, dot(lightDir, normal));
+                float distToProbe = length(pos + 0.01*normal - probePos);
+                //distToProbe += 0.05;
+                weight *= max(0.01, dot(lightDir, normal));
 
                 // visibility testing
-                ivec2 depthStartOffset = probeIDToDepthTexOffset(probeID);
-                vec2 depthUv = octahedronMap(lightDir);
-                vec2 depthTuv = (depthStartOffset + depthUv * DEPTH_MAP_SIZE) / textureSize(probeDepthMap,0);
-                vec4 dist = texture(probeDepthMap, depthTuv);
+                vec2 depthUv = vec2(getDepthTexOffset(probeID, octahedronMap(lightDir))) / textureSize(probeDepthMap,0);
+                vec4 dist = texture(probeDepthMap, depthUv);
 
                 float mean = dist.x;
                 float variance = abs(dist.y - (mean * mean));
@@ -96,10 +95,8 @@ void main() {
                 float chebychev = variance / (variance + (t_sub_mean * t_sub_mean));
                 weight *= ((distToProbe <= mean) ? 1.0 : max(chebychev, 0.0));
 
-                ivec2 startOffset = probeIDToIRDTexOffset(probeID);
-                vec2 uv = octahedronMap(normal);
-                vec2 tuv = (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0);
-                vec4 irradiance = texture(probeIrradianceMap, tuv);
+                vec2 irdUv = vec2(getIRDTexOffset(probeID, octahedronMap(normal))) / textureSize(probeIrradianceMap,0);
+                vec4 irradiance = texture(probeIrradianceMap, irdUv);
                 
                 sumIrradiance += irradiance * weight;
                 sumWeight += weight;

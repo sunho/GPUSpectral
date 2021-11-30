@@ -139,7 +139,8 @@ Scene *Loader::loadMitsuba(const std::string &path) {
                     auto pos = matrix[3];
                     l->setTransform({ .x = pos.x, .y = pos.y, .z = pos.z});
                     outScene->addLight(l);
-                    material->materialData = EmissionMaterialData{ glm::vec3(1.0f) };
+                    auto col = child->property("radiance").getColor();
+                    material->materialData = EmissionMaterialData{ glm::vec3(col.r, col.g, col.b) };
                 }
             }
 

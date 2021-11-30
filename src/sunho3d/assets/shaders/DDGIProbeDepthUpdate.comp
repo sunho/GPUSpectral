@@ -6,7 +6,7 @@
 
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
-layout (local_size_x = DEPTH_MAP_SIZE, local_size_y = DEPTH_MAP_SIZE) in;
+layout (local_size_x = DEPTH_MAP_TEX_SIZE, local_size_y = DEPTH_MAP_TEX_SIZE) in;
 
 #extension GL_KHR_shader_subgroup_ballot: require
 #extension GL_KHR_shader_subgroup_arithmetic : require
@@ -27,10 +27,15 @@ shared int reducedDistSquare;
 
 void main() {
     float depthSharpness = 5.0;
-    float maxDist = 10.0;
+    float maxDist = 5.0;
     int probeID = int(gl_WorkGroupID.x);
     ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
-    vec2 uv = vec2(iuv) / DEPTH_MAP_SIZE;
+    ivec2 iiuv = iuv - DEPTH_MAP_BORDER;
+    if (iiuv.x < 0 || iiuv.y < 0 || iiuv.x >= DEPTH_MAP_SIZE || iiuv.y >= DEPTH_MAP_SIZE) {
+        iiuv = iiuv % ivec2(DEPTH_MAP_SIZE, DEPTH_MAP_SIZE);
+        iiuv = ivec2(DEPTH_MAP_SIZE, DEPTH_MAP_SIZE) - iiuv;
+    }
+    vec2 uv = vec2(iiuv) / DEPTH_MAP_SIZE;
     vec3 dir = octahedronReverseMap(uv);
     vec2 sumDistance = vec2(0.0);
     float sumWeight = 0.0;
@@ -52,5 +57,10 @@ void main() {
     }
 
     vec4 bb = imageLoad(depthMap, storeUv);
-    imageStore(depthMap, storeUv, mix(bb, vec4(dist,0.0,0.0), 0.05));
+    if (bb == vec4(0.0)) {
+        imageStore(depthMap, storeUv, vec4(dist,0.0,0.0));
+    } else {
+        imageStore(depthMap, storeUv, mix(bb, vec4(dist,0.0,0.0), 0.05));
+    }
+
 }

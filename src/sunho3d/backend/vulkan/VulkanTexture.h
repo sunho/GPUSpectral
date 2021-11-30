@@ -9,7 +9,7 @@ class VulkanTexture : public HwTexture {
     VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsage usage, uint8_t levels,
                   TextureFormat format, uint32_t width, uint32_t height, uint32_t layers);
     ~VulkanTexture();
-    void copyInitialData(const BufferDescriptor &data);
+    void copyInitialData(const BufferDescriptor &data, ImageLayout finalLayout = ImageLayout::SHADER_READ_ONLY_OPTIMAL);
     void copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_t width,
                            uint32_t height, const ImageSubresource& subresource);
     void blitImage(vk::CommandBuffer cmd, VulkanTexture& srcImage, uint32_t width, uint32_t height, const ImageSubresource& srcSubresource, const ImageSubresource& dstSubresource);

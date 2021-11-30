@@ -31,8 +31,7 @@ void main() {
     vec3 normal = normalize(inPos);
     ivec2 startOffset = probeIDToIRDTexOffset(uniforms.probeId);
     vec2 uv = octahedronMap(normal);
-    vec2 tuv = (startOffset + uv * IRD_MAP_SIZE) / textureSize(probeIrradianceMap,0);
-    vec4 irradiance = textureLod(probeIrradianceMap, tuv, 0);
+    vec4 irradiance = textureLod(probeIrradianceMap, vec2(getIRDTexOffset(uniforms.probeId, uv)) / textureSize(probeIrradianceMap,0), 0);
 
     ivec2 depthStartOffset = probeIDToDepthTexOffset(uniforms.probeId);
     vec2 depthUv = octahedronMap(normal);
@@ -40,7 +39,7 @@ void main() {
     vec4 dist = texture(probeDepthMap, depthTuv);
 
     vec3 color = vec3(dist.x);
-    outEmission = vec4((normal+1.0)/2.0, 1.0);
+    outEmission = vec4(vec3(irradiance)/M_PI, 1.0);
     outNormal = vec4(0.0);
     outPos = vec4(0.0);
 }

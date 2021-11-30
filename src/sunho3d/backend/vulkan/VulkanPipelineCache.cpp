@@ -2,6 +2,8 @@
 #include <iostream>
 #include <Tracy.hpp>
 
+#include <sunho3d/utils/Log.h>
+
 void VulkanDescriptorAllocator::init(vk::Device newDevice) {
     device = newDevice;
 }
@@ -98,6 +100,7 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
         vkDestroyPipeline(this->device.device, pipeline, nullptr);
     });
     framebuffers.setDestroyer([=](VkFramebuffer framebuffer) {
+        std::cout << "destroy " << framebuffer << std::endl;
         vkDestroyFramebuffer(this->device.device, framebuffer, nullptr);
     });
     renderpasses.setDestroyer([=](VkRenderPass renderPass) {
@@ -114,7 +117,7 @@ void VulkanPipelineCache::tick() {
     framebuffers.tick();
     renderpasses.tick();
     ++currentFrame;
-    descriptorAllocators[currentFrame % descriptorAllocators.size()].resetPools();
+    currentDescriptorAllocator().resetPools();
 }
 
 VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute) {
@@ -365,6 +368,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
     ZoneScopedN("PipelineCache create renderpass")
     auto it = renderpasses.get(renderTarget->attachments);
     if (it) {
+        std::cout << hashStruct<VulkanAttachments>(renderTarget->attachments) << " " << * it << std::endl;
         return *it;
     }
     VkRenderPass out;
@@ -445,6 +449,7 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
     auto it = framebuffers.get(
         std::make_pair(renderPass, renderTarget->surface ? swapchain.view : nullptr));
     if (it) {
+        std::cout << renderPass << ":" << renderTarget->surface << swapchain.view << " " << *it << std::endl;
         return *it;
     }
 
@@ -481,3 +486,4 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
                      framebuffer);
     return framebuffer;
 }
+

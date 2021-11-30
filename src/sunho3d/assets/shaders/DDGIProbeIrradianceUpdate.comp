@@ -6,7 +6,7 @@
 
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
-layout (local_size_x = IRD_MAP_SIZE, local_size_y = IRD_MAP_SIZE) in;
+layout (local_size_x = IRD_MAP_TEX_SIZE, local_size_y = IRD_MAP_TEX_SIZE) in;
 
 #extension GL_KHR_shader_subgroup_ballot: require
 #extension GL_KHR_shader_subgroup_arithmetic : require
@@ -29,7 +29,12 @@ shared int reducedDistSquare;
 void main() {
     int probeID = int(gl_WorkGroupID.x);
     ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
-    vec2 uv = vec2(iuv) / IRD_MAP_SIZE;
+    ivec2 iiuv = iuv - IRD_MAP_BORDER;
+    if (iiuv.x < 0 || iiuv.y < 0 || iiuv.x >= IRD_MAP_SIZE || iiuv.y >= IRD_MAP_SIZE) {
+        iiuv = iiuv % ivec2(IRD_MAP_SIZE, IRD_MAP_SIZE);
+        iiuv = ivec2(IRD_MAP_SIZE, IRD_MAP_SIZE) - iiuv;
+    }
+    vec2 uv = vec2(iiuv) / IRD_MAP_SIZE;
     vec3 dir = octahedronReverseMap(uv);
     vec4 sumIrradiance = vec4(0.0);
     float sumWeight = 0.0;
@@ -50,6 +55,12 @@ void main() {
     irradiance *= 4.0 * M_PI; // inverse of pdf which is stradian of unit sphere
     irradiance.a = 1.0;
     ivec2 startOffset = probeIDToIRDTexOffset(probeID);
-    vec4 bb = imageLoad(irradianceMap, startOffset + iuv);
-    imageStore(irradianceMap, startOffset + iuv, mix(bb,irradiance, 0.05));
+    ivec2 storeUv = startOffset + iuv;
+    vec4 bb = imageLoad(irradianceMap, storeUv);
+    if (bb == vec4(0.0)) {
+        imageStore(irradianceMap, storeUv, irradiance);
+    } else {
+        imageStore(irradianceMap, storeUv, mix(bb,irradiance, 0.05));
+    }
+   
 }

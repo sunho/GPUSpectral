@@ -2,6 +2,7 @@
 
 #include <sunho3d/utils/HalfFloat/umHalf.h>
 #include <tiny_gltf.h>
+#include <iostream>
 
 #include "../Engine.h"
 #include "../Entity.h"
@@ -47,6 +48,10 @@ Renderer::Renderer(Engine& engine, Window* window)
     cube = loader.loadObj(engine.assetPath("cube.obj"));
 
     surfaceRenderTarget = driver.createDefaultRenderTarget();
+
+    dummyTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE , TextureFormat::RGBA8, 1, 1, 1, 1);
+    uint32_t zero = 0;
+    driver.copyTextureInitialData(dummyTexture, { .data = &zero });
     
     registerPrograms();
 }
@@ -239,6 +244,10 @@ void Renderer::prepareSceneData(InflightContext& ctx) {
             ctx.data->shadowMaps.push_back(shadowMap);
             shadowMapCache.emplace(i, shadowMap);
         }
+    }
+
+    if (ctx.data->diffuseMap.empty()) {
+        ctx.data->diffuseMap.push_back(dummyTexture);
     }
 
     RTSceneDescriptor desc = { ctx.data->instances.data(), ctx.data->instances.size() };
@@ -523,12 +532,12 @@ struct ProbeDebugUniformBuffer {
 void Renderer::ddgiSuite(InflightContext& ctx) {
     glm::uvec3 gridNum = ctx.scene->ddgi.gridNum;
     size_t probeNum = gridNum.x * gridNum.y * gridNum.z;
-    glm::uvec2 probeTexSize = glm::uvec2(IRD_MAP_SIZE * IRD_MAP_PROBE_COLS, IRD_MAP_SIZE * (probeNum / IRD_MAP_PROBE_COLS));
-    glm::uvec2 depthTexSize = glm::uvec2(DEPTH_MAP_SIZE * DEPTH_MAP_PROBE_COLS, DEPTH_MAP_SIZE * (probeNum / DEPTH_MAP_PROBE_COLS));
+    glm::uvec2 probeTexSize = glm::uvec2(IRD_MAP_TEX_SIZE * IRD_MAP_PROBE_COLS, IRD_MAP_TEX_SIZE * (probeNum / IRD_MAP_PROBE_COLS));
+    glm::uvec2 depthTexSize = glm::uvec2(DEPTH_MAP_TEX_SIZE * DEPTH_MAP_PROBE_COLS, DEPTH_MAP_TEX_SIZE * (probeNum / DEPTH_MAP_PROBE_COLS));
     if (!rayGbuffer) {
         rayGbuffer = std::make_unique<GBuffer>(driver, RAYS_PER_PROBE, probeNum);
         probeTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, probeTexSize.x, probeTexSize.y, 1);
-        probeDepthTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, depthTexSize.x, depthTexSize.y, 1);
+        probeDepthTexture = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::SAMPLEABLE | TextureUsage::STORAGE, TextureFormat::RGBA16F, 1, depthTexSize.x, depthTexSize.y, 1);
 
         std::vector<half> blank(probeTexSize.x * probeTexSize.y*4, 0.0f);
         driver.copyTextureInitialData(probeTexture, { .data = (uint32_t*)blank.data(), .size = 0 });
@@ -550,10 +559,14 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
     auto rayGEmissionBuffer = rayGbuffer->emissionBuffer;
     auto distanceBuffer = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, RAYS_PER_PROBE, probeNum, 1);
 
-    auto randianceBuffer = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT, TextureFormat::RGBA16F, 1, RAYS_PER_PROBE, probeNum, 1);
+    auto randianceBuffer = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, RAYS_PER_PROBE, probeNum, 1);
+    auto depth3 = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT, TextureFormat::DEPTH32F, 1, RAYS_PER_PROBE, probeNum, 1);
     RenderAttachments att = {};
     att.colors[0] = randianceBuffer;
+    att.depth = depth3;
     auto radianceRenderTarget = ctx.rg->createRenderTargetSC(RAYS_PER_PROBE, probeNum, att);
+    std::cout << "created: " << radianceRenderTarget.getId() << std::endl;
+    std::cout << "Radiance buffer: " << randianceBuffer.getId() << std::endl;
 
     ctx.rg->addFramePass({
         .name = "probe ray gens",
@@ -622,8 +635,6 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
         },
     });
 
-
-
     ctx.rg->addFramePass({
         .name = "ray gbuffer shade",
         .textures = {
@@ -635,7 +646,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             { ctx.data->shadowMaps, ResourceAccessType::FragmentRead},
             { {randianceBuffer}, ResourceAccessType::ColorWrite },
         },
-        .func = [this, ctx, probeNum, rayGEmissionBuffer,  radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg) {
+        .func = [this, ctx, probeNum, rayGEmissionBuffer, radianceRenderTarget, rayGPositionBuffer, rayGNormalBuffer, rayGDiffuseBuffer](FrameGraph& rg) {
             auto& camera = ctx.scene->getCamera();
             PipelineState pipe = {};
             pipe.program = getShaderProgram("DDGIShade");
@@ -654,7 +665,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
             driver.endRenderPass();
         },
     });
-
+    
     // Third pass: probe update (compute)
     ctx.rg->addFramePass({
         .name = "probe irradiance update",
@@ -713,6 +724,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
     
     std::vector<Handle<HwBufferObject>> probeUniformBuffers;
     DDGISceneInfo sceneInfo = ctx.data->cpuSceneBuffer.sceneInfo;
+    /*
     for (size_t i = 0; i < probeNum; ++i) {
         glm::vec3 pos = probeIDToPos(i, sceneInfo);
         glm::vec3 gridSize = sceneInfo.sceneSize * 2.0f / glm::vec3(sceneInfo.gridNum);
@@ -726,7 +738,7 @@ void Renderer::ddgiSuite(InflightContext& ctx) {
         ub.sceneInfo = sceneInfo;
         auto ubo = ctx.rg->createTempUniformBuffer(&ub, sizeof(ProbeDebugUniformBuffer));
         probeUniformBuffers.push_back(ubo);
-    }
+    }*/
 
     ctx.rg->addFramePass({
         .name = "gbuffer gen",

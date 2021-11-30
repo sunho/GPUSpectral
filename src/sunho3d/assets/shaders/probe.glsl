@@ -13,13 +13,25 @@ ivec3 probIDToGrid(int id, SceneInfo sceneInfo) {
 }
 
 ivec2 probeIDToIRDTexOffset(int id) {
-    ivec2 startOffset = ivec2((id % IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE, (id / IRD_MAP_PROBE_COLS) * IRD_MAP_SIZE);
+    ivec2 startOffset = ivec2((id % IRD_MAP_PROBE_COLS) * IRD_MAP_TEX_SIZE, (id / IRD_MAP_PROBE_COLS) * IRD_MAP_TEX_SIZE);
     return startOffset;
 }
 
+ivec2 getIRDTexOffset(int probeId, vec2 uv) {
+    ivec2 startOffset = probeIDToIRDTexOffset(probeId);
+    ivec2 texOffset = ivec2(startOffset.x + IRD_MAP_BORDER + uv.x * IRD_MAP_SIZE, startOffset.y + IRD_MAP_BORDER + uv.y * IRD_MAP_SIZE);
+    return texOffset;
+}
+
 ivec2 probeIDToDepthTexOffset(int id) {
-    ivec2 startOffset = ivec2((id % DEPTH_MAP_PROBE_COLS) * DEPTH_MAP_SIZE, (id / DEPTH_MAP_PROBE_COLS) * DEPTH_MAP_SIZE);
+    ivec2 startOffset = ivec2((id % DEPTH_MAP_PROBE_COLS) * DEPTH_MAP_TEX_SIZE, (id / DEPTH_MAP_PROBE_COLS) * DEPTH_MAP_TEX_SIZE);
     return startOffset;
+}
+
+ivec2 getDepthTexOffset(int probeId, vec2 uv) {
+    ivec2 startOffset = probeIDToDepthTexOffset(probeId);
+    ivec2 texOffset = ivec2(startOffset.x + DEPTH_MAP_BORDER + uv.x * DEPTH_MAP_SIZE, startOffset.y + DEPTH_MAP_BORDER + uv.y * DEPTH_MAP_SIZE);
+    return texOffset;
 }
 
 int gridToProbeID(ivec3 grid, SceneInfo sceneInfo) {

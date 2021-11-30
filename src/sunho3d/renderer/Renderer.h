@@ -13,8 +13,10 @@ namespace sunho3d {
 
 #define IRD_MAP_SIZE 8
 #define IRD_MAP_PROBE_COLS 8
+#define IRD_MAP_TEX_SIZE 10
 #define DEPTH_MAP_SIZE 24
 #define DEPTH_MAP_PROBE_COLS 16
+#define DEPTH_MAP_TEX_SIZE 26
 
 struct MaterialBuffer {
     glm::vec4 specular;
@@ -125,11 +127,11 @@ struct InflightContext {
 
 struct GBuffer {
     GBuffer(VulkanDriver& driver, uint32_t width, uint32_t height) {
-        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
-        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
-        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
-        emissionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, width, height, 1);
-        depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE, TextureFormat::DEPTH32F, 1, width, height, 1);
+        positionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE | TextureUsage::UPLOADABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        normalBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE | TextureUsage::UPLOADABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        diffuseBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE | TextureUsage::UPLOADABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        emissionBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT | TextureUsage::SAMPLEABLE | TextureUsage::UPLOADABLE, TextureFormat::RGBA16F, 1, width, height, 1);
+        depthBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::DEPTH_ATTACHMENT | TextureUsage::SAMPLEABLE | TextureUsage::UPLOADABLE, TextureFormat::DEPTH32F, 1, width, height, 1);
         RenderAttachments atts = {};
         atts.colors[0] = positionBuffer;
         atts.colors[1] = normalBuffer;
@@ -147,7 +149,7 @@ struct GBuffer {
     Handle<HwRenderTarget> renderTarget;
 };
 
-constexpr static size_t MAX_INFLIGHTS = 3; 
+constexpr static size_t MAX_INFLIGHTS = 2; 
 
 class Engine;
 class Renderer : public IdResource {
@@ -187,6 +189,7 @@ class Renderer : public IdResource {
     std::unique_ptr<GBuffer> rayGbuffer;
     Handle<HwTexture> probeTexture;
     Handle<HwTexture> probeDepthTexture;
+    Handle<HwTexture> dummyTexture;
     Mesh* cube;
 
     std::unordered_map<std::string, Handle<HwProgram> > programs;
