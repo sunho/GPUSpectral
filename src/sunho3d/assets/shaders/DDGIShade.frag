@@ -16,6 +16,7 @@ struct Light {
     vec3 pos;
     vec3 dir;
     vec2 RI;
+    vec4 radiance;
 };
 
 layout(std140, binding = 0) uniform _SceneBuffer{
@@ -81,7 +82,7 @@ void main() {
                 // back face cull
                 vec3 probeToPoint = pos-probePos;
                 vec3 lightDir = normalize(-probeToPoint);
-                float distToProbe = length(pos + 0.01*normal - probePos);
+                float distToProbe = length(pos + 0.02*normal - probePos);
                 //distToProbe += 0.05;
                 weight *= max(0.01, dot(lightDir, normal));
 
@@ -93,7 +94,7 @@ void main() {
                 float variance = abs(dist.y - (mean * mean));
                 float t_sub_mean = distToProbe - mean;
                 float chebychev = variance / (variance + (t_sub_mean * t_sub_mean));
-                weight *= ((distToProbe <= mean) ? 1.0 : max(chebychev, 0.0));
+              weight *= ((distToProbe <= mean) ? 1.0 : max(chebychev, 0.0));
 
                 vec2 irdUv = vec2(getIRDTexOffset(probeID, octahedronMap(normal))) / textureSize(probeIrradianceMap,0);
                 vec4 irradiance = texture(probeIrradianceMap, irdUv);
@@ -111,6 +112,7 @@ void main() {
 
     for (int i = 0; i < light.numLights; i++) {
         vec3 lightV = light.light[i].pos - pos;
+        vec4 lightR =  light.light[i].radiance;
         float depth = length(lightV);
         vec3 p = normalize(-lightV);
         //p.y *= -1.0;
@@ -124,8 +126,8 @@ void main() {
         vec3 light = normalize(lightV);
         vec3 h = normalize(light + v);
         float dis = length(lightV);
-        float lightI = 3.0/(dis*dis);
-        color += lightI* diffuse * max(dot(light,normal),0.0f);
+        float lightI = 0.5/(dis*dis);
+        color += lightI * diffuse * lightR * max(dot(light,normal),0.0f);
     }
     outColor = vec4(vec3(color), 1.0);
 }

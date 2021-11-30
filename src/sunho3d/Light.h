@@ -41,6 +41,14 @@ class Light : public IdResource {
         this->intensity = intensity;
     }
 
+    const glm::vec3 getRadiance() const {
+        return radiance;
+    }
+
+    void setRadiance(const glm::vec3& radiance) {
+        this->radiance = radiance;
+    }
+
     const float getRadius() const {
         return radius;
     }
@@ -53,6 +61,7 @@ class Light : public IdResource {
     float intensity{};
     float radius{};
     glm::vec3 direction;
+    glm::vec3 radiance;
     Type type;
 };
 

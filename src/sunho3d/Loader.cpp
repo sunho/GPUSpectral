@@ -135,14 +135,17 @@ Scene *Loader::loadMitsuba(const std::string &path) {
                     loadMaterial(material, *child, p);
       
                 } else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
+                    auto col = child->property("radiance").getColor();
+                    glm::vec3 radiance = glm::vec3(col.r, col.g, col.b);
                     auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
                     auto pos = matrix[3];
                     l->setTransform({ .x = pos.x, .y = pos.y, .z = pos.z});
+                    l->setRadiance(radiance);
                     outScene->addLight(l);
-                    auto col = child->property("radiance").getColor();
-                    material->materialData = EmissionMaterialData{ glm::vec3(col.r, col.g, col.b) };
+                    material->materialData = EmissionMaterialData{ radiance };
                 }
             }
+
 
   
             entity->setTransformMatrix(matrix);

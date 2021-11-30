@@ -27,7 +27,7 @@ shared int reducedDistSquare;
 
 void main() {
     float depthSharpness = 5.0;
-    float maxDist = 5.0;
+    float maxDist = 1.0;
     int probeID = int(gl_WorkGroupID.x);
     ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
     ivec2 iiuv = iuv - DEPTH_MAP_BORDER;

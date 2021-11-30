@@ -21,6 +21,7 @@ struct LightData {
     glm::vec4 pos;
     glm::vec4 dir;
     glm::vec4 RI;
+    glm::vec4 radiance;
 };
 
 static constexpr const size_t MAX_LIGHTS = 64;

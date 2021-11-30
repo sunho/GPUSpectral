@@ -34,7 +34,8 @@ void Scene::prepare() {
         sceneData.lightBuffer.lights[sceneData.lightBuffer.lightNum++] = {
             .pos = pos,
             .dir = dir,
-            .RI = RI
+            .RI = RI,
+            .radiance = glm::vec4(light->getRadiance(), 0.0)
         };
     }
 }
