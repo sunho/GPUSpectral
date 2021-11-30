@@ -60,7 +60,7 @@ void main() {
     if (bb == vec4(0.0)) {
         imageStore(irradianceMap, storeUv, irradiance);
     } else {
-        imageStore(irradianceMap, storeUv, mix(bb,irradiance, 0.05));
+        imageStore(irradianceMap, storeUv, mix(bb,irradiance, 0.01));
     }
    
 }

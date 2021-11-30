@@ -52,15 +52,15 @@ void main() {
     vec2 dist = sumDistance / sumWeight;
     ivec2 startOffset = probeIDToDepthTexOffset(probeID);
     ivec2 storeUv = startOffset + iuv;
-    if (sumWeight < 0.02) {
-        imageStore(depthMap, storeUv, vec4(0.0, 0.0,1.0, 0.0));
+    if (sumWeight < 0.25) {
+        return;
     }
 
     vec4 bb = imageLoad(depthMap, storeUv);
     if (bb == vec4(0.0)) {
         imageStore(depthMap, storeUv, vec4(dist,0.0,0.0));
     } else {
-        imageStore(depthMap, storeUv, mix(bb, vec4(dist,0.0,0.0), 0.05));
+        imageStore(depthMap, storeUv, mix(bb, vec4(dist,0.0,0.0), 0.01));
     }
 
 }

@@ -82,7 +82,7 @@ void main() {
                 // back face cull
                 vec3 probeToPoint = pos-probePos;
                 vec3 lightDir = normalize(-probeToPoint);
-                float distToProbe = length(pos + 0.02*normal - probePos);
+                float distToProbe = length(pos + 0.2*normal - probePos);
                 //distToProbe += 0.05;
                 weight *= max(0.01, dot(lightDir, normal));
 
