@@ -1,0 +1,3 @@
+[submodule "external/TinyParser-Mitsuba"]
+	path = external/TinyParser-Mitsuba
+	url = https://github.com/PearCoding/TinyParser-Mitsuba
