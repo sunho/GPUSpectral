@@ -17,24 +17,7 @@ set(SOURCE_LIST
   ${SHADERS_HEADERS}
 )
 
-find_package(CUDA 10.0 REQUIRED)
-if (OptiX74_FOUND)
-  set(OPTIX_INCLUDE_DIR "${OPTIX74_INCLUDE_DIR}")
-elseif (OptiX73_FOUND)
-  set(OPTIX_INCLUDE_DIR "${OPTIX73_INCLUDE_DIR}")
-elseif (OptiX72_FOUND)
-  set(OPTIX_INCLUDE_DIR "${OPTIX72_INCLUDE_DIR}")
-elseif(OptiX71_FOUND)
-  set(OPTIX_INCLUDE_DIR "${OPTIX71_INCLUDE_DIR}")
-elseif(OptiX70_FOUND)
-  set(OPTIX_INCLUDE_DIR "${OPTIX70_INCLUDE_DIR}")
-else()
-  message(FATAL_ERROR "No OptiX SDK 7.x found.")
-endif()
-
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
-
-include_directories(${OPTIX_INCLUDE_DIR})
 
 NVCUDA_COMPILE_PTX( SOURCES ${SHADERS}
                     DEPENDENCIES ${SHADERS_HEADERS}
@@ -46,8 +29,10 @@ NVCUDA_COMPILE_PTX( SOURCES ${SHADERS}
 add_executable(GPUSpectral ${SOURCE} ${SHADERS_HEADERS} ${PTX_SOURCES}) 
 target_link_libraries(
   GPUSpectral
-  ${CUDA_LIBRARIES}
-  ${CUDA_CUDA_LIBRARY}
+  stb_image
+  optix
+  cuda
+  tinyparser_mitsuba
 )
 
 add_custom_command(

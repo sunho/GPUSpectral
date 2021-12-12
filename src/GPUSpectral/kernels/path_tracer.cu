@@ -212,5 +212,34 @@ extern "C" __global__ void __closesthit__radiance()
 
     unsigned int seed = prd->seed;
 
+    {
+        const float z1 = rnd(seed);
+        const float z2 = rnd(seed);
+
+        float3 w_in;
+        Onb onb( N );
+        onb.inverse_transform( w_in );
+        prd->direction = w_in;
+        prd->origin    = P;
+
+        prd->attenuation *= rt_data->diffuse_color;
+        prd->countEmitted = false;
+    }
+
+    const float z1 = rnd(seed);
+    const float z2 = rnd(seed);
+    prd->seed = seed;
+
+    ParallelogramLight light = params.light;
+    const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+
+    // Calculate properties of light sample (for area based pdf)
+    const float  Ldist = length(light_pos - P );
+    const float3 L     = normalize(light_pos - P );
+    const float  nDl   = dot( N, L );
+    const float  LnDl  = -dot( light.normal, L );
+
+    float weight = 0.0f;
+
     prd->radiance += N;
 }

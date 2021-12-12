@@ -1,0 +1,32 @@
+
+find_package(OptiX70)
+find_package(OptiX71)
+find_package(OptiX72)
+find_package(OptiX73)
+find_package(OptiX74)
+find_package(CUDA 10.0 REQUIRED)
+if (OptiX74_FOUND)
+  set(OPTIX_INCLUDE_DIR "${OPTIX74_INCLUDE_DIR}" CACHE PATH "")
+elseif (OptiX73_FOUND)
+  set(OPTIX_INCLUDE_DIR "${OPTIX73_INCLUDE_DIR}" CACHE PATH "")
+elseif (OptiX72_FOUND)
+  set(OPTIX_INCLUDE_DIR "${OPTIX72_INCLUDE_DIR}" CACHE PATH "")
+elseif(OptiX71_FOUND)
+  set(OPTIX_INCLUDE_DIR "${OPTIX71_INCLUDE_DIR}" CACHE PATH "")
+elseif(OptiX70_FOUND)
+  set(OPTIX_INCLUDE_DIR "${OPTIX70_INCLUDE_DIR}" CACHE PATH "")
+else()
+  message(FATAL_ERROR "No OptiX SDK 7.x found.")
+endif()
+
+add_library(optix INTERFACE)
+target_include_directories(optix INTERFACE ${OPTIX_INCLUDE_DIR})
+
+add_library(cuda INTERFACE)
+target_link_libraries(cuda INTERFACE ${CUDA_LIBRARIES})
+target_include_directories(cuda INTERFACE ${CUDA_INCLUDE_DIRS})
+
+add_library(stb_image STATIC stb.cpp)
+target_include_directories(stb_image PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/stb")
+
+add_subdirectory(TinyParser-Mitsuba)

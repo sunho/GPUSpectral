@@ -5,6 +5,8 @@
 #include <optix.h>
 #include <optix_host.h>
 #include <optix_stack_size.h>
+#include <tinyparser-mitsuba.h>
+#include <stb_image_write.h>
 #include <optix_function_table_definition.h>
 #include <optix_stubs.h>
 #include "kernels/vector_math.h"
@@ -320,7 +322,6 @@ void initLaunchParams(PathTracerState& state)
         reinterpret_cast<void**>(&state.params.accum_buffer),
         state.params.width * state.params.height * sizeof(float4)
     ));
-    state.params.frame_buffer = nullptr;  // Will be set when output buffer is mapped
 
     state.params.samples_per_launch = 1;
     state.params.subframe_index = 0u;
@@ -331,16 +332,25 @@ void initLaunchParams(PathTracerState& state)
     state.params.light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
     state.params.light.normal = normalize(cross(state.params.light.v1, state.params.light.v2));
     state.params.handle = state.gas_handle;
+    auto lookAt = make_float3(278.0f, 273.0f, 330.0f);
+    auto up = make_float3(0.0f, -1.0f, 0.0f);
+    state.params.eye = make_float3(278.0f, 273.0f, -900.0f);
+
+    auto w = normalize(lookAt - state.params.eye);
+    auto u = normalize(cross(up, w));
+    auto v = cross(w, u);
+    state.params.U = u;
+    state.params.V = v;
+    state.params.W = w;
 
     CUDA_CHECK(cudaStreamCreate(&state.stream));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.d_params), sizeof(Params)));
 
 }
 
-void launchSubframe(uchar4* output_buffer, PathTracerState& state)
+void launchSubframe(PathTracerState& state)
 {
     // Launch
-    state.params.frame_buffer = output_buffer;
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(state.d_params),
         &state.params, sizeof(Params),
@@ -748,6 +758,7 @@ int main(int argc, char* argv[])
     state.params.width = 768;
     state.params.height = 768;
 
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state.params.frame_buffer), state.params.width * state.params.height * 4));
     //
     // Parse command line options
     //
@@ -759,9 +770,17 @@ int main(int argc, char* argv[])
     createPipeline(state);
     createSBT(state);
     initLaunchParams(state);
+    launchSubframe(state);
 
-
-    //launchSubframe(output_buffer, state);
+    std::vector<uint32_t> pixels(state.params.width * state.params.height);
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(pixels.data()),
+        reinterpret_cast<void*>(state.params.frame_buffer),
+        state.params.width * state.params.height * 4,
+        cudaMemcpyDeviceToHost
+    ));
+    cudaDeviceSynchronize();
+    stbi_write_jpg("jpg_test_.jpg", state.params.width, state.params.height, 4, pixels.data(), state.params.width * 4);
 
     return 0;
 }
