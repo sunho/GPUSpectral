@@ -2,7 +2,7 @@
 #include <vector_types.h>
 #include <vector_functions.hpp>
 #include "path_tracer.h"
-#include "vector_math.h"
+#include "../math/VectorMath.h"
 #include <math.h>
 
 extern "C" {

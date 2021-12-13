@@ -1,9 +1,16 @@
 set(SOURCE
+  loader/SceneLoader.h
+  loader/SceneLoader.cpp
+  renderer/Renderer.h
+  renderer/Renderer.cpp
+  renderer/Scene.h
+  renderer/Scene.cpp
+  utils/CudaUtil.h
   main.cpp
 )
 
 set(SHADERS_HEADERS
-  kernels/vector_math.h
+  math/VectorMath.h
   kernels/path_tracer.h
 )
 
@@ -39,4 +46,10 @@ add_custom_command(
     TARGET GPUSpectral
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/kernels "$<TARGET_FILE_DIR:GPUSpectral>/kernels"
+)
+
+add_custom_command(
+    TARGET GPUSpectral
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets "$<TARGET_FILE_DIR:GPUSpectral>/assets"
 )

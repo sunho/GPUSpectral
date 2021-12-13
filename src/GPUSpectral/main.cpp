@@ -9,7 +9,8 @@
 #include <stb_image_write.h>
 #include <optix_function_table_definition.h>
 #include <optix_stubs.h>
-#include "kernels/vector_math.h"
+#include "./utils/CudaUtil.h"
+#include "./math/VectorMath.h"
 
 #include "kernels/path_tracer.h"
 
@@ -36,62 +37,6 @@ std::string loadShader(const char* fileName) {
     std::string includedSource((std::istreambuf_iterator<char>(is)), std::istreambuf_iterator<char>());
     return includedSource;
 }
-
-#define CUDA_SYNC_CHECK()                                                      \
-    do                                                                         \
-    {                                                                          \
-        cudaDeviceSynchronize();                                               \
-        cudaError_t error = cudaGetLastError();                                \
-        if( error != cudaSuccess )                                             \
-        {                                                                      \
-            std::stringstream ss;                                              \
-            ss << "CUDA error on synchronize with error '"                     \
-               << cudaGetErrorString( error )                                  \
-               << "' (" __FILE__ << ":" << __LINE__ << ")\n";                  \
-        }                                                                      \
-    } while( 0 )
-
-#define OPTIX_CHECK( call )                                                    \
-    do                                                                         \
-    {                                                                          \
-        OptixResult res = call;                                                \
-        if( res != OPTIX_SUCCESS )                                             \
-        {                                                                      \
-            std::stringstream ss;                                              \
-            ss << "Optix call '" << #call << "' failed: " __FILE__ ":"         \
-               << __LINE__ << ")\n";                                           \
-        }                                                                      \
-    } while( 0 )
-
-#define CUDA_CHECK( call )                                                     \
-    do                                                                         \
-    {                                                                          \
-        cudaError_t error = call;                                              \
-        if( error != cudaSuccess )                                             \
-        {                                                                      \
-            std::stringstream ss;                                              \
-            ss << "CUDA call (" << #call << " ) failed with error: '"          \
-               << cudaGetErrorString( error )                                  \
-               << "' (" __FILE__ << ":" << __LINE__ << ")\n";                  \
-        }                                                                      \
-    } while( 0 )
-
-
-#define OPTIX_CHECK_LOG( call )                                                \
-    do                                                                         \
-    {                                                                          \
-        OptixResult res = call;                                                \
-        const size_t sizeof_log_returned = sizeof_log;                         \
-        sizeof_log = sizeof( log ); /* reset sizeof_log for future calls */    \
-        if( res != OPTIX_SUCCESS )                                             \
-        {                                                                      \
-            std::stringstream ss;                                              \
-            ss << "Optix call '" << #call << "' failed: " __FILE__ ":"         \
-               << __LINE__ << ")\nLog:\n" << log                               \
-               << ( sizeof_log_returned > sizeof( log ) ? "<TRUNCATED>" : "" ) \
-               << "\n";                                                        \
-        }                                                                      \
-    } while( 0 )
 
 
 typedef Record<RayGenData>   RayGenRecord;
