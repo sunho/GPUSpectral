@@ -2662,6 +2662,14 @@ struct mat4 {
         m[0][3] = m41; m[1][3] = m42; m[2][3] = m43; m[3][3] = m44;
     }
 
+    __host__ __device__ __forceinline__ mat4(float* data) {
+        for (size_t i = 0; i < 4; ++i) {
+            for (size_t j = 0; j < 4; ++j) {
+                m[j][j] = data[i * 4 + j];
+            }
+        }
+    }
+
     __host__ __device__ __forceinline__ float* operator[] (const size_t idx) {
         return m[idx];
     }

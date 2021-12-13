@@ -1,5 +1,7 @@
 #include "SceneLoader.h"
 #include <tinyparser-mitsuba.h>
+#include <tiny_obj_loader.h>
+#include <iostream>
 
 #include <filesystem>
 
@@ -22,7 +24,7 @@ static void loadMaterial(Material* material, tinyparser_mitsuba::Object& obj, co
         }*/
         if (!found) {
             auto rgb = obj.property("reflectance").getColor();
-            material->materialData = DiffuseColorMaterialData{ glm::vec3(rgb.r, rgb.g, rgb.b) };
+            material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     } else if (type == "roughplastic") {
         bool found = false;
@@ -38,7 +40,7 @@ static void loadMaterial(Material* material, tinyparser_mitsuba::Object& obj, co
         }*/
         if (!found) {
             auto rgb = obj.property("diffuse_reflectance").getColor();
-            material->materialData = DiffuseColorMaterialData{ glm::vec3(rgb.r, rgb.g, rgb.b) };
+            material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
 
@@ -66,7 +68,6 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
     auto parentPath = std::filesystem::path(path).parent_path();
     tinyparser_mitsuba::SceneLoader loader;
     auto scene = loader.loadFromFile(path.c_str());
-    int i = 0;
     for (auto obj : scene.anonymousChildren()) {
         if (obj->type() == tinyparser_mitsuba::OT_SHAPE) {
             std::string filename;
@@ -84,63 +85,85 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             }
             auto mesh = loadOrGetMesh(filename);
             auto transform = obj->property("to_world").getTransform();
-            auto matrix = glm::make_mat4(transform.matrix.data());
-            matrix = glm::transpose(matrix);
-            if (obj->property("center").isValid())
-            {
+            auto matrix = mat4(transform.matrix.data());
+            if (obj->property("center").isValid()) {
                 auto point = obj->property("center").getVector();
-                matrix[3] = glm::vec4(point.x, point.y, point.z, 1.0);
+                matrix[3][0] = point.x;
+                matrix[3][1] = point.y;
+                matrix[3][2] = point.z;
+                matrix[3][3] = 1.0f;
             }
 
-            auto material = engine.createMaterial();
-            entity->setMaterial(material);
+            RenderObject renderObject = {};
+            Material material = {};
             for (auto child : obj->anonymousChildren()) {
                 if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-                    material->materialData = DiffuseColorMaterialData{ glm::vec3(1.0f) };
-                    loadMaterial(material, *child, p);
+                    loadMaterial(&material, *child, parentPath);
                 }
                 else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
                     auto col = child->property("radiance").getColor();
-                    glm::vec3 radiance = glm::vec3(col.r, col.g, col.b);
-                    auto l = new sunho3d::Light(sunho3d::Light::Type::POINT);
-                    auto pos = matrix[3];
-                    l->setTransform({ .x = pos.x, .y = pos.y, .z = pos.z });
-                    l->setRadiance(radiance);
-                    outScene->addLight(l);
-                    material->materialData = EmissionMaterialData{ radiance };
+                    material.emission = make_float3(col.r, col.g, col.b);
                 }
             }
 
-
-            entity->setTransformMatrix(matrix);
-            entity->setMesh(mesh);
-
-            outScene->addEntity(entity);
+            renderObject.meshId = mesh;
+            renderObject.transform = matrix;
+            renderObject.materialId = outScene.materials.size();
+            outScene.materials.push_back(material);
+            outScene.renderObjects.push_back(renderObject);
         } else if (obj->type() == tinyparser_mitsuba::OT_SENSOR) {
             auto transform = obj->property("to_world").getTransform();
             float fov = obj->property("fov").getNumber();
-            auto matrix = glm::make_mat4(transform.matrix.data());
-            matrix = glm::transpose(matrix);
-            glm::vec4 affine = matrix[3];
-
-
-            //matrix = glm::inverse(matrix); // TODO: need this?
-            matrix[3] = -1.0f * affine;
-            matrix[3][3] *= -1.0f;
-            //matrix[2][2] *= -1.0f;
-            //matrix[1][1] *= -1.0f;
-
-
-
-            outScene->getCamera().view = matrix;
-            outScene->getCamera().setProjectionFov(glm::radians(fov), 1.0, 0.01f, 25.0f);
-            //outScene->getCamera().proj[2][2] *= -1.0f;
-            //outScene->getCamera().proj[1][1] *= -1.0f;
+            auto matrix = mat4(transform.matrix.data());
+            float3 eye = make_float3(matrix[3][0], matrix[3][1], matrix[3][2]);
+            outScene.camera.eye = eye;
+            outScene.camera.u = make_float3(matrix[0][1], matrix[0][1], matrix[0][2]);
+            outScene.camera.v = make_float3(matrix[1][1], matrix[1][1], matrix[1][2]);
+            outScene.camera.w = make_float3(matrix[2][1], matrix[2][1], matrix[2][2]);
         }
     }
+    return outScene;
 }
 
 Mesh loadMesh(const std::string& path) {
-       
+    Mesh outMesh = {};
+    std::string warn;
+    std::string err;
+    std::vector<tinyobj::shape_t> shapes;
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::material_t> materials;
+    std::map<int, Material*> generatedMaterials;
+
+    auto p = std::filesystem::path(path);
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), p.parent_path().string().c_str());
+    if (!warn.empty()) {
+        std::cout << "WARN: " << warn << std::endl;
+    }
+    if (!err.empty()) {
+        std::cerr << err << std::endl;
+    }
+    for (size_t s = 0; s < shapes.size(); s++) {
+        Material* material = nullptr;
+        const int matId = shapes[s].mesh.material_ids[0];
+        for (size_t f = 0; f < shapes[s].mesh.indices.size(); ++f) {
+            auto i0 = shapes[s].mesh.indices[f];
+            float3 pos;
+            pos.x = attrib.vertices[3 * i0.vertex_index];
+            pos.y = attrib.vertices[3 * i0.vertex_index + 1];
+            pos.z = attrib.vertices[3 * i0.vertex_index + 2];
+            outMesh.positions.push_back(pos);
+            float2 uv;
+            uv.x = attrib.texcoords[2 * i0.texcoord_index];
+            uv.y = attrib.texcoords[2 * i0.texcoord_index + 1];
+            outMesh.uvs.push_back(uv);
+            float3 normal;
+            normal.x = attrib.normals[3 * i0.normal_index];
+            normal.y = attrib.normals[3 * i0.normal_index + 1];
+            normal.z = attrib.normals[3 * i0.normal_index + 2];
+            outMesh.normals.push_back(normal);
+        }
+    }
+    return outMesh;
 }
 

@@ -3,6 +3,7 @@
 #include "../math/VectorMath.h"
 #include "../kernels/path_tracer.h"
 #include "Scene.h"
+#include <filesystem>
 #include <functional>
 #include <optix.h>
 #include <vector>
@@ -17,13 +18,20 @@ struct Mesh {
 class Renderer;
 
 struct CudaTLAS {
-    CudaTLAS(Renderer& renderer, const Scene& scene);
+    CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& scene);
 
     OptixTraversableHandle         gasHandle;
     CUdeviceptr                    gasOutputBuffer;
     CUdeviceptr                    devicePositions;
     CUdeviceptr                    deviceNormals;
     CUdeviceptr                    deviceUvs;
+
+    std::vector<float4> positions;
+    std::vector<float4> normals;
+    std::vector<float4> uvs;
+    std::vector<int> matIndices;
+private:
+    void fillData(Renderer& renderer, const Scene& scene);
 };
 
 struct CudaPipeline {
@@ -44,7 +52,7 @@ private:
 };
 
 struct CudaSBT {
-    CudaSBT(Renderer& renderer, const Scene& scene);
+    CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas, const Scene& scene);
 
     CUdeviceptr raygenRecord;
     CUdeviceptr missRecordBase;
@@ -53,7 +61,7 @@ struct CudaSBT {
 };
 
 struct RenderState {
-    RenderState(Renderer& renderer, const Scene& scene);
+    RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene);
 
     Scene scene;
     CudaTLAS tlas;
@@ -65,6 +73,7 @@ struct RenderState {
 
 class Renderer {
 public:
+    friend class CudaSBT;
     Renderer(const std::string& basePath);
     ~Renderer();
 
@@ -75,12 +84,13 @@ public:
     void render();
 
     std::string loadKernel(const std::string& name);
-    std::string assetPath(const std::string& filename);
+    std::string assetPath(const std::string& filename) { return (baseFsPath / "assets" / filename).string(); }
 
 private:
     static OptixDeviceContext createDeviceContext();
 
     std::string basePath;
+    std::filesystem::path baseFsPath;
 
     std::vector<Mesh> meshes;
     OptixDeviceContext context;

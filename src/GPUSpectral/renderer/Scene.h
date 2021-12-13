@@ -6,9 +6,9 @@
 
 struct Camera {
     float3 eye;
-    float3 look;
-    float3 up;
-    float fov;
+    float3 u;
+    float3 v;
+    float3 w;
 };
 
 struct RenderObject {

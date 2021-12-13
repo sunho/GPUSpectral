@@ -40,6 +40,7 @@ target_link_libraries(
   optix
   cuda
   tinyparser_mitsuba
+  tinyobjloader
 )
 
 add_custom_command(
