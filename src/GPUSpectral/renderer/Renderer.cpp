@@ -48,19 +48,30 @@ std::string Renderer::loadKernel(const std::string& fileName) {
     return includedSource;
 }
 
+Mesh* Renderer::getMesh(int id) {
+    return &meshes[id];
+       
+}
+
+int Renderer::addMesh(const Mesh& mesh) {
+    int id = meshes.size();
+    meshes.push_back(mesh);
+    return id;
+}
+
+void Renderer::setScene(const Scene& scene) {
+    state = std::make_unique<RenderState>(*this, context, scene);
+}
+
 void Renderer::render() {
     state->params.width = 768;
     state->params.height = 768;
+    CUDA_CHECK(cudaMalloc(
+        reinterpret_cast<void**>(&state->params.accum_buffer),
+        state->params.width * state->params.height * sizeof(float4)
+    ));
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state->params.frame_buffer), state->params.width * state->params.height * 4));
-
-    std::vector<uint32_t> pixels(state->params.width * state->params.height);
-    CUDA_CHECK(cudaMemcpy(
-        reinterpret_cast<void*>(pixels.data()),
-        reinterpret_cast<void*>(state->params.frame_buffer),
-        state->params.width * state->params.height * 4,
-        cudaMemcpyDeviceToHost
-    ));
     // Launch
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(state->dParams),
@@ -79,6 +90,14 @@ void Renderer::render() {
         1                     // launch depth
     ));
     cudaDeviceSynchronize();
+
+    std::vector<uint32_t> pixels(state->params.width * state->params.height);
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(pixels.data()),
+        reinterpret_cast<void*>(state->params.frame_buffer),
+        state->params.width * state->params.height * 4,
+        cudaMemcpyDeviceToHost
+    ));
     stbi_write_jpg("jpg_test_.jpg", state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
 }
 
@@ -245,6 +264,7 @@ void CudaPipeline::initPipeline(Renderer& renderer, OptixDeviceContext context) 
 }
 
 CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& scene) {
+    fillData(renderer, scene);
     const size_t vertices_size_in_bytes = positions.size() * sizeof(float4);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&devicePositions), vertices_size_in_bytes));
     CUDA_CHECK(cudaMemcpy(
@@ -436,10 +456,6 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
 
 RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
-    CUDA_CHECK(cudaMalloc(
-        reinterpret_cast<void**>(&params.accum_buffer),
-        params.width * params.height * sizeof(float4)
-    ));
 
     params.samples_per_launch = 1;
     params.subframe_index = 0u;
@@ -450,9 +466,9 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
     params.light.normal = normalize(cross(params.light.v1, params.light.v2));
     params.handle = tlas.gasHandle;
-    auto lookAt = make_float3(278.0f, 273.0f, 330.0f);
+    auto lookAt = make_float3(0.0f, 0.0f, 0.0f);
     auto up = make_float3(0.0f, -1.0f, 0.0f);
-    params.eye = make_float3(278.0f, 273.0f, -900.0f);
+    params.eye = make_float3(0.0f, 0.0f, 6.0f);
     auto w = normalize(lookAt - params.eye);
     auto u = normalize(cross(up, w));
     auto v = cross(w, u);

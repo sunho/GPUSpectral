@@ -57,7 +57,7 @@ struct CudaSBT {
     CUdeviceptr raygenRecord;
     CUdeviceptr missRecordBase;
     CUdeviceptr hitgroupRecordBase;
-    OptixShaderBindingTable sbt;
+    OptixShaderBindingTable sbt{};
 };
 
 struct RenderState {

@@ -2665,7 +2665,7 @@ struct mat4 {
     __host__ __device__ __forceinline__ mat4(float* data) {
         for (size_t i = 0; i < 4; ++i) {
             for (size_t j = 0; j < 4; ++j) {
-                m[j][j] = data[i * 4 + j];
+                m[j][i] = data[i * 4 + j];
             }
         }
     }

@@ -54,7 +54,7 @@ static void loadMaterial(Material* material, tinyparser_mitsuba::Object& obj, co
 Scene loadScene(Renderer& renderer, const std::string& path) {
     std::unordered_map<std::string, int> meshCache;
     auto loadOrGetMesh = [&](const std::string& objPath) {
-        if (meshCache.find(objPath) == meshCache.end()) {
+        if (meshCache.find(objPath) != meshCache.end()) {
             return meshCache.at(objPath);
         }
         auto obj = loadMesh(objPath);
@@ -117,9 +117,9 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             auto matrix = mat4(transform.matrix.data());
             float3 eye = make_float3(matrix[3][0], matrix[3][1], matrix[3][2]);
             outScene.camera.eye = eye;
-            outScene.camera.u = make_float3(matrix[0][1], matrix[0][1], matrix[0][2]);
-            outScene.camera.v = make_float3(matrix[1][1], matrix[1][1], matrix[1][2]);
-            outScene.camera.w = make_float3(matrix[2][1], matrix[2][1], matrix[2][2]);
+            outScene.camera.u = make_float3(matrix[0][0], matrix[0][1], matrix[0][2]);
+            outScene.camera.v = make_float3(matrix[1][0], matrix[1][1], matrix[1][2]);
+            outScene.camera.w = make_float3(matrix[2][0], matrix[2][1], matrix[2][2]);
         }
     }
     return outScene;
