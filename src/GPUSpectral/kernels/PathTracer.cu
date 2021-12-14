@@ -1,7 +1,7 @@
 #include <optix.h>
 #include <vector_types.h>
 #include <vector_functions.hpp>
-#include "path_tracer.h"
+#include "PathTracer.h"
 #include "../math/VectorMath.h"
 #include <math.h>
 

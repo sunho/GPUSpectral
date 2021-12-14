@@ -1,5 +1,8 @@
+#pragma once
+
 #include <optix.h>
 #include <vector_types.h>
+#include "LightSampler.h"
 
 template <typename T>
 struct Record

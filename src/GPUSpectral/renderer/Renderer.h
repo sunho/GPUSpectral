@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../math/VectorMath.h"
-#include "../kernels/path_tracer.h"
+#include "../kernels/PathTracer.h"
 #include "Scene.h"
 #include <filesystem>
 #include <functional>

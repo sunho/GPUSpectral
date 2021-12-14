@@ -457,7 +457,7 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
 RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
 
-    params.samples_per_launch = 1;
+    params.samples_per_launch = 32;
     params.subframe_index = 0u;
 
     params.light.emission = make_float3(15.0f, 15.0f, 5.0f);
@@ -466,15 +466,10 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
     params.light.normal = normalize(cross(params.light.v1, params.light.v2));
     params.handle = tlas.gasHandle;
-    auto lookAt = make_float3(0.0f, 0.0f, 0.0f);
-    auto up = make_float3(0.0f, -1.0f, 0.0f);
-    params.eye = make_float3(0.0f, 0.0f, 6.0f);
-    auto w = normalize(lookAt - params.eye);
-    auto u = normalize(cross(up, w));
-    auto v = cross(w, u);
-    params.U = u;
-    params.V = v;
-    params.W = w;
+    params.eye = scene.camera.eye;
+    params.U = scene.camera.u;
+    params.V = scene.camera.v;
+    params.W = scene.camera.w;
 
     CUDA_CHECK(cudaStreamCreate(&stream));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dParams), sizeof(Params)));

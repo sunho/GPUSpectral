@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(GPUSpectral LANGUAGES CXX CUDA)
+project(GPUSpectral LANGUAGES CXX)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
