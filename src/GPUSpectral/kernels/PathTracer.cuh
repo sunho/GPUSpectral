@@ -2,7 +2,7 @@
 
 #include <optix.h>
 #include <vector_types.h>
-#include "LightSampler.h"
+#include "LightSampler.cuh"
 
 template <typename T>
 struct Record
@@ -18,15 +18,8 @@ typedef Record<EmptyData> EmptyRecord;
 enum RayType
 {
     RAY_TYPE_RADIANCE = 0,
+    RAY_TYPE_OCCLUSION,
     RAY_TYPE_COUNT
-};
-
-struct ParallelogramLight
-{
-    float3 corner;
-    float3 v1, v2;
-    float3 normal;
-    float3 emission;
 };
 
 struct Params
@@ -43,7 +36,7 @@ struct Params
     float3       V;
     float3       W;
 
-    ParallelogramLight     light; // TODO: make light list
+    LightData lightData;
     OptixTraversableHandle handle;
 };
 

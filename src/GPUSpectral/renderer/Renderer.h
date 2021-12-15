@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../math/VectorMath.h"
-#include "../kernels/PathTracer.h"
+#include "../math/VectorMath.cuh"
+#include "../kernels/PathTracer.cuh"
 #include "Scene.h"
 #include <filesystem>
 #include <functional>
@@ -25,11 +25,13 @@ struct CudaTLAS {
     CUdeviceptr                    devicePositions;
     CUdeviceptr                    deviceNormals;
     CUdeviceptr                    deviceUvs;
+    LightData                     lightData;
 
     std::vector<float4> positions;
     std::vector<float4> normals;
     std::vector<float4> uvs;
     std::vector<int> matIndices;
+    std::vector<TriangleLight> triangleLights;
 private:
     void fillData(Renderer& renderer, const Scene& scene);
 };
@@ -40,8 +42,8 @@ struct CudaPipeline {
     OptixProgramGroup              raygenProgGroup;
     OptixProgramGroup              radianceMissGroup;
     OptixProgramGroup              radianceHitGroup;
-    OptixProgramGroup              shadowMissGroup;
     OptixProgramGroup              shadowHitGroup;
+    OptixProgramGroup              shadowMissGroup;
     
     OptixModule                    ptxModule;
     OptixPipeline                  pipeline;

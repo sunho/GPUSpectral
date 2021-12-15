@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../math/VectorMath.h"
+#include "../math/VectorMath.cuh"
 #include <vector>
 #include <unordered_map>
 
@@ -18,8 +18,8 @@ struct RenderObject {
 };
 
 struct Material {
-    float3 color;
-    float3 emission;
+    float3 color = { 0.0f, 0.0f, 0.0f };
+    float3 emission = { 0.0f,0.0f,0.0f };
 };
 
 struct Scene {

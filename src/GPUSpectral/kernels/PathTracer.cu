@@ -1,8 +1,8 @@
 #include <optix.h>
 #include <vector_types.h>
 #include <vector_functions.hpp>
-#include "PathTracer.h"
-#include "../math/VectorMath.h"
+#include "PathTracer.cuh"
+#include "../math/VectorMath.cuh"
 #include <math.h>
 
 extern "C" {
@@ -13,46 +13,14 @@ struct RadiancePRD
 {
     float3       emitted;
     float3       radiance;
-    float3       attenuation;
+    float3       weight;
     float3       origin;
     float3       direction;
-    unsigned int seed;
+    
+    SamplerState sampler;
     int          countEmitted;
     int          done;
     int          pad;
-};
-
-struct Onb
-{
-  __forceinline__ __device__ Onb(const float3& normal)
-  {
-    m_normal = normal;
-
-    if( fabs(m_normal.x) > fabs(m_normal.z) )
-    {
-      m_binormal.x = -m_normal.y;
-      m_binormal.y =  m_normal.x;
-      m_binormal.z =  0;
-    }
-    else
-    {
-      m_binormal.x =  0;
-      m_binormal.y = -m_normal.z;
-      m_binormal.z =  m_normal.y;
-    }
-
-    m_binormal = normalize(m_binormal);
-    m_tangent = cross( m_binormal, m_normal );
-  }
-
-  __forceinline__ __device__ void inverse_transform(float3& p) const
-  {
-    p = p.x*m_tangent + p.y*m_binormal + p.z*m_normal;
-  }
-
-  float3 m_tangent;
-  float3 m_binormal;
-  float3 m_normal;
 };
 
 static __forceinline__ __device__ void* unpackPointer( unsigned int i0, unsigned int i1 )
@@ -104,6 +72,42 @@ static __forceinline__ __device__ void traceRadiance(
             u0, u1 );
 }
 
+static __forceinline__ __device__ void setPayloadOcclusion(bool occluded)
+{
+    optixSetPayload_0(static_cast<unsigned int>(occluded));
+}
+
+static __forceinline__ __device__ bool traceOcclusion(
+    OptixTraversableHandle handle,
+    float3                 ray_origin,
+    float3                 ray_direction,
+    float                  tmin,
+    float                  tmax
+)
+{
+    unsigned int occluded = 0u;
+    optixTrace(
+        handle,
+        ray_origin,
+        ray_direction,
+        tmin,
+        tmax,
+        0.0f,                    // rayTime
+        OptixVisibilityMask(1),
+        OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT,
+        RAY_TYPE_OCCLUSION,      // SBT offset
+        RAY_TYPE_COUNT,          // SBT stride
+        RAY_TYPE_OCCLUSION,      // missSBTIndex
+        occluded);
+    return occluded;
+}
+
+extern "C" __global__ void __closesthit__occlusion()
+{
+    setPayloadOcclusion(true);
+}
+
+
 extern "C" __global__ void __raygen__rg()
 {
     const int    w   = params.width;
@@ -114,14 +118,13 @@ extern "C" __global__ void __raygen__rg()
     const float3 W   = params.W;
     const uint3  idx = optixGetLaunchIndex();
     const int    subframe_index = params.subframe_index;
-
-    unsigned int seed = idx.y * w + idx.x;
+    SamplerState sampler(pcgHash(idx.y * w + idx.x));
     float3 result = make_float3(0.0f);
     int i = params.samples_per_launch;
     do
     {
         // The center of each pixel is at fraction (0.5,0.5)
-        const float2 subpixel_jitter = make_float2( rnd( seed ), rnd( seed ) );
+        const float2 subpixel_jitter = make_float2( randUniform(sampler), randUniform(sampler) );
 
         const float2 d = 2.0f * make_float2(
                 ( static_cast<float>( idx.x ) + subpixel_jitter.x ) / static_cast<float>( w ),
@@ -131,16 +134,16 @@ extern "C" __global__ void __raygen__rg()
         float3 ray_origin    = eye;
 
         RadiancePRD prd;
-        prd.emitted      = make_float3(0.f);
-        prd.radiance     = make_float3(0.f);
-        prd.attenuation  = make_float3(1.f);
+        prd.weight = make_float3(1.f);
         prd.countEmitted = true;
         prd.done         = false;
-        prd.seed         = seed;
+        prd.sampler = sampler;
 
         int depth = 0;
         for( ;; )
         {
+            prd.emitted      = make_float3(0.f);
+            prd.radiance     = make_float3(0.f);
             traceRadiance(
                     params.handle,
                     ray_origin,
@@ -150,7 +153,7 @@ extern "C" __global__ void __raygen__rg()
                     &prd );
 
             result += prd.emitted;
-            result += prd.radiance * prd.attenuation;
+            result += prd.radiance;
 
             if( prd.done  || depth >= 3 ) // TODO RR, variable for depth
                 break;
@@ -182,7 +185,7 @@ extern "C" __global__ void __miss__radiance()
     MissData* rt_data  = reinterpret_cast<MissData*>( optixGetSbtDataPointer() );
     RadiancePRD* prd = getPRD();
 
-    prd->radiance = make_float3( rt_data->bg_color );
+    prd->radiance = make_float3( rt_data->bg_color * 3.0 ) * prd->weight;
     prd->done      = true;
 }
 
@@ -206,40 +209,42 @@ extern "C" __global__ void __closesthit__radiance()
 
     if( prd->countEmitted )
         prd->emitted = rt_data->emission_color;
-    else
-        prd->emitted = make_float3( 0.0f );
+    prd->countEmitted = false;
 
+    SamplerState sampler = prd->sampler;
 
-    unsigned int seed = prd->seed;
+    float3 wi = randDirHemisphere(sampler);
+    Onb onb(N);
+    onb.inverse_transform(wi);
+    prd->origin    = P;
 
-    {
-        const float z1 = rnd(seed);
-        const float z2 = rnd(seed);
+    prd->direction = wi; // TODO sample this wisely
 
-        float3 w_in;
-        Onb onb( N );
-        onb.inverse_transform( w_in );
-        prd->direction = w_in;
-        prd->origin    = P;
+    float3 lightPos;
+    float lightPdf;
+    float3 lightEmission;
+    sampleLight(params.lightData, sampler, lightPos, lightPdf, lightEmission);
+    float3 L = normalize(lightPos - P);
+    float Ldist = length(lightPos - P);
+    const float NoL   = dot( N, L );
 
-        prd->attenuation *= rt_data->diffuse_color;
-        prd->countEmitted = false;
+    if (NoL > 0.0f) {
+        const bool occluded = traceOcclusion(
+            params.handle,
+            P,
+            L,
+            0.01f,         // tmin
+            Ldist - 0.01f  // tmax
+        );
+
+        if (!occluded)
+        {
+            prd->radiance = NoL * (rt_data->diffuse_color / M_PI) * prd->weight * lightEmission / lightPdf;
+        }
     }
 
-    const float z1 = rnd(seed);
-    const float z2 = rnd(seed);
-    prd->seed = seed;
+    float NoW = dot(wi, N);
+    float pdf = 1.0 / (2 * M_PI);
+    prd->weight *= (rt_data->diffuse_color/ M_PI) * NoW / pdf;
 
-    ParallelogramLight light = params.light;
-    const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-
-    // Calculate properties of light sample (for area based pdf)
-    const float  Ldist = length(light_pos - P );
-    const float3 L     = normalize(light_pos - P );
-    const float  nDl   = dot( N, L );
-    const float  LnDl  = -dot( light.normal, L );
-
-    float weight = 0.0f;
-
-    prd->radiance += N;
 }

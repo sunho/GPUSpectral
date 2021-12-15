@@ -72,6 +72,7 @@ void Renderer::render() {
     ));
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state->params.frame_buffer), state->params.width * state->params.height * 4));
+    state->params.subframe_index++;
     // Launch
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(state->dParams),
@@ -130,7 +131,7 @@ void CudaPipeline::initModule(Renderer& renderer, OptixDeviceContext context) {
 
     auto pipelineCompileOptions = createPipelineCompileOption();
     
-    std::string inputStr = renderer.loadKernel("path_tracer.ptx");
+    std::string inputStr = renderer.loadKernel("PathTracer.ptx");
     size_t      inputSize = inputStr.size();
 
     const char* input = inputStr.data();
@@ -183,6 +184,20 @@ void CudaPipeline::initProgramGroups(Renderer& renderer, OptixDeviceContext cont
             log, &sizeof_log,
             &radianceMissGroup
         ));
+
+        memset(&miss_prog_group_desc, 0, sizeof(OptixProgramGroupDesc));
+        miss_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+        miss_prog_group_desc.miss.module = nullptr;  // NULL miss program for occlusion rays
+        miss_prog_group_desc.miss.entryFunctionName = nullptr;
+        sizeof_log = sizeof(log);
+        OPTIX_CHECK_LOG(optixProgramGroupCreate(
+            context, &miss_prog_group_desc,
+            1,  // num program groups
+            &program_group_options,
+            log,
+            &sizeof_log,
+            &shadowMissGroup
+        ));
     }
 
     {
@@ -200,6 +215,21 @@ void CudaPipeline::initProgramGroups(Renderer& renderer, OptixDeviceContext cont
             &sizeof_log,
             &radianceHitGroup
         ));
+
+        memset(&hit_prog_group_desc, 0, sizeof(OptixProgramGroupDesc));
+        hit_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+        hit_prog_group_desc.hitgroup.moduleCH = ptxModule;
+        hit_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__occlusion";
+        sizeof_log = sizeof(log);
+        OPTIX_CHECK(optixProgramGroupCreate(
+            context,
+            &hit_prog_group_desc,
+            1,  // num program groups
+            &program_group_options,
+            log,
+            &sizeof_log,
+            &shadowHitGroup
+        ));
     }
 }
 
@@ -208,7 +238,9 @@ void CudaPipeline::initPipeline(Renderer& renderer, OptixDeviceContext context) 
     {
         raygenProgGroup,
         radianceMissGroup,
-        radianceHitGroup
+        radianceHitGroup,
+        shadowHitGroup,
+        shadowMissGroup
     };
 
     OptixPipelineLinkOptions pipeline_link_options = {};
@@ -236,6 +268,8 @@ void CudaPipeline::initPipeline(Renderer& renderer, OptixDeviceContext context) 
     OPTIX_CHECK(optixUtilAccumulateStackSizes(raygenProgGroup, &stack_sizes));
     OPTIX_CHECK(optixUtilAccumulateStackSizes(radianceMissGroup, &stack_sizes));
     OPTIX_CHECK(optixUtilAccumulateStackSizes(radianceHitGroup, &stack_sizes));
+    OPTIX_CHECK(optixUtilAccumulateStackSizes(shadowHitGroup, &stack_sizes));
+    OPTIX_CHECK(optixUtilAccumulateStackSizes(shadowMissGroup, &stack_sizes));
 
     uint32_t max_trace_depth = 2;
     uint32_t max_cc_depth = 0;
@@ -280,6 +314,15 @@ CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& 
         reinterpret_cast<void*>(d_mat_indices),
         matIndices.data(),
         mat_indices_size_in_bytes,
+        cudaMemcpyHostToDevice
+    ));
+
+    const size_t trinagleLight= triangleLights.size() * sizeof(TriangleLight);
+    lightData.triangleLights = Array<TriangleLight>(triangleLights.size());
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(lightData.triangleLights.data()),
+        triangleLights.data(),
+        triangleLights.size() * sizeof(TriangleLight),
         cudaMemcpyHostToDevice
     ));
 
@@ -383,6 +426,20 @@ void CudaTLAS::fillData(Renderer& renderer, const Scene& scene) {
         for (size_t i = 0; i < mesh->positions.size() / 3; ++i) {
             matIndices.push_back(obj.materialId);
         }
+        auto material = scene.materials[obj.materialId];
+        if (material.emission.x != 0.0f || material.emission.y != 0.0f || material.emission.z != 0.0f) {
+            for (size_t i = 0; i < mesh->positions.size(); i+=3) {
+                TriangleLight light = {};
+                float3 pos0 = mesh->positions[i];
+                float3 pos1 = mesh->positions[i+1];
+                float3 pos2 = mesh->positions[i+2];
+                light.positions[0] = make_float3(obj.transform * float4(pos0.x, pos0.y, pos0.z, 1.0f));
+                light.positions[1] = make_float3(obj.transform * float4(pos1.x, pos1.y, pos1.z, 1.0f));
+                light.positions[2] = make_float3(obj.transform * float4(pos2.x, pos2.y, pos2.z, 1.0f));
+                light.radinace = material.emission;
+                triangleLights.push_back(light);
+            }
+        }
     }
 }
 
@@ -406,9 +463,11 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
     const size_t miss_record_size = sizeof(Record<MissData>);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_miss_records), miss_record_size * RAY_TYPE_COUNT));
 
-    Record<MissData> ms_sbt[1];
+    Record<MissData> ms_sbt[2];
     OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.radianceMissGroup, &ms_sbt[0]));
     ms_sbt[0].data.bg_color = make_float4(0.0f);
+    OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.shadowMissGroup, &ms_sbt[1]));
+    ms_sbt[1].data.bg_color = make_float4(0.0f);
 
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(d_miss_records),
@@ -435,6 +494,13 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
             hitgroup_records[sbt_idx].data.diffuse_color = scene.materials[i].color;
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(tlas.devicePositions);
         }
+
+        {
+            const int sbt_idx = i * RAY_TYPE_COUNT + 1;  // SBT for occlusion ray-type for ith material
+            memset(&hitgroup_records[sbt_idx], 0, hitgroup_record_size);
+
+            OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.shadowHitGroup, &hitgroup_records[sbt_idx]));
+        }
     }
 
     CUDA_CHECK(cudaMemcpy(
@@ -457,19 +523,16 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
 RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
 
-    params.samples_per_launch = 32;
+    params.samples_per_launch = 10240;
     params.subframe_index = 0u;
 
-    params.light.emission = make_float3(15.0f, 15.0f, 5.0f);
-    params.light.corner = make_float3(343.0f, 548.5f, 227.0f);
-    params.light.v1 = make_float3(0.0f, 0.0f, 105.0f);
-    params.light.v2 = make_float3(-130.0f, 0.0f, 0.0f);
-    params.light.normal = normalize(cross(params.light.v1, params.light.v2));
     params.handle = tlas.gasHandle;
     params.eye = scene.camera.eye;
     params.U = scene.camera.u;
     params.V = scene.camera.v;
     params.W = scene.camera.w;
+
+    params.lightData = tlas.lightData;
 
     CUDA_CHECK(cudaStreamCreate(&stream));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dParams), sizeof(Params)));

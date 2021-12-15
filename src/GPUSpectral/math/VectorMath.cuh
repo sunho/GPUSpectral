@@ -25,7 +25,7 @@
 #    define CUDAINLINE __forceinline__
 #    define CONST_STATIC_INIT( ... )
 #else
-#define HOSTDEVICE static
+#define HOSTDEVICE 
 #define CUDAINLINE inline 
 #define CONST_STATIC_INIT( ... ) = __VA_ARGS__
 #endif
@@ -2618,27 +2618,6 @@ __forceinline__ __device__ uchar4 make_color(const float4& c)
 }
 
 /** @} */
-
-// Generate random unsigned int in [0, 2^24)
-static __host__ __device__ __inline__ unsigned int lcg(unsigned int& prev)
-{
-    const unsigned int LCG_A = 1664525u;
-    const unsigned int LCG_C = 1013904223u;
-    prev = (LCG_A * prev + LCG_C);
-    return prev & 0x00FFFFFF;
-}
-
-static __host__ __device__ __inline__ unsigned int lcg2(unsigned int& prev)
-{
-    prev = (prev * 8121 + 28411) % 134456;
-    return prev;
-}
-
-// Generate random float in [0, 1)
-static __host__ __device__ __inline__ float rnd(unsigned int& prev)
-{
-    return ((float)lcg(prev) / (float)0x01000000);
-}
 
 struct mat4 {
     float m[4][4];
