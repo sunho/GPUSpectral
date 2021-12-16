@@ -26,15 +26,14 @@ shared int reducedDist;
 shared int reducedDistSquare;
 
 void main() {
-    float depthSharpness = 5.0;
-    float maxDist = 2.0;
+    float depthSharpness = 7.0;
+    float maxDist = 1.0;
     int probeID = int(gl_WorkGroupID.x);
     ivec2 iuv = ivec2(gl_LocalInvocationID.x, gl_LocalInvocationID.y);
     ivec2 iiuv = iuv - DEPTH_MAP_BORDER;
     if (iiuv.x < 0 || iiuv.y < 0 || iiuv.x >= DEPTH_MAP_SIZE || iiuv.y >= DEPTH_MAP_SIZE) {
-        //iiuv = ivec2(DEPTH_MAP_SIZE, DEPTH_MAP_SIZE) - iiuv;
         iiuv = iiuv % ivec2(DEPTH_MAP_SIZE, DEPTH_MAP_SIZE);
-      
+        iiuv = ivec2(DEPTH_MAP_SIZE, DEPTH_MAP_SIZE) - iiuv;
     }
     vec2 uv = vec2(iiuv) / DEPTH_MAP_SIZE;
     vec3 dir = octahedronReverseMap(uv);

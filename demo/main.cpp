@@ -59,10 +59,10 @@ int main() {
         renderer->run(scene);
     });
    */
-  
+ 
 
     auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
-    scene->ddgi.gridNum = glm::uvec3(20, 20, 20);
+    scene->ddgi.gridNum = glm::uvec3(16, 16, 16);
     scene->ddgi.worldSize = glm::vec3(1.5f, 1.5f, 1.5f);
     scene->ddgi.gridOrigin = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 cameraPos = glm::vec3(0.0, 1.0, 13.0f);

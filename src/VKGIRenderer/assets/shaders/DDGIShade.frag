@@ -82,9 +82,9 @@ void main() {
                 // back face cull
                 vec3 probeToPoint = pos-probePos;
                 vec3 lightDir = normalize(-probeToPoint);
-                float distToProbe = length(pos + 0.1*normal - probePos);
+                float distToProbe = length(pos + 0.001*normal - probePos);
                 //distToProbe += 0.05;
-                weight *= max(0.00, dot(lightDir, normal));
+                weight *= max(0.01, dot(lightDir, normal));
 
                 // visibility testing
                 vec2 depthUv = vec2(getDepthTexOffset(probeID, octahedronMap(lightDir))) / textureSize(probeDepthMap,0);
