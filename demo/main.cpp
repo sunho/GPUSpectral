@@ -1,6 +1,6 @@
-#include <sunho3d/Engine.h>
-#include <sunho3d/Loader.h>
-#include <sunho3d/Light.h>
+#include <VKGIRenderer/Engine.h>
+#include <VKGIRenderer/Loader.h>
+#include <VKGIRenderer/Light.h>
 
 #include <Windows.h>
 #include <filesystem>
@@ -12,21 +12,25 @@ std::filesystem::path basePath() {
     return out.parent_path();
 }
 
-int main() {
-    sunho3d::Engine engine(basePath(), basePath() / "assets");
-    sunho3d::Window* window = engine.createWindow(1200, 1200);
-    sunho3d::Renderer* renderer = engine.createRenderer(window);
-    sunho3d::Loader loader(engine, *renderer);
-    
 
-    //sunho3d::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
-/*
+int main() {
+
+    VKGIRenderer::Engine engine(basePath(), basePath() / "assets");
+    VKGIRenderer::Window* window = engine.createWindow(1200, 1200);
+    VKGIRenderer::Renderer* renderer = engine.createRenderer(window);
+    VKGIRenderer::Loader loader(engine, *renderer);
+   
+
+    //VKGIRenderer::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
+    /*
+  
     auto scene = loader.loadMitsuba((basePath() / "assets" / "staircase2" / "scene.xml").string());
-    scene->ddgi.gridNum = glm::uvec3(32, 32, 32);
+    scene->ddgi.gridNum = glm::uvec3(32, 20, 20);
     scene->ddgi.worldSize = glm::vec3(15.0f,15.0f,15.0f);
-    scene->ddgi.gridOrigin = glm::vec3(0.0f, 4.0f, 0.0f);
+    scene->ddgi.gridOrigin = glm::vec3(0.0f, 6.0f, 0.0f);
     glm::vec3 cameraPos = glm::vec3(6.0, 2.0, 1.0f);
     glm::vec3 origin = glm::vec3(-2.0, 1.0, 0.0);
+
 
     window->run([&](){
         //t.x += 0.1;
@@ -55,9 +59,10 @@ int main() {
         renderer->run(scene);
     });
    */
- 
+  
+
     auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
-    scene->ddgi.gridNum = glm::uvec3(16, 16, 16);
+    scene->ddgi.gridNum = glm::uvec3(20, 20, 20);
     scene->ddgi.worldSize = glm::vec3(1.5f, 1.5f, 1.5f);
     scene->ddgi.gridOrigin = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::vec3 cameraPos = glm::vec3(0.0, 1.0, 13.0f);
@@ -90,7 +95,6 @@ int main() {
         renderer->run(scene);
     });
     
-
     
 
 

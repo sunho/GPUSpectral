@@ -1,5 +1,5 @@
 add_executable(demo main.cpp)
-target_link_libraries(demo PRIVATE sunho3d)
+target_link_libraries(demo PRIVATE VKGIRenderer)
 
 add_custom_command(
     TARGET demo
@@ -16,5 +16,5 @@ add_custom_command(
 add_custom_command(
     TARGET demo
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../src/sunho3d/assets "$<TARGET_FILE_DIR:demo>/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../src/VKGIRenderer/assets "$<TARGET_FILE_DIR:demo>/assets"
 )

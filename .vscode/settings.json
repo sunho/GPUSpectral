@@ -117,7 +117,8 @@
         "xutility": "cpp",
         "*.inc": "cpp",
         "future": "cpp",
-        "*.hlsl": "cpp"
+        "*.hlsl": "cpp",
+        "execution": "cpp"
     },
     "cmake.configureOnOpen": true
 }
