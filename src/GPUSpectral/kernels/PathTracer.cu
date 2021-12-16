@@ -17,6 +17,7 @@ struct RadiancePRD {
     float3       direction;
     
     SamplerState sampler;
+    int          wasDelta;
     int          countEmitted;
     int          done;
     int          pad;
@@ -127,6 +128,7 @@ extern "C" __global__ void __raygen__rg() {
         RadiancePRD prd;
         prd.weight = make_float3(1.f);
         prd.countEmitted = true;
+        prd.wasDelta = false;
         prd.done         = false;
         prd.sampler = sampler;
         prd.direction = ray_direction;
@@ -236,16 +238,14 @@ extern "C" __global__ void __closesthit__radiance() {
 
     if( prd->countEmitted)
         prd->emitted = prd->weight * rt_data->emission_color;
-    prd->countEmitted = false;
 
+    if (prd->wasDelta)
+        prd->emitted = prd->weight * rt_data->emission_color;
+
+    prd->countEmitted = false;
     prd->origin    = P;
     prd->direction = wi;
     prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
-
-    if( bsdfRes.isDelta)
-        prd->emitted = prd->weight * rt_data->emission_color;
-
-
-
+    prd->wasDelta = bsdfRes.isDelta;
     prd->sampler = sampler;
 }
