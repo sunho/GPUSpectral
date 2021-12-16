@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../math/VectorMath.cuh"
+#include "../kernels/VectorMath.cuh"
 #include "../kernels/PathTracer.cuh"
 #include "Scene.h"
 #include <filesystem>
@@ -25,13 +25,11 @@ struct CudaTLAS {
     CUdeviceptr                    devicePositions;
     CUdeviceptr                    deviceNormals;
     CUdeviceptr                    deviceUvs;
-    LightData                     lightData;
 
     std::vector<float4> positions;
     std::vector<float4> normals;
     std::vector<float4> uvs;
     std::vector<int> matIndices;
-    std::vector<TriangleLight> triangleLights;
 private:
     void fillData(Renderer& renderer, const Scene& scene);
 };
@@ -66,6 +64,8 @@ struct RenderState {
     RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene);
 
     Scene scene;
+    LightData deviceLightData;
+    BSDFData deviceBSDFData;
     CudaTLAS tlas;
     CudaSBT sbt;
     CUstream stream;

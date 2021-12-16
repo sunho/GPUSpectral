@@ -2,15 +2,14 @@
 #include <vector_types.h>
 #include <vector_functions.hpp>
 #include "PathTracer.cuh"
-#include "../math/VectorMath.cuh"
+#include "VectorMath.cuh"
 #include <math.h>
 
 extern "C" {
     __constant__ Params params;
 }
 
-struct RadiancePRD
-{
+struct RadiancePRD {
     float3       emitted;
     float3       radiance;
     float3       weight;
@@ -37,8 +36,7 @@ static __forceinline__ __device__ void  packPointer( void* ptr, unsigned int& i0
     i1 = uptr & 0x00000000ffffffff;
 }
 
-static __forceinline__ __device__ RadiancePRD* getPRD()
-{
+static __forceinline__ __device__ RadiancePRD* getPRD() {
     const unsigned int u0 = optixGetPayload_0();
     const unsigned int u1 = optixGetPayload_1();
     return reinterpret_cast<RadiancePRD*>( unpackPointer( u0, u1 ) );
@@ -51,10 +49,8 @@ static __forceinline__ __device__ void traceRadiance(
         float                  tmin,
         float                  tmax,
         RadiancePRD*           prd
-        )
-{
+        ) {
     // TODO: deduce stride from num ray-types passed in params
-
     unsigned int u0, u1;
     packPointer( prd, u0, u1 );
     optixTrace(
@@ -72,8 +68,7 @@ static __forceinline__ __device__ void traceRadiance(
             u0, u1 );
 }
 
-static __forceinline__ __device__ void setPayloadOcclusion(bool occluded)
-{
+static __forceinline__ __device__ void setPayloadOcclusion(bool occluded) {
     optixSetPayload_0(static_cast<unsigned int>(occluded));
 }
 
@@ -102,14 +97,12 @@ static __forceinline__ __device__ bool traceOcclusion(
     return occluded;
 }
 
-extern "C" __global__ void __closesthit__occlusion()
-{
+extern "C" __global__ void __closesthit__occlusion() {
     setPayloadOcclusion(true);
 }
 
 
-extern "C" __global__ void __raygen__rg()
-{
+extern "C" __global__ void __raygen__rg() {
     const int    w   = params.width;
     const int    h   = params.height;
     const float3 eye = params.eye;
@@ -126,11 +119,9 @@ extern "C" __global__ void __raygen__rg()
         // The center of each pixel is at fraction (0.5,0.5)
         const float2 subpixel_jitter = make_float2( randUniform(sampler), randUniform(sampler) );
 
-        const float2 d = 2.0f * make_float2(
-                ( static_cast<float>( idx.x ) + subpixel_jitter.x ) / static_cast<float>( w ),
-                ( static_cast<float>( idx.y ) + subpixel_jitter.y ) / static_cast<float>( h )
-                ) - 1.0f;
-        float3 ray_direction = normalize(d.x*U + d.y*V + W);
+        const float2 fragcord = make_float2(static_cast<float>(idx.x) + subpixel_jitter.x, static_cast<float>(idx.y) + subpixel_jitter.y);
+        const float3 rd = rayDir(make_float2(w, h), fragcord, params.fov);
+        float3 ray_direction = normalize(rd.x*U + rd.y*V + rd.z*W);
         float3 ray_origin    = eye;
 
         RadiancePRD prd;
@@ -138,6 +129,7 @@ extern "C" __global__ void __raygen__rg()
         prd.countEmitted = true;
         prd.done         = false;
         prd.sampler = sampler;
+        prd.direction = ray_direction;
 
         int depth = 0;
         for( ;; )
@@ -155,7 +147,7 @@ extern "C" __global__ void __raygen__rg()
             result += prd.emitted;
             result += prd.radiance;
 
-            if( prd.done  || depth >= 3 ) // TODO RR, variable for depth
+            if( prd.done  || depth >= 8 ) // TODO RR, variable for depth
                 break;
 
             ray_origin    = prd.origin;
@@ -177,11 +169,10 @@ extern "C" __global__ void __raygen__rg()
         accum_color = lerp( accum_color_prev, accum_color, a );
     }
     params.accum_buffer[ image_index ] = make_float4( accum_color, 1.0f);
-    params.frame_buffer[ image_index ] = make_color ( accum_color );
+    params.frame_buffer[ image_index ] = make_color ( ACESFilm(accum_color) );
 }
 
-extern "C" __global__ void __miss__radiance()
-{
+extern "C" __global__ void __miss__radiance() {
     MissData* rt_data  = reinterpret_cast<MissData*>( optixGetSbtDataPointer() );
     RadiancePRD* prd = getPRD();
 
@@ -189,8 +180,7 @@ extern "C" __global__ void __miss__radiance()
     prd->done      = true;
 }
 
-extern "C" __global__ void __closesthit__radiance()
-{
+extern "C" __global__ void __closesthit__radiance() {
     HitGroupData* rt_data = (HitGroupData*)optixGetSbtDataPointer();
 
     const int    prim_idx        = optixGetPrimitiveIndex();
@@ -202,33 +192,29 @@ extern "C" __global__ void __closesthit__radiance()
     const float3 v2   = make_float3( rt_data->vertices[ vert_idx_offset+2 ] );
     const float3 N_0  = normalize( cross( v1-v0, v2-v0 ) );
 
-    const float3 N    = faceforward( N_0, -ray_dir, N_0 );
+    const float3 N    = rt_data->twofaced ? faceforward( N_0, -ray_dir, N_0 ) : N_0;
     const float3 P    = optixGetWorldRayOrigin() + optixGetRayTmax()*ray_dir;
 
     RadiancePRD* prd = getPRD();
 
-    if( prd->countEmitted )
-        prd->emitted = rt_data->emission_color;
-    prd->countEmitted = false;
-
     SamplerState sampler = prd->sampler;
 
-    float3 wi = randDirHemisphere(sampler);
     Onb onb(N);
-    onb.inverse_transform(wi);
-    prd->origin    = P;
-
-    prd->direction = wi; // TODO sample this wisely
+    float3 wo = normalize(onb.transform(-ray_dir));
 
     float3 lightPos;
     float lightPdf;
     float3 lightEmission;
     sampleLight(params.lightData, sampler, lightPos, lightPdf, lightEmission);
+
     float3 L = normalize(lightPos - P);
+    float3 wL = onb.transform(L);
     float Ldist = length(lightPos - P);
     const float NoL   = dot( N, L );
 
     if (NoL > 0.0f) {
+        BSDFOutput lightBsdfRes;
+        evalBSDF(params.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
         const bool occluded = traceOcclusion(
             params.handle,
             P,
@@ -237,14 +223,29 @@ extern "C" __global__ void __closesthit__radiance()
             Ldist - 0.01f  // tmax
         );
 
-        if (!occluded)
-        {
-            prd->radiance = NoL * (rt_data->diffuse_color / M_PI) * prd->weight * lightEmission / lightPdf;
+        if (!occluded) {
+            prd->radiance = NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
         }
     }
 
-    float NoW = dot(wi, N);
-    float pdf = 1.0 / (2 * M_PI);
-    prd->weight *= (rt_data->diffuse_color/ M_PI) * NoW / pdf;
+    BSDFOutput bsdfRes;
+    float3 wi;
+    sampleBSDF(params.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
+    float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
+    onb.inverse_transform(wi);
 
+    if( prd->countEmitted)
+        prd->emitted = prd->weight * rt_data->emission_color;
+    prd->countEmitted = false;
+
+    prd->origin    = P;
+    prd->direction = wi;
+    prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
+
+    if( bsdfRes.isDelta)
+        prd->emitted = prd->weight * rt_data->emission_color;
+
+
+
+    prd->sampler = sampler;
 }

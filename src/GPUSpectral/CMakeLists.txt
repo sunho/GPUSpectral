@@ -10,10 +10,11 @@ set(SOURCE
 )
 
 set(SHADERS_HEADERS
-  math/VectorMath.cuh
+  kernels/VectorMath.cuh
   kernels/PathTracer.cuh
   kernels/Common.cuh
   kernels/LightSampler.cuh
+  kernels/BSDFSampler.cuh
 )
 
 set(SHADERS
@@ -35,7 +36,7 @@ NVCUDA_COMPILE_PTX( SOURCES ${SHADERS}
                     NVCC_OPTIONS "--gpu-architecture=compute_50" "--use_fast_math" "--relocatable-device-code=true" "--generate-line-info" "-Wno-deprecated-gpu-targets" "-I${OPTIX_INCLUDE_DIR}" "-I${CMAKE_CURRENT_SOURCE_DIR}/kernels"
                   )
 
-add_executable(GPUSpectral ${SOURCE} ${SHADERS_HEADERS} ${PTX_SOURCES}) 
+add_executable(GPUSpectral ${SOURCE} ${SHADERS} ${SHADERS_HEADERS} ${PTX_SOURCES}) 
 target_link_libraries(
   GPUSpectral
   stb_image

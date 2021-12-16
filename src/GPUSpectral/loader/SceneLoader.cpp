@@ -5,11 +5,11 @@
 
 #include <filesystem>
 
-static void loadMaterial(Material* material, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
+static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
     std::string type = obj.pluginType();
-    /*if (type == "twosided") {
-        material->twosided = true;
-    }*/
+    if (type == "twosided") {
+        material->twofaced = true;
+    }
     if (type == "diffuse") {
         bool found = false;
         /*for (auto [name, child] : obj.namedChildren()) {
@@ -24,7 +24,8 @@ static void loadMaterial(Material* material, tinyparser_mitsuba::Object& obj, co
         }*/
         if (!found) {
             auto rgb = obj.property("reflectance").getColor();
-            material->color = make_float3(rgb.r, rgb.g, rgb.b);
+            float3 reflectance = make_float3(rgb.r, rgb.g, rgb.b);
+            material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ reflectance });
         }
     } else if (type == "roughplastic") {
         bool found = false;
@@ -40,13 +41,18 @@ static void loadMaterial(Material* material, tinyparser_mitsuba::Object& obj, co
         }*/
         if (!found) {
             auto rgb = obj.property("diffuse_reflectance").getColor();
-            material->color = make_float3(rgb.r, rgb.g, rgb.b);
+            //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
+    }
+    else if (type == "dielectric") {
+        float intIOR = obj.property("int_ior").getNumber();
+        float extIOR = obj.property("ext_ior").getNumber();
+        material->bsdf = scene.addSmoothDielectricBSDF(SmoothDielectricBSDF{ intIOR, extIOR });
     }
 
     for (auto child : obj.anonymousChildren()) {
         if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-            loadMaterial(material, *child, basepath);
+            loadMaterial(scene, material, *child, basepath);
         }
     }
 }
@@ -72,7 +78,7 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
         if (obj->type() == tinyparser_mitsuba::OT_SHAPE) {
             std::string filename;
             if (obj->pluginType() == "obj") {
-                filename = obj->property("filename").getString();
+                filename = (parentPath / obj->property("filename").getString()).string();
             }
             else if (obj->pluginType() == "rectangle") {
                 filename = renderer.assetPath("rect.obj");
@@ -94,26 +100,42 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
                 matrix[3][3] = 1.0f;
             }
 
+            bool emitting = false;
             RenderObject renderObject = {};
             Material material = {};
             for (auto child : obj->anonymousChildren()) {
                 if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-                    loadMaterial(&material, *child, parentPath);
-                }
-                else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
+                    loadMaterial(outScene, &material, *child, parentPath);
+                } else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
                     auto col = child->property("radiance").getColor();
                     material.emission = make_float3(col.r, col.g, col.b);
+                    emitting = true;
                 }
             }
 
             renderObject.meshId = mesh;
             renderObject.transform = matrix;
-            renderObject.materialId = outScene.materials.size();
-            outScene.materials.push_back(material);
-            outScene.renderObjects.push_back(renderObject);
+            renderObject.material = outScene.addMaterial(material);
+            outScene.addRenderObject(renderObject);
+
+            if (emitting) {
+                auto m = renderer.getMesh(mesh);
+                for (size_t i = 0; i < m->positions.size(); i+=3) {
+                    TriangleLight light = {};
+                    float3 pos0 = m->positions[i];
+                    float3 pos1 = m->positions[i+1];
+                    float3 pos2 = m->positions[i+2];
+                    light.positions[0] = make_float3(renderObject.transform * float4(pos0.x, pos0.y, pos0.z, 1.0f));
+                    light.positions[1] = make_float3(renderObject.transform * float4(pos1.x, pos1.y, pos1.z, 1.0f));
+                    light.positions[2] = make_float3(renderObject.transform * float4(pos2.x, pos2.y, pos2.z, 1.0f));
+                    light.radinace = material.emission;
+                    outScene.addTriangleLight(light);
+                }
+            }
         } else if (obj->type() == tinyparser_mitsuba::OT_SENSOR) {
             auto transform = obj->property("to_world").getTransform();
             float fov = obj->property("fov").getNumber();
+            outScene.camera.fov = fov * M_PI / 180.f;
             auto matrix = mat4(transform.matrix.data());
             float3 eye = make_float3(matrix[3][0], matrix[3][1], matrix[3][2]);
             outScene.camera.eye = eye;

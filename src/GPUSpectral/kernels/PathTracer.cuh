@@ -3,6 +3,7 @@
 #include <optix.h>
 #include <vector_types.h>
 #include "LightSampler.cuh"
+#include "BSDFSampler.cuh"
 
 template <typename T>
 struct Record
@@ -35,8 +36,10 @@ struct Params
     float3       U;
     float3       V;
     float3       W;
+    float fov;
 
     LightData lightData;
+    BSDFData bsdfData;
     OptixTraversableHandle handle;
 };
 
@@ -52,7 +55,8 @@ struct MissData
 struct HitGroupData
 {
     float3  emission_color;
-    float3  diffuse_color;
+    uint32_t twofaced;
+    BSDFHandle bsdf;
     float4* vertices;
 };
 

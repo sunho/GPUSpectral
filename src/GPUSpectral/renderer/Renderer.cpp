@@ -66,6 +66,7 @@ void Renderer::setScene(const Scene& scene) {
 void Renderer::render() {
     state->params.width = 768;
     state->params.height = 768;
+    state->params.samples_per_launch = 1024;
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state->params.accum_buffer),
         state->params.width * state->params.height * sizeof(float4)
@@ -99,6 +100,7 @@ void Renderer::render() {
         state->params.width * state->params.height * 4,
         cudaMemcpyDeviceToHost
     ));
+    stbi_flip_vertically_on_write(true);
     stbi_write_jpg("jpg_test_.jpg", state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
 }
 
@@ -317,15 +319,6 @@ CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& 
         cudaMemcpyHostToDevice
     ));
 
-    const size_t trinagleLight= triangleLights.size() * sizeof(TriangleLight);
-    lightData.triangleLights = Array<TriangleLight>(triangleLights.size());
-    CUDA_CHECK(cudaMemcpy(
-        reinterpret_cast<void*>(lightData.triangleLights.data()),
-        triangleLights.data(),
-        triangleLights.size() * sizeof(TriangleLight),
-        cudaMemcpyHostToDevice
-    ));
-
     //
     // Build triangle GAS
     //
@@ -424,21 +417,7 @@ void CudaTLAS::fillData(Renderer& renderer, const Scene& scene) {
         }
 
         for (size_t i = 0; i < mesh->positions.size() / 3; ++i) {
-            matIndices.push_back(obj.materialId);
-        }
-        auto material = scene.materials[obj.materialId];
-        if (material.emission.x != 0.0f || material.emission.y != 0.0f || material.emission.z != 0.0f) {
-            for (size_t i = 0; i < mesh->positions.size(); i+=3) {
-                TriangleLight light = {};
-                float3 pos0 = mesh->positions[i];
-                float3 pos1 = mesh->positions[i+1];
-                float3 pos2 = mesh->positions[i+2];
-                light.positions[0] = make_float3(obj.transform * float4(pos0.x, pos0.y, pos0.z, 1.0f));
-                light.positions[1] = make_float3(obj.transform * float4(pos1.x, pos1.y, pos1.z, 1.0f));
-                light.positions[2] = make_float3(obj.transform * float4(pos2.x, pos2.y, pos2.z, 1.0f));
-                light.radinace = material.emission;
-                triangleLights.push_back(light);
-            }
+            matIndices.push_back(obj.material);
         }
     }
 }
@@ -491,7 +470,8 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
 
             OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.radianceHitGroup, &hitgroup_records[sbt_idx]));
             hitgroup_records[sbt_idx].data.emission_color = scene.materials[i].emission;
-            hitgroup_records[sbt_idx].data.diffuse_color = scene.materials[i].color;
+            hitgroup_records[sbt_idx].data.bsdf = scene.materials[i].bsdf;
+            hitgroup_records[sbt_idx].data.twofaced = scene.materials[i].twofaced;
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(tlas.devicePositions);
         }
 
@@ -523,7 +503,6 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
 RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
 
-    params.samples_per_launch = 10240;
     params.subframe_index = 0u;
 
     params.handle = tlas.gasHandle;
@@ -531,8 +510,20 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.U = scene.camera.u;
     params.V = scene.camera.v;
     params.W = scene.camera.w;
+    params.fov = scene.camera.fov;
 
-    params.lightData = tlas.lightData;
+    deviceLightData.triangleLights.allocDevice(scene.triangleLights.size());
+    deviceLightData.triangleLights.upload(scene.triangleLights.data());
+    params.lightData = deviceLightData;
+
+    {
+        deviceBSDFData.diffuseBSDFs.allocDevice(scene.diffuseBSDFs.size());
+        deviceBSDFData.diffuseBSDFs.upload(scene.diffuseBSDFs.data());
+        
+        deviceBSDFData.smoothDielectricBSDFs.allocDevice(scene.smoothDielectricBSDFs.size());
+        deviceBSDFData.smoothDielectricBSDFs.upload(scene.smoothDielectricBSDFs.data());
+        params.bsdfData = deviceBSDFData;
+    }
 
     CUDA_CHECK(cudaStreamCreate(&stream));
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&dParams), sizeof(Params)));
