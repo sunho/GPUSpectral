@@ -164,3 +164,43 @@ HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov) {
     auto dir = normalize(make_float3(xy.x, xy.y, z));
     return dir;
 }
+
+HOSTDEVICE CUDAINLINE float3 sampleHalf(SamplerState& sampler, float alpha) {
+    float2 u = make_float2(randUniform(sampler), randUniform(sampler));
+    float phi = 2.0f * M_PI * u.x;
+    // 1 + tan^2 = sec^2
+    // 1 / (1+tan^2) = cos^2
+    float tan2 = -alpha * alpha * log(u.y == 0.0f ? 1.0f : u.y);
+    float cos2 = 1.0f / (1.0f + tan2); // denominator is never 0.0
+    float sin2 = 1.0f - cos2;
+    float cost = sqrt(cos2);
+    float sint = sqrt(sin2);
+    return make_float3(cos(phi) * sint, sin(phi) * sint, cost);
+}
+
+HOSTDEVICE CUDAINLINE float beckmannD(float3 wh, float alpha) {
+    float cos2 = wh.z * wh.z;
+    float tan2 = (wh.x * wh.x + wh.y * wh.y) / cos2;
+    float a = exp(-tan2 / (alpha * alpha));
+    float b = M_PI * alpha * alpha * cos2 * cos2;
+    return a / b;
+}
+
+HOSTDEVICE CUDAINLINE float ggxD(float3 wh, float alpha) {
+    float cos2 = wh.z * wh.z;
+    float tan2 = (wh.x * wh.x + wh.y * wh.y) / cos2;
+
+    float a = M_PI * alpha * alpha * cos2 * cos2 * (1.0f + tan2 / (alpha * alpha));
+    return 1.0f / a;
+}
+
+HOSTDEVICE CUDAINLINE float ggxLambda(float3 wh, float alpha) {
+    float tan2 = (wh.x * wh.x + wh.y * wh.y) / (wh.z * wh.z);
+    float a = -1.0f + sqrt(1.0f + alpha*alpha*tan2);
+    return 0.5f * a;
+}
+
+HOSTDEVICE CUDAINLINE float ggxMask(float3 wo, float3 wi, float alpha) {
+    return 1.0f / (1.0f + ggxLambda(wo, alpha) + ggxLambda(wi, alpha));
+}
+

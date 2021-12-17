@@ -40,6 +40,18 @@ struct SmoothPlasticBSDF {
     float R0;
 };
 
+enum MicrofacetType : uint32_t {
+    BECKMANN,
+    GGX
+};
+
+struct RoughConductorBSDF {
+    float iorIn;
+    float iorOut; // usually 1.0
+    float alpha;
+    MicrofacetType distribution;
+};
+
 struct BSDFData {
     #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) Array<BSDFNAME> BSDFFIELD##s;
     #include "BSDF.inc"
@@ -180,6 +192,26 @@ HOSTDEVICE CUDAINLINE void sampleSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf
     }
 }
 
+HOSTDEVICE CUDAINLINE void sampleRoughConductorBSDF(const RoughConductorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
+    float no = bsdf.iorOut;
+    float nt = bsdf.iorIn;
+    float Fr = nt == 0.0f ? 1.0f : fresnel(wo, no, nt);
+    float3 wh = sampleHalf(sampler, bsdf.alpha);
+    if (dot(wh, wo) <= 0.0f) {
+        wh *= -1.0f;
+    }
+    wi = normalize(2.0 * wh - wo);
+    if (dot(wo, wi) <= 0.0f) {
+        output.bsdf = make_float3(0.0f);
+        output.pdf = 1.0f;
+        output.isDelta = false;
+        return;
+    }
+    output.bsdf = Fr * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) * make_float3(1.0f);
+    output.pdf = beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * dot(wo,wh));
+    output.isDelta = false;
+}
+
 HOSTDEVICE CUDAINLINE void evalDiffuseBSDF(const DiffuseBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
     output.bsdf = bsdf.reflectance / M_PI;
     output.pdf = 1.0 / (2 * M_PI);
@@ -202,6 +234,16 @@ HOSTDEVICE CUDAINLINE void evalSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf, 
     float Fr = schlickFresnel(bsdf.R0, abs(wo.z));
     output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z));
     output.pdf = (1.0f-Fr) * (1.0 / (2 * M_PI));
+    output.isDelta = false;
+}
+
+HOSTDEVICE CUDAINLINE void evalRoughConductorBSDF(const RoughConductorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
+    float no = bsdf.iorOut;
+    float nt = bsdf.iorIn;
+    float Fr = nt == 0.0f ? 1.0f : fresnel(wo, no, nt);
+    float3 wh = normalize((wo + wi) / 2.0f);
+    output.bsdf = Fr * ggxD(wh, bsdf.alpha)* make_float3(1.0f);
+    output.pdf = beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * dot(wo,wh));
     output.isDelta = false;
 }
 

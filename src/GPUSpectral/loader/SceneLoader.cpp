@@ -82,6 +82,32 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
+    else if (type == "roughconductor") {
+        bool found = false;
+        /*for (auto [name, child] : obj.namedChildren()) {
+            if (name == "diffuse_reflectance") {
+                found = true;
+                auto filename = child->property("filename").getString();
+                auto path = (basepath / filename).string();
+                auto tex = loadOrGetTexture(path);
+                material->materialData = DiffuseTextureMaterialData{ tex };
+                break;
+            }
+        }*/
+        if (!found) {
+            auto rgb = obj.property("diffuse_reflectance").getColor();
+            float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
+            float alpha = obj.property("alpha").getNumber();
+            if (obj.property("ext_eta").isValid()) {
+                if (abs(obj.property("ext_eta").getNumber() - 1.0f) > 0.001f) {
+                    std::cout << "unsupported ext ior of rough conductor" << std::endl;
+                }
+            }
+            float ior = obj.property("eta").isValid() ? obj.property("eta").getNumber() : 1.3f;
+            material->bsdf = scene.addRoughConductorBSDF(RoughConductorBSDF{ior, 1.0f, (float)sqrt(2)*alpha, GGX});
+            //material->color = make_float3(rgb.r, rgb.g, rgb.b);
+        }
+    }
 
     for (auto child : obj.anonymousChildren()) {
         if (child->type() == tinyparser_mitsuba::OT_BSDF) {
