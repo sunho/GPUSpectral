@@ -1,0 +1,3 @@
+BSDFDefinition(DiffuseBSDF, diffuseBSDF, DIFFUSE)
+BSDFDefinition(SmoothDielectricBSDF, smoothDielectricBSDF, SMOOTH_DIELECTRIC)
+BSDFDefinition(SmoothConductorBSDF, smoothConductorBSDF, SMOOTH_CONDUCTOR)

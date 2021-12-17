@@ -66,7 +66,7 @@ void Renderer::setScene(const Scene& scene) {
 void Renderer::render() {
     state->params.width = 768;
     state->params.height = 768;
-    state->params.samples_per_launch = 10240;
+    state->params.samples_per_launch = 128;
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state->params.accum_buffer),
         state->params.width * state->params.height * sizeof(float4)
@@ -517,11 +517,11 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.lightData = deviceLightData;
 
     {
-        deviceBSDFData.diffuseBSDFs.allocDevice(scene.diffuseBSDFs.size());
-        deviceBSDFData.diffuseBSDFs.upload(scene.diffuseBSDFs.data());
-        
-        deviceBSDFData.smoothDielectricBSDFs.allocDevice(scene.smoothDielectricBSDFs.size());
-        deviceBSDFData.smoothDielectricBSDFs.upload(scene.smoothDielectricBSDFs.data());
+    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
+        deviceBSDFData.BSDFFIELD##s.allocDevice(scene.BSDFFIELD##s.size()); \
+        deviceBSDFData.BSDFFIELD##s.upload(scene.BSDFFIELD##s.data());
+    #include "../kernels/BSDF.inc"
+    #undef BSDFDefinition
         params.bsdfData = deviceBSDFData;
     }
 

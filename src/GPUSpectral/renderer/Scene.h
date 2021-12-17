@@ -44,17 +44,14 @@ struct Scene {
         return materials[handle];
     }
 
-    BSDFHandle addDiffuseBSDF(const DiffuseBSDF& bsdf) {
-        BSDFHandle outHandle { BSDF_DIFFUSE, (uint32_t)diffuseBSDFs.size() };
-        diffuseBSDFs.push_back(bsdf);
-        return outHandle;
+    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
+    BSDFHandle add##BSDFNAME(const BSDFNAME& bsdf) { \
+        BSDFHandle outHandle { BSDF_##BSDFTYPE, (uint32_t)BSDFFIELD##s.size() }; \
+        BSDFFIELD##s.push_back(bsdf); \
+        return outHandle; \
     }
-
-    BSDFHandle addSmoothDielectricBSDF(const SmoothDielectricBSDF& bsdf) {
-        BSDFHandle outHandle { BSDF_SMOOTH_DIELECTRIC, (uint32_t)smoothDielectricBSDFs.size() };
-        smoothDielectricBSDFs.push_back(bsdf);
-        return outHandle;
-    }
+    #include "../kernels/BSDF.inc"
+    #undef BSDFDefinition
 
     void addRenderObject(const RenderObject& object) {
         renderObjects.push_back(object);
@@ -68,6 +65,7 @@ struct Scene {
     std::vector<RenderObject> renderObjects;
     std::vector<Material> materials;
     std::vector<TriangleLight> triangleLights;
-    std::vector<DiffuseBSDF> diffuseBSDFs;
-    std::vector<SmoothDielectricBSDF> smoothDielectricBSDFs;
+    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) std::vector<BSDFNAME> BSDFFIELD##s;
+    #include "../kernels/BSDF.inc"
+    #undef BSDFDefinition
 };

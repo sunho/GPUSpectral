@@ -43,11 +43,13 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             auto rgb = obj.property("diffuse_reflectance").getColor();
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
-    }
-    else if (type == "dielectric") {
+    } else if (type == "dielectric") {
         float intIOR = obj.property("int_ior").getNumber();
         float extIOR = obj.property("ext_ior").getNumber();
         material->bsdf = scene.addSmoothDielectricBSDF(SmoothDielectricBSDF{ intIOR, extIOR });
+    } else if (type == "conductor") {
+        float ior = obj.property("eta").isValid() ? obj.property("eta").getNumber() : 0.0f;
+        material->bsdf = scene.addSmoothConductorBSDF(SmoothConductorBSDF{ ior, 1.0f });
     }
 
     for (auto child : obj.anonymousChildren()) {

@@ -10,6 +10,7 @@ set(SOURCE
 )
 
 set(SHADERS_HEADERS
+  kernels/BSDF.inc
   kernels/VectorMath.cuh
   kernels/PathTracer.cuh
   kernels/Common.cuh
