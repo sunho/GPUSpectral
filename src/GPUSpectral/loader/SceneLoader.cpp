@@ -2,6 +2,7 @@
 #include <tinyparser-mitsuba.h>
 #include <tiny_obj_loader.h>
 #include <iostream>
+#include <assert.h>
 
 #include <filesystem>
 
@@ -27,7 +28,8 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             float3 reflectance = make_float3(rgb.r, rgb.g, rgb.b);
             material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ reflectance });
         }
-    } else if (type == "roughplastic") {
+    }
+    else if (type == "roughplastic") {
         bool found = false;
         /*for (auto [name, child] : obj.namedChildren()) {
             if (name == "diffuse_reflectance") {
@@ -43,13 +45,42 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             auto rgb = obj.property("diffuse_reflectance").getColor();
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
-    } else if (type == "dielectric") {
+    }
+    else if (type == "dielectric") {
         float intIOR = obj.property("int_ior").getNumber();
         float extIOR = obj.property("ext_ior").getNumber();
         material->bsdf = scene.addSmoothDielectricBSDF(SmoothDielectricBSDF{ intIOR, extIOR });
-    } else if (type == "conductor") {
+    }
+    else if (type == "conductor") {
         float ior = obj.property("eta").isValid() ? obj.property("eta").getNumber() : 0.0f;
         material->bsdf = scene.addSmoothConductorBSDF(SmoothConductorBSDF{ ior, 1.0f });
+    }
+    else if (type == "plastic") {
+        bool found = false;
+        /*for (auto [name, child] : obj.namedChildren()) {
+            if (name == "diffuse_reflectance") {
+                found = true;
+                auto filename = child->property("filename").getString();
+                auto path = (basepath / filename).string();
+                auto tex = loadOrGetTexture(path);
+                material->materialData = DiffuseTextureMaterialData{ tex };
+                break;
+            }
+        }*/
+        if (!found) {
+            auto rgb = obj.property("diffuse_reflectance").getColor();
+            float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
+            if (obj.property("ext_ior").isValid()) {
+                if (abs(obj.property("ext_ior").getNumber() - 1.0f) > 0.001f) {
+                    std::cout << "unsupported ext ior of plastic" << std::endl;
+                }
+            }
+            float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
+            float R0 = (ior - 1.0f) / (ior + 1.0f);
+            R0 *= R0;
+            material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{diffuse, R0});
+            //material->color = make_float3(rgb.r, rgb.g, rgb.b);
+        }
     }
 
     for (auto child : obj.anonymousChildren()) {

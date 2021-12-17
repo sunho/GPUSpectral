@@ -66,7 +66,7 @@ void Renderer::setScene(const Scene& scene) {
 void Renderer::render() {
     state->params.width = 768;
     state->params.height = 768;
-    state->params.samples_per_launch = 128;
+    state->params.samples_per_launch = 20240;
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state->params.accum_buffer),
         state->params.width * state->params.height * sizeof(float4)
