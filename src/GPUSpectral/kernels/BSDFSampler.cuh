@@ -286,12 +286,12 @@ HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, 
             wh *= -1.0f;
         }
         wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-        if (wi.z <= 0.0f) {
+        /*if (wi.z <= 0.0f) {
             output.bsdf = make_float3(0.0f);
             output.pdf = 1.0f;
             output.isDelta = false;
             return;
-        }
+        }*/
     } 
     else {
         wi = randCosineHemisphere(sampler);
@@ -350,7 +350,7 @@ HOSTDEVICE CUDAINLINE void evalRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, fl
     float Fr = schlickFresnel(bsdf.R0, abs(wo.z));
     float3 wh = normalize(wi + wo);
     float3 diffuse = bsdf.diffuse * fresnelBlendDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z));
-    float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha) / (4.0f * fmaxf(fabs(wo.z), fabs(wi.z)));
+    float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) / (4.0f * fmaxf(fabs(wo.z), fabs(wi.z)));
     output.pdf = Fr * beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * fabs(dot(wo, wh))) + (1.0f - Fr) * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
     output.isDelta = false;

@@ -78,10 +78,12 @@ static __forceinline__ __device__ bool traceOcclusion(
     float3                 ray_origin,
     float3                 ray_direction,
     float                  tmin,
-    float                  tmax
+    float                  tmax,
+    float3&                emission
 )
 {
     unsigned int occluded = 0u;
+    unsigned int u0, u1, u2;
     optixTrace(
         handle,
         ray_origin,
@@ -94,12 +96,21 @@ static __forceinline__ __device__ bool traceOcclusion(
         RAY_TYPE_OCCLUSION,      // SBT offset
         RAY_TYPE_COUNT,          // SBT stride
         RAY_TYPE_OCCLUSION,      // missSBTIndex
-        occluded);
+        occluded,
+        u0,
+        u1,
+        u2
+        );
+    emission = make_float3(uint_as_float(u0), uint_as_float(u1), uint_as_float(u2));
     return occluded;
 }
 
 extern "C" __global__ void __closesthit__occlusion() {
+    HitGroupData* rt_data = (HitGroupData*)optixGetSbtDataPointer();
     setPayloadOcclusion(true);
+    optixSetPayload_1(float_as_int(rt_data->emission_color.x));
+    optixSetPayload_2(float_as_int(rt_data->emission_color.y));
+    optixSetPayload_3(float_as_int(rt_data->emission_color.z));
 }
 
 
@@ -230,22 +241,47 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 wL = onb.transform(L);
     float Ldist = length(lightPos - P);
     const float NoL   = fabs(dot( SN, L ));
+    float3 direct = make_float3(0.0f);
 
     if (dot(N, L) > 0.0f) {
         BSDFOutput lightBsdfRes;
         evalBSDF(params.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
-        const bool occluded = traceOcclusion(
+
+        BSDFOutput bsdfRes;
+        float3 wi;
+        sampleBSDF(params.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
+        float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
+        onb.inverse_transform(wi);
+
+        float3 shadowEmission;
+        bool occluded = traceOcclusion(
             params.handle,
             P,
             L,
             0.01f,         // tmin
-            Ldist - 0.01f  // tmax
+            Ldist - 0.01f,  // tmax
+            shadowEmission
         );
-
         if (!occluded) {
-            prd->radiance = NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+            float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
+            direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+        }
+
+        occluded = traceOcclusion(
+            params.handle,
+            P,
+            wi,
+            0.01f,         // tmin
+            1e16f,  // tmax
+            shadowEmission
+        );
+        
+        if (occluded) {
+            float w = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+            direct += shadowEmission * NoW * prd->weight * w / bsdfRes.pdf;
         }
     }
+    prd->radiance = direct;
 
     BSDFOutput bsdfRes;
     float3 wi;

@@ -66,7 +66,7 @@ void Renderer::setScene(const Scene& scene) {
 void Renderer::render() {
     state->params.width = 768;
     state->params.height = 768;
-    state->params.samples_per_launch = 128;
+    state->params.samples_per_launch = 22480;
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state->params.accum_buffer),
         state->params.width * state->params.height * sizeof(float4)
@@ -117,7 +117,7 @@ static OptixPipelineCompileOptions createPipelineCompileOption() {
     OptixPipelineCompileOptions options = {};
     options.usesMotionBlur = false;
     options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-    options.numPayloadValues = 2;
+    options.numPayloadValues = 4;
     options.numAttributeValues = 2;
 #ifdef DEBUG // Enables debug exceptions during optix launches. This may incur significant performance cost and should only be done during development.
     options.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
@@ -495,7 +495,7 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
         {
             const int sbt_idx = i * RAY_TYPE_COUNT + 1;  // SBT for occlusion ray-type for ith material
             memset(&hitgroup_records[sbt_idx], 0, hitgroup_record_size);
-
+            hitgroup_records[sbt_idx].data.emission_color = scene.materials[i].emission;
             OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.shadowHitGroup, &hitgroup_records[sbt_idx]));
         }
     }

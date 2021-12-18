@@ -53,7 +53,7 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
             float R0 = (ior - 1.0f) / (ior + 1.0f);
             R0 *= R0;
-            material->bsdf = scene.addRoughPlasticBSDF(RoughPlasticBSDF{pow(diffuse,make_float3(2.2f)), R0, (float)sqrt(1.0f)*alpha, GGX});
+            material->bsdf = scene.addRoughPlasticBSDF(RoughPlasticBSDF{pow(diffuse,make_float3(2.2f)), R0, (float)alpha, GGX});
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }

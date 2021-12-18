@@ -231,8 +231,8 @@ HOSTDEVICE CUDAINLINE float beckmannD(float3 wh, float alpha) {
 HOSTDEVICE CUDAINLINE float ggxD(float3 wh, float alpha) {
     float cos2 = wh.z * wh.z;
     float tan2 = (wh.x * wh.x + wh.y * wh.y) / cos2;
-
-    float a = M_PI * alpha * alpha * cos2 * cos2 * (1.0f + tan2 / (alpha * alpha));
+    float b = (1.0f + tan2 / (alpha * alpha));
+    float a = M_PI * alpha * alpha * cos2 * cos2 * b * b;
     return 1.0f / a;
 }
 
@@ -246,3 +246,7 @@ HOSTDEVICE CUDAINLINE float ggxMask(float3 wo, float3 wi, float alpha) {
     return 1.0f / (1.0f + ggxLambda(wo, alpha) + ggxLambda(wi, alpha));
 }
 
+HOSTDEVICE CUDAINLINE float powerHeuristic(int nf, float fPdf, int ng, float gPdf) {
+    float f = nf * fPdf, g = ng * gPdf;
+    return (f * f) / (f * f + g * g);
+}
