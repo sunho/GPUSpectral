@@ -58,5 +58,6 @@ struct HitGroupData
     uint32_t twofaced;
     BSDFHandle bsdf;
     float4* vertices;
+    float4* normals;
 };
 

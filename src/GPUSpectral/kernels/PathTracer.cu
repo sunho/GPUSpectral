@@ -199,16 +199,26 @@ extern "C" __global__ void __closesthit__radiance() {
     const float3 v0   = make_float3( rt_data->vertices[ vert_idx_offset+0 ] );
     const float3 v1   = make_float3( rt_data->vertices[ vert_idx_offset+1 ] );
     const float3 v2   = make_float3( rt_data->vertices[ vert_idx_offset+2 ] );
+    const float3 n0   = make_float3( rt_data->normals[ vert_idx_offset+0 ] );
+    const float3 n1   = make_float3( rt_data->normals[ vert_idx_offset+1 ] );
+    const float3 n2   = make_float3( rt_data->normals[ vert_idx_offset+2 ] );
+    float2 bary = optixGetTriangleBarycentrics();
+    float3 SN = normalize(bary.x * n1 + bary.y * n2 + (1.0f - bary.x - bary.y) * n0);
     const float3 N_0  = normalize( cross( v1-v0, v2-v0 ) );
 
-    const float3 N    = rt_data->twofaced ? faceforward( N_0, -ray_dir, N_0 ) : N_0;
+    float3 N = N_0;
+    if (rt_data->twofaced && dot(N, -ray_dir) < 0) {
+        N *= -1.0f;
+        SN *= -1.0f;
+    }
     const float3 P    = optixGetWorldRayOrigin() + optixGetRayTmax()*ray_dir;
 
     RadiancePRD* prd = getPRD();
 
     SamplerState sampler = prd->sampler;
 
-    Onb onb(N);
+    Onb onb(SN);
+    Onb geoOnb(N);
     float3 wo = normalize(onb.transform(-ray_dir));
 
     float3 lightPos;
@@ -219,9 +229,9 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 L = normalize(lightPos - P);
     float3 wL = onb.transform(L);
     float Ldist = length(lightPos - P);
-    const float NoL   = dot( N, L );
+    const float NoL   = fabs(dot( SN, L ));
 
-    if (NoL > 0.0f) {
+    if (dot(N, L) > 0.0f) {
         BSDFOutput lightBsdfRes;
         evalBSDF(params.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
         const bool occluded = traceOcclusion(
@@ -243,6 +253,12 @@ extern "C" __global__ void __closesthit__radiance() {
     float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
     onb.inverse_transform(wi);
 
+
+    if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
+        prd->done = true;
+        return;
+    }
+
     if( prd->countEmitted)
         prd->emitted = prd->weight * rt_data->emission_color;
 
@@ -250,7 +266,7 @@ extern "C" __global__ void __closesthit__radiance() {
         prd->emitted = prd->weight * rt_data->emission_color;
 
     prd->countEmitted = false;
-    prd->origin    = P;
+    prd->origin = P;
     prd->direction = wi;
     prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
     prd->wasDelta = bsdfRes.isDelta;

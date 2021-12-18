@@ -318,6 +318,13 @@ CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& 
         cudaMemcpyHostToDevice
     ));
 
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&deviceNormals), vertices_size_in_bytes));
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(deviceNormals),
+        normals.data(), vertices_size_in_bytes,
+        cudaMemcpyHostToDevice
+    ));
+
     CUdeviceptr  d_mat_indices = 0;
     const size_t mat_indices_size_in_bytes = matIndices.size() * sizeof(uint32_t);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_mat_indices), mat_indices_size_in_bytes));
@@ -482,6 +489,7 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
             hitgroup_records[sbt_idx].data.bsdf = scene.materials[i].bsdf;
             hitgroup_records[sbt_idx].data.twofaced = scene.materials[i].twofaced;
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(tlas.devicePositions);
+            hitgroup_records[sbt_idx].data.normals= reinterpret_cast<float4*>(tlas.deviceNormals);
         }
 
         {
