@@ -112,6 +112,34 @@ HOSTDEVICE CUDAINLINE float3 randDirHemisphere(SamplerState& sampler) {
     return make_float3(x, y, z);
 }
 
+HOSTDEVICE CUDAINLINE float2 sampleConcentric(SamplerState& sampler) {
+    float2 sample = make_float2(randUniform(sampler), randUniform(sampler));
+    float2 u = 2.0f * sample - 1.0f;
+    if (u.x == 0.0f && u.y == 0.0f) {
+        return make_float2(0.0f, 0.0f);
+    }
+    float r, th;
+    if (fabs(u.x) > fabs(u.y)) {
+        r = u.x;
+        th = (M_PI / 4.0f) * (u.y / u.x);
+    }
+    else {
+        r = u.y;
+        th = M_PI / 2.0f - (M_PI / 4.0f) * (u.x / u.y);
+    }
+    return make_float2(r * cos(th), r * sin(th));
+}
+
+HOSTDEVICE CUDAINLINE float3 randCosineHemisphere(SamplerState& sampler) {
+    float2 u = sampleConcentric(sampler);
+    float z = sqrt(fmaxf(0.0f, 1.0f - u.x * u.x - u.y * u.y));
+    return make_float3(u.x, u.y, z);
+}
+
+HOSTDEVICE CUDAINLINE float cosineHemispherePdf(float3 wo) {
+    return fmaxf(abs(wo.z) / M_PI, 0.000001f);
+}
+
 struct Onb
 {
   HOSTDEVICE CUDAINLINE Onb(const float3& normal) {
@@ -156,6 +184,20 @@ HOSTDEVICE CUDAINLINE float3 ACESFilm(float3 x)
     float d = 0.59;
     float e = 0.14;
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+HOSTDEVICE CUDAINLINE float3 reinhard(float3 c) {
+    return pow(c / (c + 1.0f), make_float3(1.0f / 2.2f));
+}
+
+HOSTDEVICE CUDAINLINE float3 filmMap(float3 c) {
+    float3 x = fmaxf(make_float3(0.0f), c - 0.004f);
+    return (x * (6.2f * x + 0.5f)) / (x * (6.2f * x + 1.7f) + 0.06f);
+}
+
+HOSTDEVICE CUDAINLINE float3 gammaCorrect(float3 c) {
+    float gamma = 2.2;
+    return pow(c, make_float3(1.0f / gamma));
 }
 
 HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov) {

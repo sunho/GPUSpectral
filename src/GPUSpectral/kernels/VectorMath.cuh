@@ -475,6 +475,10 @@ CUDAINLINE HOSTDEVICE void operator/=(float3& a, const float s)
 }
 /** @} */
 
+CUDAINLINE HOSTDEVICE float3 pow(const float3& a, const float3& b) {
+    return make_float3(pow(a.x, b.x), pow(a.y, b.y), pow(a.z, b.z));
+}
+
 /** lerp */
 CUDAINLINE HOSTDEVICE float3 lerp(const float3& a, const float3& b, const float t)
 {
@@ -587,6 +591,14 @@ CUDAINLINE HOSTDEVICE float4 make_float4(const int4& a)
 CUDAINLINE HOSTDEVICE float4 make_float4(const uint4& a)
 {
   return make_float4(float(a.x), float(a.y), float(a.z), float(a.w));
+}
+
+CUDAINLINE HOSTDEVICE float3 sqrt(const float3& x) {
+    return make_float3(sqrt(x.x), sqrt(x.y), sqrt(x.z));
+}
+
+CUDAINLINE HOSTDEVICE bool isnan(const float3& x) {
+    return isnan(x.x) || isnan(x.y) || isnan(x.z);
 }
 /** @} */
 
@@ -2615,6 +2627,10 @@ __forceinline__ __device__ uchar4 make_color(const float3& c)
 __forceinline__ __device__ uchar4 make_color(const float4& c)
 {
     return make_color(make_float3(c.x, c.y, c.z));
+}
+
+__forceinline__ __device__ bool isfinite(const float3& c) {
+    return isfinite(c.x) || isfinite(c.y) || isfinite(c.z);
 }
 
 /** @} */

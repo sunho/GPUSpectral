@@ -26,7 +26,7 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
         if (!found) {
             auto rgb = obj.property("reflectance").getColor();
             float3 reflectance = make_float3(rgb.r, rgb.g, rgb.b);
-            material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ reflectance });
+            material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ pow(reflectance, make_float3(2.2f))});
         }
     }
     else if (type == "roughplastic") {
@@ -43,6 +43,17 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
         }*/
         if (!found) {
             auto rgb = obj.property("diffuse_reflectance").getColor();
+            float alpha = obj.property("alpha").getNumber();
+            float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
+            if (obj.property("ext_ior").isValid()) {
+                if (abs(obj.property("ext_ior").getNumber() - 1.0f) > 0.001f) {
+                    std::cout << "unsupported ext ior of plastic" << std::endl;
+                }
+            }
+            float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
+            float R0 = (ior - 1.0f) / (ior + 1.0f);
+            R0 *= R0;
+            material->bsdf = scene.addRoughPlasticBSDF(RoughPlasticBSDF{pow(diffuse,make_float3(2.2f)), R0, (float)sqrt(1.0f)*alpha, GGX});
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
@@ -78,7 +89,7 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
             float R0 = (ior - 1.0f) / (ior + 1.0f);
             R0 *= R0;
-            material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{diffuse, R0});
+            material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{pow(diffuse,make_float3(2.2f)), R0});
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
@@ -95,16 +106,20 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             }
         }*/
         if (!found) {
-            auto rgb = obj.property("diffuse_reflectance").getColor();
-            float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
+            auto eta_ = obj.property("eta").getColor();
+            auto k_ = obj.property("k").getColor();
+            auto reflectance_ = obj.property("specular_reflectance").getColor();
+            float3 eta = make_float3(eta_.r, eta_.g, eta_.b);
+            float3 k = make_float3(k_.r, k_.g, k_.b);
+            float3 reflectance = make_float3(reflectance_.r, reflectance_.g, reflectance_.b);
             float alpha = obj.property("alpha").getNumber();
-            if (obj.property("ext_eta").isValid()) {
-                if (abs(obj.property("ext_eta").getNumber() - 1.0f) > 0.001f) {
-                    std::cout << "unsupported ext ior of rough conductor" << std::endl;
-                }
-            }
-            float ior = obj.property("eta").isValid() ? obj.property("eta").getNumber() : 1.3f;
-            material->bsdf = scene.addRoughConductorBSDF(RoughConductorBSDF{ior, 1.0f, (float)sqrt(2)*alpha, GGX});
+            material->bsdf = scene.addRoughConductorBSDF(RoughConductorBSDF{
+                .eta = eta,
+                .k = k,
+                .reflectance = reflectance,
+                .alpha = (float)sqrt(2)*alpha,
+                .distribution = GGX
+            });
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }

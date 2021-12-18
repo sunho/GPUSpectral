@@ -66,7 +66,7 @@ void Renderer::setScene(const Scene& scene) {
 void Renderer::render() {
     state->params.width = 768;
     state->params.height = 768;
-    state->params.samples_per_launch = 1024;
+    state->params.samples_per_launch = 128;
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&state->params.accum_buffer),
         state->params.width * state->params.height * sizeof(float4)
@@ -102,6 +102,15 @@ void Renderer::render() {
     ));
     stbi_flip_vertically_on_write(true);
     stbi_write_jpg("jpg_test_.jpg", state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
+
+    std::vector<float> pixels2(state->params.width * state->params.height);
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(pixels2.data()),
+        reinterpret_cast<void*>(state->params.accum_buffer),
+        state->params.width * state->params.height * 4,
+        cudaMemcpyDeviceToHost
+    ));
+    stbi_write_jpg("jpg_test_.exr", state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
 }
 
 static OptixPipelineCompileOptions createPipelineCompileOption() {

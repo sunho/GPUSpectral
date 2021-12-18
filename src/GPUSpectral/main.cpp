@@ -14,7 +14,7 @@ std::filesystem::path basePath() {
 
 int main() {
     Renderer renderer(basePath().string());
-    auto scene = loadScene(renderer, "test/scene.xml");
+    auto scene = loadScene(renderer, "coffee/scene.xml");
     renderer.setScene(scene);
     renderer.render();
 
