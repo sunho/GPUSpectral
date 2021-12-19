@@ -123,7 +123,8 @@ extern "C" __global__ void __raygen__rg() {
     const float3 W = params.W;
     const uint3  idx = optixGetLaunchIndex();
     const int    subframe_index = params.subframe_index;
-    SamplerState sampler(pcgHash(idx.y * w + idx.x));
+    float imageAspectRatio = 1.0f;
+    SamplerState sampler(pcgHash(tea<4>(idx.y * w + idx.x, subframe_index)));
     float3 result = make_float3(0.0f);
     int i = params.samples_per_launch;
     do
@@ -132,7 +133,7 @@ extern "C" __global__ void __raygen__rg() {
         const float2 subpixel_jitter = make_float2(randUniform(sampler), randUniform(sampler));
 
         const float2 fragcord = make_float2(static_cast<float>(idx.x) + subpixel_jitter.x, static_cast<float>(idx.y) + subpixel_jitter.y);
-        const float3 rd = rayDir(make_float2(w, h), fragcord, params.fov);
+        const float3 rd = rayDir(make_float2(w, h), fragcord, params.fov, imageAspectRatio);
         float3 ray_direction = normalize(rd.x * U + rd.y * V + rd.z * W);
         float3 ray_origin = eye;
 
@@ -153,7 +154,7 @@ extern "C" __global__ void __raygen__rg() {
                 params.handle,
                 ray_origin,
                 ray_direction,
-                0.01f,  // tmin       // TODO: smarter offset
+                0.000f,  // tmin       // TODO: smarter offset
                 1e16f,  // tmax
                 &prd);
 
@@ -235,15 +236,15 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 lightPos;
     float lightPdf;
     float3 lightEmission;
-    sampleLight(params.lightData, sampler, lightPos, lightPdf, lightEmission);
+    float3 lightNormal;
+    sampleLight(params.lightData, sampler, lightPos, lightPdf, lightEmission, lightNormal);
 
     float3 L = normalize(lightPos - P);
     float3 wL = onb.transform(L);
     float Ldist = length(lightPos - P);
     const float NoL   = fabs(dot( SN, L ));
     float3 direct = make_float3(0.0f);
-
-    if (dot(N, L) > 0.0f) {
+    {
         BSDFOutput lightBsdfRes;
         evalBSDF(params.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
 
@@ -252,33 +253,40 @@ extern "C" __global__ void __closesthit__radiance() {
         sampleBSDF(params.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
         float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
         onb.inverse_transform(wi);
-
-        float3 shadowEmission;
-        bool occluded = traceOcclusion(
-            params.handle,
-            P,
-            L,
-            0.01f,         // tmin
-            Ldist - 0.01f,  // tmax
-            shadowEmission
-        );
-        if (!occluded) {
-            float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-            direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+        if (dot(N, L) > 0.0f) {
+            float3 shadowEmission;
+            bool occluded = traceOcclusion(
+                params.handle,
+                P,
+                L,
+                0.001f,         // tmin
+                Ldist - 0.01f,  // tmax
+                shadowEmission
+            );
+            if (!occluded) {
+                float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
+                direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+            }
         }
 
-        occluded = traceOcclusion(
-            params.handle,
-            P,
-            wi,
-            0.01f,         // tmin
-            1e16f,  // tmax
-            shadowEmission
-        );
+        if (dot(wi, N) > 0.0f || isTransimissionBSDF(rt_data->bsdf.type())) {
+            float3 shadowEmission;
+            bool occluded = traceOcclusion(
+                params.handle,
+                P,
+                wi,
+                0.001f,         // tmin
+                1e16f,  // tmax
+                shadowEmission
+            );
         
-        if (occluded) {
-            float w = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
-            direct += shadowEmission * NoW * prd->weight * w / bsdfRes.pdf;
+            if (occluded) {
+                float w = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+                direct += bsdfRes.bsdf * shadowEmission * NoW * prd->weight * w / bsdfRes.pdf;
+                if (rt_data->bsdf.type() == BSDF_ROUGH_PLASTIC) {
+                    //printf("%d %f %f %f %f\n", rt_data->bsdf.type(), direct.x, direct.y, direct.z, bsdfRes.bsdf.x);
+                }
+            }
         }
     }
     prd->radiance = direct;
@@ -302,7 +310,7 @@ extern "C" __global__ void __closesthit__radiance() {
         prd->emitted = prd->weight * rt_data->emission_color;
 
     prd->countEmitted = false;
-    prd->origin = P;
+    prd->origin = P + 0.0001f*faceforward(N, wi, N);
     prd->direction = wi;
     prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
     prd->wasDelta = bsdfRes.isDelta;

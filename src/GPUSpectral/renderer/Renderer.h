@@ -9,6 +9,11 @@
 #include <vector>
 #include <span>
 
+struct RenderConfig {
+    int width;
+    int height;
+};
+
 struct Mesh {
     std::vector<float3> positions;
     std::vector<float3> normals;
@@ -61,7 +66,7 @@ struct CudaSBT {
 };
 
 struct RenderState {
-    RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene);
+    RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene, const RenderConfig& config);
 
     Scene scene;
     LightData deviceLightData;
@@ -82,8 +87,8 @@ public:
     int addMesh(const Mesh& mesh);
     Mesh* getMesh(int meshId);
 
-    void setScene(const Scene& scene);
-    void render();
+    void setScene(const Scene& scene, const RenderConfig& config);
+    void render(int spp);
 
     std::string loadKernel(const std::string& name);
     std::string assetPath(const std::string& filename) { return (baseFsPath / "assets" / filename).string(); }

@@ -200,10 +200,10 @@ HOSTDEVICE CUDAINLINE float3 gammaCorrect(float3 c) {
     return pow(c, make_float3(1.0f / gamma));
 }
 
-HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov) {
+HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov, float ratio) {
     float2 xy = fragCoord - size / 2.0f;
     float z = size.y / tan(fov);
-    auto dir = normalize(make_float3(xy.x, xy.y, z));
+    auto dir = normalize(make_float3(xy.x, xy.y * ratio, z));
     return dir;
 }
 
@@ -212,11 +212,11 @@ HOSTDEVICE CUDAINLINE float3 sampleHalf(SamplerState& sampler, float alpha) {
     float phi = 2.0f * M_PI * u.x;
     // 1 + tan^2 = sec^2
     // 1 / (1+tan^2) = cos^2
-    float tan2 = -alpha * alpha * log(u.y == 0.0f ? 1.0f : u.y);
-    float cos2 = 1.0f / (1.0f + tan2); // denominator is never 0.0
-    float sin2 = 1.0f - cos2;
-    float cost = sqrt(cos2);
-    float sint = sqrt(sin2);
+    float logSample = log(1.0f - u.y);
+    if (isinf(logSample)) logSample = 0.0f;
+    float tan2 = -alpha * alpha * logSample;
+    float cost = 1.0f / sqrt(1.0f + tan2); // denominator is never 0.0
+    float sint = sqrt(fmaxf(0.0f, 1.0f - cost* cost));
     return make_float3(cos(phi) * sint, sin(phi) * sint, cost);
 }
 
@@ -231,6 +231,7 @@ HOSTDEVICE CUDAINLINE float beckmannD(float3 wh, float alpha) {
 HOSTDEVICE CUDAINLINE float ggxD(float3 wh, float alpha) {
     float cos2 = wh.z * wh.z;
     float tan2 = (wh.x * wh.x + wh.y * wh.y) / cos2;
+    if (isinf(tan2)) { return 0.0f; };
     float b = (1.0f + tan2 / (alpha * alpha));
     float a = M_PI * alpha * alpha * cos2 * cos2 * b * b;
     return 1.0f / a;
@@ -250,3 +251,21 @@ HOSTDEVICE CUDAINLINE float powerHeuristic(int nf, float fPdf, int ng, float gPd
     float f = nf * fPdf, g = ng * gPdf;
     return (f * f) / (f * f + g * g);
 }
+
+template<unsigned int N>
+static __host__ __device__ __inline__ unsigned int tea(unsigned int val0, unsigned int val1)
+{
+    unsigned int v0 = val0;
+    unsigned int v1 = val1;
+    unsigned int s0 = 0;
+
+    for (unsigned int n = 0; n < N; n++)
+    {
+        s0 += 0x9e3779b9;
+        v0 += ((v1 << 4) + 0xa341316c) ^ (v1 + s0) ^ ((v1 >> 5) + 0xc8013ea4);
+        v1 += ((v0 << 4) + 0xad90777d) ^ (v0 + s0) ^ ((v0 >> 5) + 0x7e95761e);
+    }
+
+    return v0;
+}
+

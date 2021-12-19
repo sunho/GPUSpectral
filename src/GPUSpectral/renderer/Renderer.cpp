@@ -59,20 +59,12 @@ int Renderer::addMesh(const Mesh& mesh) {
     return id;
 }
 
-void Renderer::setScene(const Scene& scene) {
-    state = std::make_unique<RenderState>(*this, context, scene);
+void Renderer::setScene(const Scene& scene, const RenderConfig& config) {
+    state = std::make_unique<RenderState>(*this, context, scene, config);
 }
 
-void Renderer::render() {
-    state->params.width = 768;
-    state->params.height = 768;
-    state->params.samples_per_launch = 22480;
-    CUDA_CHECK(cudaMalloc(
-        reinterpret_cast<void**>(&state->params.accum_buffer),
-        state->params.width * state->params.height * sizeof(float4)
-    ));
-
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&state->params.frame_buffer), state->params.width * state->params.height * 4));
+void Renderer::render(int spp) {
+    state->params.samples_per_launch = spp;
     state->params.subframe_index++;
     // Launch
     CUDA_CHECK(cudaMemcpyAsync(
@@ -100,17 +92,12 @@ void Renderer::render() {
         state->params.width * state->params.height * 4,
         cudaMemcpyDeviceToHost
     ));
+    if (!std::filesystem::is_directory("output")) {
+        std::filesystem::create_directory("output");
+    }
     stbi_flip_vertically_on_write(true);
-    stbi_write_jpg("jpg_test_.jpg", state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
-
-    std::vector<float> pixels2(state->params.width * state->params.height);
-    CUDA_CHECK(cudaMemcpy(
-        reinterpret_cast<void*>(pixels2.data()),
-        reinterpret_cast<void*>(state->params.accum_buffer),
-        state->params.width * state->params.height * 4,
-        cudaMemcpyDeviceToHost
-    ));
-    stbi_write_jpg("jpg_test_.exr", state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
+    auto filename = std::string("output/output") + std::to_string(state->params.subframe_index) + ".jpg";
+    stbi_write_jpg(filename.c_str(), state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
 }
 
 static OptixPipelineCompileOptions createPipelineCompileOption() {
@@ -517,17 +504,25 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
 }
 
 
-RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene) :
+RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene, const RenderConfig& config) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
 
     params.subframe_index = 0u;
-
     params.handle = tlas.gasHandle;
     params.eye = scene.camera.eye;
     params.U = scene.camera.u;
     params.V = scene.camera.v;
     params.W = scene.camera.w;
-    params.fov = scene.camera.fov;
+    params.fov = scene.camera.fov*2.0f;
+    params.width = config.width;
+    params.height = config.height;
+
+    CUDA_CHECK(cudaMalloc(
+        reinterpret_cast<void**>(&params.accum_buffer),
+        params.width * params.height * sizeof(float4)
+    ));
+
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&params.frame_buffer), params.width * params.height * 4));
 
     deviceLightData.triangleLights.allocDevice(scene.triangleLights.size());
     deviceLightData.triangleLights.upload(scene.triangleLights.data());

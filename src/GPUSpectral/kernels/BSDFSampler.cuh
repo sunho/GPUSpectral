@@ -55,6 +55,15 @@ struct RoughConductorBSDF {
 
 struct RoughPlasticBSDF {
     float3 diffuse;
+    float iorIn;
+    float iorOut; // usually 1.0
+    float R0;
+    float alpha;
+    MicrofacetType distribution;
+};
+
+struct RoughFloorBSDF {
+    float3 diffuse;
     float R0;
     float alpha;
     MicrofacetType distribution;
@@ -213,8 +222,8 @@ HOSTDEVICE CUDAINLINE float coupledDiffuseTerm(float R0, float cosTho, float cos
 
 HOSTDEVICE CUDAINLINE float fresnelBlendDiffuseTerm(float R0, float cosTho, float cosThi) {
     float k = 28.0f / (23.0f * M_PI);
-    float a = 1.0f - cosTho;
-    float b = 1.0f - cosThi;
+    float a = 1.0f - 0.5f*cosTho;
+    float b = 1.0f - 0.5f*cosThi;
     float a5 = a * a * a * a * a;
     float b5 = b * b * b * b * b;
     return k * (1.0f - R0) * (1.0f - a5)* (1.0f - b5);
@@ -275,12 +284,9 @@ HOSTDEVICE CUDAINLINE void sampleRoughConductorBSDF(const RoughConductorBSDF& bs
     output.isDelta = false;
 }
 
-HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float Fr = schlickFresnel(bsdf.R0, fabs(wo.z));
+HOSTDEVICE CUDAINLINE void sampleRoughFloorBSDF(const RoughFloorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
     float u = randUniform(sampler);
-    // reflection with prob Fr
-    // refraction with prob 1 - Fr
-    if (u < Fr) {
+    if (u < 0.5f) {
         float3 wh = sampleHalf(sampler, bsdf.alpha);
         if (wh.z <= 0.0f) {
             wh *= -1.0f;
@@ -297,9 +303,10 @@ HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, 
         wi = randCosineHemisphere(sampler);
     }
     float3 wh = normalize(wi + wo);
+    float Fr = schlickFresnel(bsdf.R0, fabs(dot(wo, wh)));
     float3 diffuse = bsdf.diffuse * fresnelBlendDiffuseTerm(bsdf.R0, fabs(wo.z), fabs(wi.z));
-    float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) / (4.0f * fmaxf(fabs(wo.z), fabs(wi.z)));
-    output.pdf = Fr * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * dot(wo, wh)) + (1.0f - Fr) * cosineHemispherePdf(wi);
+    float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha)/ (4.0f * fabs(dot(wo,wh))* fmaxf(fabs(wo.z), fabs(wi.z)));
+    output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
     if (output.pdf == 0.0f) {
         printf("%f %f\n", diffuse.x, specular.x);
@@ -346,12 +353,13 @@ HOSTDEVICE CUDAINLINE void evalRoughConductorBSDF(const RoughConductorBSDF& bsdf
     output.isDelta = false;
 }
 
-HOSTDEVICE CUDAINLINE void evalRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    float Fr = schlickFresnel(bsdf.R0, abs(wo.z));
+HOSTDEVICE CUDAINLINE void evalRoughFloorBSDF(const RoughFloorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
     float3 wh = normalize(wi + wo);
+    float Fr = schlickFresnel(bsdf.R0, fabs(dot(wo,wh)));
     float3 diffuse = bsdf.diffuse * fresnelBlendDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z));
-    float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) / (4.0f * fmaxf(fabs(wo.z), fabs(wi.z)));
-    output.pdf = Fr * beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * fabs(dot(wo, wh))) + (1.0f - Fr) * cosineHemispherePdf(wi);
+    float ggx = ggxD(wh, bsdf.alpha);
+    float3 specular = make_float3(Fr) * ggx / (4.0f * fabs(dot(wo,wh)) * fmaxf(fabs(wo.z), fabs(wi.z)));
+    output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * fabs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
     output.isDelta = false;
 }

@@ -15,8 +15,16 @@ std::filesystem::path basePath() {
 int main() {
     Renderer renderer(basePath().string());
     auto scene = loadScene(renderer, "coffee/scene.xml");
-    renderer.setScene(scene);
-    renderer.render();
+    RenderConfig config = {
+        .width = 800,
+        .height = 1000
+    }; 
+    renderer.setScene(scene, config); 
+    int totalSamples = 24800;
+    int spp = 256;
+    for (int i = 0; i < totalSamples / spp; ++i) {
+        renderer.render(spp);
+    }
 
     return 0;
 }
