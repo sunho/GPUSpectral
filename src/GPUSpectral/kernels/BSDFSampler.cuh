@@ -2,6 +2,8 @@
 
 #include "Common.cuh":
 
+#define EPS 0.0000001f
+
 enum BSDFType: uint16_t {
     #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) BSDF_##BSDFTYPE,
     #include "BSDF.inc"
@@ -108,7 +110,7 @@ HOSTDEVICE CUDAINLINE float fresnel(float no, float cosTho, float nt, float cosT
 }
 
 HOSTDEVICE CUDAINLINE float fresnel(float3 wo, float no, float nt) {
-    float sinTho = sqrt(abs(wo.x * wo.x + wo.y * wo.y)); // sqrt((cos(phi)sin(theta))^2 + ((sin(phi)sin(theta))^2)
+    float sinTho = sqrt(fmaxf(wo.x * wo.x + wo.y * wo.y, 0.0f)); // sqrt((cos(phi)sin(theta))^2 + ((sin(phi)sin(theta))^2)
     float sqrtTerm = 1.0f - ((no * no) / (nt * nt)) * (sinTho * sinTho);
     if (sqrtTerm <= 0.0f) {
         return 1.0f;
@@ -119,7 +121,7 @@ HOSTDEVICE CUDAINLINE float fresnel(float3 wo, float no, float nt) {
 }
 
 HOSTDEVICE CUDAINLINE float fresnel(float cosTho, float no, float nt) {
-    float sinTho = sqrt(1.0f - cosTho*cosTho);
+    float sinTho = sqrt(fmaxf(1.0f - cosTho*cosTho,0.0f));
     float sqrtTerm = 1.0f - ((no * no) / (nt * nt)) * (sinTho * sinTho);
     if (sqrtTerm <= 0.0f) {
         return 1.0f;
@@ -170,7 +172,7 @@ HOSTDEVICE CUDAINLINE float3 FresnelDieletricConductor(float3 Eta, float3 Etak, 
 }
 
 HOSTDEVICE CUDAINLINE bool refract(float3 wo, float3 n, float no, float nt, float3& wt) {
-    float sinTho = sqrt(abs(wo.x * wo.x + wo.y * wo.y)); // sqrt((cos(phi)sin(theta))^2 + ((sin(phi)sin(theta))^2)
+    float sinTho = sqrt(fmaxf(wo.x * wo.x + wo.y * wo.y,0.0f)); // sqrt((cos(phi)sin(theta))^2 + ((sin(phi)sin(theta))^2)
     float sqrtTerm = 1.0f - ((no * no) / (nt * nt)) * (sinTho * sinTho);
     if (sqrtTerm <= 0.0f) {
         return false;
@@ -269,6 +271,8 @@ HOSTDEVICE CUDAINLINE void sampleSmoothConductorBSDF(const SmoothConductorBSDF& 
     output.bsdf = Fr*make_float3(1.0f/abs(wo.z));
     output.isDelta = true;
     output.pdf = 1.0f;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
 }
 
 HOSTDEVICE CUDAINLINE void sampleSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
@@ -287,6 +291,8 @@ HOSTDEVICE CUDAINLINE void sampleSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf
         output.bsdf = diffuse + Fri * make_float3(1.0f / abs(wo.z));
         output.pdf = Fri;
         output.isDelta = true;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
     } 
     else {
         wi = randCosineHemisphere(sampler);
@@ -297,6 +303,8 @@ HOSTDEVICE CUDAINLINE void sampleSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf
         output.bsdf = diffuse;
         output.pdf = (1.0f - Fri) * cosineHemispherePdf(wi);
         output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
     }
 }
 
@@ -310,12 +318,16 @@ HOSTDEVICE CUDAINLINE void sampleSmoothFloorBSDF(const SmoothFloorBSDF& bsdf, Sa
         output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z)) + Fr * make_float3(1.0f / abs(wo.z));
         output.pdf = Fr;
         output.isDelta = true;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
     } 
     else {
         wi = randCosineHemisphere(sampler);
         output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z));
         output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
         output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
     }
 }
 
@@ -335,6 +347,8 @@ HOSTDEVICE CUDAINLINE void sampleRoughConductorBSDF(const RoughConductorBSDF& bs
     output.bsdf = bsdf.reflectance * Fr * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha);
     output.pdf = beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
     output.isDelta = false;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
 }
 
 HOSTDEVICE CUDAINLINE void sampleRoughFloorBSDF(const RoughFloorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
@@ -361,11 +375,9 @@ HOSTDEVICE CUDAINLINE void sampleRoughFloorBSDF(const RoughFloorBSDF& bsdf, Samp
     float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha)/ (4.0f * fabs(dot(wo,wh))* fmaxf(fabs(wo.z), fabs(wi.z)));
     output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
-    if (output.pdf == 0.0f) {
-        printf("%f %f\n", diffuse.x, specular.x);
-        output.bsdf = make_float3(0.0f);
-    }
     output.isDelta = false;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
 }
 
 HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
@@ -391,6 +403,8 @@ HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, 
     float3 diffuse = bsdf.diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - bsdf.diffuse * Ri));
     output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 
@@ -398,6 +412,8 @@ HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, 
 HOSTDEVICE CUDAINLINE void evalDiffuseBSDF(const DiffuseBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
     output.bsdf = bsdf.reflectance / M_PI;
     output.pdf = cosineHemispherePdf(wi);
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 
@@ -410,6 +426,8 @@ HOSTDEVICE CUDAINLINE void evalSmoothDielectricBSDF(const SmoothDielectricBSDF& 
 HOSTDEVICE CUDAINLINE void evalSmoothConductorBSDF(const SmoothConductorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
     output.bsdf = make_float3(0.0f);
     output.pdf = 1.0f;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = true;
 }
 
@@ -423,6 +441,8 @@ HOSTDEVICE CUDAINLINE void evalSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf, 
     float3 diffuse = bsdf.diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - bsdf.diffuse * Ri));
     output.bsdf = diffuse;
     output.pdf = (1.0f - Fri) * cosineHemispherePdf(wi);
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 
@@ -430,6 +450,8 @@ HOSTDEVICE CUDAINLINE void evalSmoothFloorBSDF(const SmoothFloorBSDF& bsdf, floa
     float Fr = schlickFresnel(bsdf.R0, fabs(wo.z));
     output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, fabs(wo.z), fabs(wi.z));
     output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 
@@ -443,6 +465,8 @@ HOSTDEVICE CUDAINLINE void evalRoughConductorBSDF(const RoughConductorBSDF& bsdf
     }*/
     output.bsdf = Fr * bsdf.reflectance * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha);
     output.pdf = beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 
@@ -454,6 +478,8 @@ HOSTDEVICE CUDAINLINE void evalRoughFloorBSDF(const RoughFloorBSDF& bsdf, float3
     float3 specular = make_float3(Fr) * ggx / (4.0f * fabs(dot(wo,wh)) * fmaxf(fabs(wo.z), fabs(wi.z)));
     output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * fabs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 
@@ -467,8 +493,10 @@ HOSTDEVICE CUDAINLINE void evalRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, fl
     float eta = no / nt;
     float3 specular = make_float3(Fri) * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
     float3 diffuse = bsdf.diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - bsdf.diffuse * Ri));
-    output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
+    output.pdf = 0.5f * fmaxf(beckmannD(wh, bsdf.alpha) * fabs(wh.z), 0.01) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
     output.bsdf = diffuse + specular;
+    NUMBERCHECK(output.bsdf)
+    NUMBERCHECK(output.pdf)
     output.isDelta = false;
 }
 

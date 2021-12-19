@@ -4,6 +4,7 @@
 
 #include "VectorMath.cuh"
 #include <stdint.h>
+#include <cassert>
 #include <cuda_runtime.h>
 #include <math.h>
 #if defined(__CUDACC__) || defined(__CUDABE__)
@@ -17,6 +18,7 @@
 #define CUDAINLINE inline 
 #define CONST_STATIC_INIT( ... ) = __VA_ARGS__
 #endif
+#define NUMBERCHECK(num) assert(!isnan(num));
 
 template <typename T>
 struct Array {

@@ -2630,7 +2630,7 @@ __forceinline__ __device__ uchar4 make_color(const float4& c)
 }
 
 __forceinline__ __device__ bool isfinite(const float3& c) {
-    return isfinite(c.x) || isfinite(c.y) || isfinite(c.z);
+    return isfinite(c.x) && isfinite(c.y) && isfinite(c.z);
 }
 
 /** @} */
