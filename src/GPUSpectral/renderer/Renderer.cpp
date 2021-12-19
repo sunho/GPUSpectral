@@ -513,7 +513,7 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.U = scene.camera.u;
     params.V = scene.camera.v;
     params.W = scene.camera.w;
-    params.fov = scene.camera.fov*2.0f;
+    params.fov = scene.camera.fov;
     params.width = config.width;
     params.height = config.height;
 

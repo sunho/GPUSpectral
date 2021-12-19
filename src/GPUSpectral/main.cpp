@@ -20,7 +20,7 @@ int main() {
         .height = 1000
     }; 
     renderer.setScene(scene, config); 
-    int totalSamples = 24800;
+    int totalSamples = 248000;
     int spp = 256;
     for (int i = 0; i < totalSamples / spp; ++i) {
         renderer.render(spp);

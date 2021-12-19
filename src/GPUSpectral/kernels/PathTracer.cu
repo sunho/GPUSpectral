@@ -188,7 +188,7 @@ extern "C" __global__ void __raygen__rg() {
     }
     else {
         params.accum_buffer[image_index] = make_float4(accum_color, 1.0f);
-        params.frame_buffer[image_index] = make_color(gammaCorrect(filmMap(accum_color)));
+        params.frame_buffer[image_index] = make_color(filmMap(accum_color));
     }
 }
 
@@ -259,7 +259,7 @@ extern "C" __global__ void __closesthit__radiance() {
                 params.handle,
                 P,
                 L,
-                0.001f,         // tmin
+                0.00001f,         // tmin
                 Ldist - 0.01f,  // tmax
                 shadowEmission
             );
@@ -310,7 +310,7 @@ extern "C" __global__ void __closesthit__radiance() {
         prd->emitted = prd->weight * rt_data->emission_color;
 
     prd->countEmitted = false;
-    prd->origin = P + 0.0001f*faceforward(N, wi, N);
+    prd->origin = P + 0.000001f*faceforward(N, wi, N);
     prd->direction = wi;
     prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
     prd->wasDelta = bsdfRes.isDelta;

@@ -53,7 +53,14 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
             float R0 = (ior - 1.0f) / (ior + 1.0f);
             R0 *= R0;
-            material->bsdf = scene.addRoughPlasticBSDF(RoughPlasticBSDF{pow(diffuse,make_float3(2.2f)), R0, (float)sqrt(2.0f)*alpha, GGX});
+            material->bsdf = scene.addRoughPlasticBSDF(RoughPlasticBSDF{
+                .diffuse = pow(diffuse,make_float3(1.0f)),
+                .iorIn = ior,
+                .iorOut = 1.0f,
+                .R0 = R0,
+                .alpha = (float)sqrt(2.0f)*alpha,
+                .distribution = GGX
+             });
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
@@ -89,7 +96,12 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
             float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
             float R0 = (ior - 1.0f) / (ior + 1.0f);
             R0 *= R0;
-            material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{pow(diffuse,make_float3(2.2f)), R0});
+            material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{
+                .diffuse=pow(diffuse,make_float3(1.0f)),
+                .iorIn = ior,
+                .iorOut = 1.0f,
+                .R0 = R0,
+                });
             //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
