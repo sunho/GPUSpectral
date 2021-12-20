@@ -510,7 +510,7 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.subframe_index = 0u;
     params.handle = tlas.gasHandle;
     params.eye = scene.camera.eye;
-    params.U = scene.camera.u;
+    params.U =scene.camera.u;
     params.V = scene.camera.v;
     params.W = scene.camera.w;
     params.fov = scene.camera.fov;

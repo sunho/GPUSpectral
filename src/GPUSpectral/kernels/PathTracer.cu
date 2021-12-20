@@ -161,6 +161,11 @@ extern "C" __global__ void __raygen__rg() {
             result += prd.emitted;
             result += prd.radiance;
 
+            if (depth >= 17) {
+                //result += make_float3(0.0, 10.0f, 0.0);
+                break;
+            }
+
             if (prd.done || depth >= 17) // TODO RR, variable for depth
                 break;
 
@@ -217,15 +222,22 @@ extern "C" __global__ void __closesthit__radiance() {
     float2 bary = optixGetTriangleBarycentrics();
     float3 SN = normalize(bary.x * n1 + bary.y * n2 + (1.0f - bary.x - bary.y) * n0);
     const float3 N_0  = normalize( cross( v1-v0, v2-v0 ) );
+    RadiancePRD* prd = getPRD();
 
     float3 N = N_0;
-    if (rt_data->twofaced && dot(N, -ray_dir) < 0) {
-        N *= -1.0f;
-        SN *= -1.0f;
+    if (dot(N, -ray_dir) < 0) {
+        if (!isTransimissionBSDF(rt_data->bsdf.type())) {
+            prd->done = true;
+            return;
+        }
+
+        if (rt_data->twofaced) {
+            N *= -1.0f;
+            SN *= -1.0f;
+        }
     }
     const float3 P    = optixGetWorldRayOrigin() + optixGetRayTmax()*ray_dir;
 
-    RadiancePRD* prd = getPRD();
 
     SamplerState sampler = prd->sampler;
 
@@ -253,7 +265,7 @@ extern "C" __global__ void __closesthit__radiance() {
         sampleBSDF(params.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
         float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
         onb.inverse_transform(wi);
-        if (dot(N, L) > 0.0f) {
+        if (dot(N, L) > 0.0f || isTransimissionBSDF(rt_data->bsdf.type())) {
             float3 shadowEmission;
             bool occluded = traceOcclusion(
                 params.handle,
@@ -275,7 +287,7 @@ extern "C" __global__ void __closesthit__radiance() {
                 params.handle,
                 P,
                 wi,
-                0.001f,         // tmin
+                0.00001f,         // tmin
                 1e16f,  // tmax
                 shadowEmission
             );
@@ -297,20 +309,19 @@ extern "C" __global__ void __closesthit__radiance() {
     float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
     onb.inverse_transform(wi);
 
-
-    if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
-        prd->done = true;
-        return;
-    }
-
     if( prd->countEmitted)
         prd->emitted = prd->weight * rt_data->emission_color;
 
     if (prd->wasDelta)
         prd->emitted = prd->weight * rt_data->emission_color;
 
+    if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
+        prd->done = true;
+        return;
+    }
+
     prd->countEmitted = false;
-    prd->origin = P + 0.000001f*faceforward(N, wi, N);
+    prd->origin = P + 0.0001f*faceforward(N, wi, N);
     prd->direction = wi;
     prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
     prd->wasDelta = bsdfRes.isDelta;

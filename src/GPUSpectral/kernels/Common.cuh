@@ -205,7 +205,7 @@ HOSTDEVICE CUDAINLINE float3 gammaCorrect(float3 c) {
 HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov, float ratio) {
     float2 xy = fragCoord - size / 2.0f;
     float z = size.y / tan(fov);
-    auto dir = normalize(make_float3(xy.x, xy.y * ratio, z));
+    auto dir = normalize(make_float3(-xy.x, xy.y * ratio, z));
     return dir;
 }
 
@@ -240,7 +240,9 @@ HOSTDEVICE CUDAINLINE float ggxD(float3 wh, float alpha) {
 }
 
 HOSTDEVICE CUDAINLINE float ggxLambda(float3 wh, float alpha) {
-    float tan2 = (wh.x * wh.x + wh.y * wh.y) / (wh.z * wh.z);
+    float cos2 = wh.z * wh.z;
+    float tan2 = (wh.x * wh.x + wh.y * wh.y) / cos2;
+    if (isinf(tan2)) { return 0.0f; };
     float a = -1.0f + sqrt(1.0f + alpha*alpha*tan2);
     return 0.5f * a;
 }

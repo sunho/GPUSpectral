@@ -338,12 +338,6 @@ HOSTDEVICE CUDAINLINE void sampleRoughConductorBSDF(const RoughConductorBSDF& bs
         wh *= -1.0f;
     }
     wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-    /*if (wi.z <= 0.0f) {
-        output.bsdf = make_float3(0.0f);
-        output.pdf = 1.0f;
-        output.isDelta = false;
-        return;
-    }*/
     output.bsdf = bsdf.reflectance * Fr * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha);
     output.pdf = beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
     output.isDelta = false;
@@ -359,12 +353,6 @@ HOSTDEVICE CUDAINLINE void sampleRoughFloorBSDF(const RoughFloorBSDF& bsdf, Samp
             wh *= -1.0f;
         }
         wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-        /*if (wi.z <= 0.0f) {
-            output.bsdf = make_float3(0.0f);
-            output.pdf = 1.0f;
-            output.isDelta = false;
-            return;
-        }*/
     } 
     else {
         wi = randCosineHemisphere(sampler);
