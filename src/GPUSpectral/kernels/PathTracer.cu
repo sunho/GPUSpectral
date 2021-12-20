@@ -193,7 +193,7 @@ extern "C" __global__ void __raygen__rg() {
     }
     else {
         params.accum_buffer[image_index] = make_float4(accum_color, 1.0f);
-        params.frame_buffer[image_index] = make_color(filmMap(accum_color));
+        params.frame_buffer[image_index] = make_color(accum_color);
     }
 }
 
@@ -226,11 +226,10 @@ extern "C" __global__ void __closesthit__radiance() {
 
     float3 N = N_0;
     if (dot(N, -ray_dir) < 0) {
-        if (!isTransimissionBSDF(rt_data->bsdf.type())) {
+        if (!isTransimissionBSDF(rt_data->bsdf.type())){
             prd->done = true;
             return;
         }
-
         if (rt_data->twofaced) {
             N *= -1.0f;
             SN *= -1.0f;
@@ -245,16 +244,19 @@ extern "C" __global__ void __closesthit__radiance() {
     Onb geoOnb(N);
     float3 wo = normalize(onb.transform(-ray_dir));
 
+
     float3 lightPos;
     float lightPdf;
     float3 lightEmission;
     float3 lightNormal;
     sampleLight(params.lightData, sampler, lightPos, lightPdf, lightEmission, lightNormal);
 
+
     float3 L = normalize(lightPos - P);
     float3 wL = onb.transform(L);
     float Ldist = length(lightPos - P);
-    const float NoL   = fabs(dot( SN, L ));
+    const float NoL = fabs(dot(SN, L));
+    lightPdf *= Ldist * Ldist / fabs(dot(-L, lightNormal));
     float3 direct = make_float3(0.0f);
     {
         BSDFOutput lightBsdfRes;
@@ -263,9 +265,9 @@ extern "C" __global__ void __closesthit__radiance() {
         BSDFOutput bsdfRes;
         float3 wi;
         sampleBSDF(params.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
-        float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
+        float NoW = fabs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
         onb.inverse_transform(wi);
-        if (dot(N, L) > 0.0f || isTransimissionBSDF(rt_data->bsdf.type())) {
+        if ((dot(N, L) > 0.0f && dot(lightNormal, -L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
             float3 shadowEmission;
             bool occluded = traceOcclusion(
                 params.handle,
@@ -275,9 +277,9 @@ extern "C" __global__ void __closesthit__radiance() {
                 Ldist - 0.01f,  // tmax
                 shadowEmission
             );
-            if (!occluded) {
+            if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
                 float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-                direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+                direct +=  NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
             }
         }
 
@@ -292,7 +294,7 @@ extern "C" __global__ void __closesthit__radiance() {
                 shadowEmission
             );
         
-            if (occluded) {
+            if (occluded && isvalid(bsdfRes.pdf) && isvalid(bsdfRes.bsdf) && bsdfRes.pdf != 0.0f) {
                 float w = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
                 direct += bsdfRes.bsdf * shadowEmission * NoW * prd->weight * w / bsdfRes.pdf;
                 if (rt_data->bsdf.type() == BSDF_ROUGH_PLASTIC) {
@@ -316,6 +318,11 @@ extern "C" __global__ void __closesthit__radiance() {
         prd->emitted = prd->weight * rt_data->emission_color;
 
     if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
+        prd->done = true;
+        return;
+    }
+
+    if (!isvalid(bsdfRes.pdf) || !isvalid(bsdfRes.bsdf) || bsdfRes.pdf == 0.0f) {
         prd->done = true;
         return;
     }

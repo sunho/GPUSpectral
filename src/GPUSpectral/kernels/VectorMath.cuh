@@ -600,6 +600,10 @@ CUDAINLINE HOSTDEVICE float3 sqrt(const float3& x) {
 CUDAINLINE HOSTDEVICE bool isnan(const float3& x) {
     return isnan(x.x) || isnan(x.y) || isnan(x.z);
 }
+
+CUDAINLINE HOSTDEVICE bool isinf(const float3& x) {
+    return isinf(x.x) || isinf(x.y) || isinf(x.z);
+}
 /** @} */
 
 /** negate */
@@ -2618,10 +2622,15 @@ __forceinline__ __device__ unsigned char quantizeUnsigned8Bits(float x)
     return (unsigned char)min((unsigned int)(x * (float)Np1), (unsigned int)N);
 }
 
+HOSTDEVICE CUDAINLINE float3 gammaCorrect(float3 c) {
+    float gamma = 2.2;
+    return pow(c, make_float3(1.0f / gamma));
+}
+
 __forceinline__ __device__ uchar4 make_color(const float3& c)
 {
     // first apply gamma, then convert to unsigned char
-    float3 srgb = toSRGB(clamp(c, 0.0f, 1.0f));
+    float3 srgb = gammaCorrect(clamp(c, 0.0f, 1.0f));
     return make_uchar4(quantizeUnsigned8Bits(srgb.x), quantizeUnsigned8Bits(srgb.y), quantizeUnsigned8Bits(srgb.z), 255u);
 }
 __forceinline__ __device__ uchar4 make_color(const float4& c)

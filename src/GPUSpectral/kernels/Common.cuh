@@ -18,7 +18,8 @@
 #define CUDAINLINE inline 
 #define CONST_STATIC_INIT( ... ) = __VA_ARGS__
 #endif
-#define NUMBERCHECK(num) assert(!isnan(num));
+#define NUMBERCHECK(num) if (isnan(num)) { printf("nan detected; %s line %d\n", __FILE__, __LINE__); }
+#define isvalid(num) (!isnan(num) && !isinf(num))
 
 template <typename T>
 struct Array {
@@ -195,11 +196,6 @@ HOSTDEVICE CUDAINLINE float3 reinhard(float3 c) {
 HOSTDEVICE CUDAINLINE float3 filmMap(float3 c) {
     float3 x = fmaxf(make_float3(0.0f), c - 0.004f);
     return (x * (6.2f * x + 0.5f)) / (x * (6.2f * x + 1.7f) + 0.06f);
-}
-
-HOSTDEVICE CUDAINLINE float3 gammaCorrect(float3 c) {
-    float gamma = 2.2;
-    return pow(c, make_float3(1.0f / gamma));
 }
 
 HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov, float ratio) {
