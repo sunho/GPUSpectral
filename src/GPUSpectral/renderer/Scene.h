@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../kernels/VectorMath.cuh"
+#include "../kernels/BSDFSampler.cuh"
+#include "../kernels/LightSampler.cuh"
 #include <vector>
 #include <unordered_map>
 

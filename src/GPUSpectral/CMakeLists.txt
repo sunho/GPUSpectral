@@ -3,6 +3,12 @@ set(SOURCE
   loader/SceneLoader.cpp
   renderer/Renderer.h
   renderer/Renderer.cpp
+  renderer/CudaPipeline.h
+  renderer/CudaPipeline.cpp
+  renderer/CudaSBT.h
+  renderer/CudaSBT.cpp
+  renderer/CudaTLAS.h
+  renderer/CudaTLAS.cpp
   renderer/Scene.h
   renderer/Scene.cpp
   utils/CudaUtil.h
