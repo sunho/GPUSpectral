@@ -4,95 +4,6 @@
 
 #define EPS 0.0000001f
 
-enum BSDFType: uint16_t {
-    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) BSDF_##BSDFTYPE,
-    #include "BSDF.inc"
-    #undef BSDFDefinition
-};
-
-struct BSDFHandle {
-    HOSTDEVICE CUDAINLINE BSDFHandle() { } 
-    BSDFHandle(BSDFType type, uint32_t index) : handle((static_cast<uint32_t>(type) << 16) | (index & 0xFFFF)){
-    }
-    HOSTDEVICE CUDAINLINE BSDFType type() const {
-        return static_cast<BSDFType>((handle >> 16) & 0xffff);
-    }
-    HOSTDEVICE CUDAINLINE uint32_t index() const {
-        return handle & 0xFFFF;
-    }
-    uint32_t handle;
-};
-
-struct DiffuseBSDF {
-    float3 reflectance;
-};
-
-struct SmoothDielectricBSDF {
-    float iorIn;
-    float iorOut; // usually 1.0
-};
-
-struct SmoothConductorBSDF {
-    float iorIn;
-    float iorOut; // usually 1.0
-};
-
-struct SmoothFloorBSDF {
-    float3 diffuse;
-    float R0;
-};
-
-struct SmoothPlasticBSDF {
-    float3 diffuse;
-    float iorIn;
-    float iorOut; // usually 1.0
-    float R0;
-};
-
-enum MicrofacetType : uint32_t {
-    BECKMANN,
-    GGX
-};
-
-struct RoughConductorBSDF {
-    float3 eta;
-    float3 k;
-    float3 reflectance;
-    float alpha;
-    MicrofacetType distribution;
-};
-
-struct RoughPlasticBSDF {
-    float3 diffuse;
-    float iorIn;
-    float iorOut; // usually 1.0
-    float R0;
-    float alpha;
-    MicrofacetType distribution;
-};
-
-struct RoughFloorBSDF {
-    float3 diffuse;
-    float R0;
-    float alpha;
-    MicrofacetType distribution;
-};
-
-HOSTDEVICE CUDAINLINE bool isTransimissionBSDF(BSDFType type) {
-    switch (type) {
-    case BSDF_SMOOTH_DIELECTRIC:
-        return true;
-    default:
-        return false;
-    }
-}
-
-struct BSDFData {
-    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) Array<BSDFNAME> BSDFFIELD##s;
-    #include "BSDF.inc"
-    #undef BSDFDefinition
-};
-
 struct BSDFOutput {
     float3 bsdf;
     float pdf;
@@ -182,54 +93,6 @@ HOSTDEVICE CUDAINLINE bool refract(float3 wo, float3 n, float no, float nt, floa
     return true;
 }
 
-HOSTDEVICE CUDAINLINE void sampleDiffuseBSDF(const DiffuseBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    wi = randCosineHemisphere(sampler);
-    output.bsdf = bsdf.reflectance / M_PI;
-    output.pdf = cosineHemispherePdf(wi);
-    output.isDelta = false;
-}
-
-// bsdf for reflection: F_r/|cos(th_o)|
-// bsdf for refraction: (n_t^2/n_o^2)(1-F_r)/|cos(th_o)|
-HOSTDEVICE CUDAINLINE void sampleSmoothDielectricBSDF(const SmoothDielectricBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    bool entering = wo.z > 0.0f;
-    float no = entering ? bsdf.iorOut : bsdf.iorIn;
-    float nt = entering ? bsdf.iorIn : bsdf.iorOut;
-    float cosTho = wo.z;
-    float3 wt;
-    if (!refract(wo, faceforward(make_float3(0.0f, 0.0f, 1.0f), wo, make_float3(0.0f, 0.0f, 1.0f)), no, nt, wt)) {
-        // total internal reflection
-        wi.z = wo.z;
-        wi.x = -wo.x;
-        wi.y = -wo.y;
-        output.bsdf = 1.0f * make_float3(1 / abs(cosTho));
-        output.isDelta = true;
-        output.pdf = 1.0f;
-        return;
-    }
-    float Fr = fresnel(no, abs(cosTho), nt, abs(wt.z));
-    float u = randUniform(sampler);
-    // reflection with prob Fr
-    // refraction with prob 1 - Fr
-    if (u < Fr) {
-        // reflect
-        wi.z = wo.z;
-        wi.x = -wo.x;
-        wi.y = -wo.y;
-        output.bsdf = Fr * make_float3(1 / abs(cosTho));
-        output.isDelta = true;
-        output.pdf = Fr;
-    }
-    else {
-        // refract
-        wi = wt;
-
-        output.bsdf = make_float3(((no * no) / (nt * nt)) * (1.0f - Fr) / abs(wt.z));
-        output.isDelta = true;
-        output.pdf = 1.0f - Fr;
-    }
-}
-
 HOSTDEVICE CUDAINLINE float coupledDiffuseTerm(float R0, float cosTho, float cosThi) {
     float k = 21.0f / (20.0f * M_PI * (1.0f - R0));
     float a = 1.0f - cosTho;
@@ -261,238 +124,369 @@ HOSTDEVICE CUDAINLINE float schlickFresnel(float R0, float cosTho) {
     return R0 + a5 * (1.0f - R0);
 }
 
-HOSTDEVICE CUDAINLINE void sampleSmoothConductorBSDF(const SmoothConductorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float no = bsdf.iorOut;
-    float nt = bsdf.iorIn;
-    float Fr = nt == 0.0f ? 1.0f : fresnel(wo, no, nt);
-    wi.z = wo.z;
-    wi.x = -wo.x;
-    wi.y = -wo.y;
-    output.bsdf = Fr*make_float3(1.0f/abs(wo.z));
-    output.isDelta = true;
-    output.pdf = 1.0f;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-}
+enum BSDFType: uint16_t {
+    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) BSDF_##BSDFTYPE,
+    #include "BSDF.inc"
+    #undef BSDFDefinition
+};
 
-HOSTDEVICE CUDAINLINE void sampleSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float u = randUniform(sampler);
-    float no = bsdf.iorOut;
-    float nt = bsdf.iorIn;
-    float Fri = fresnel(fabs(wo.z), no, nt);
-    if (u < Fri) {
+struct BSDFHandle {
+    HOSTDEVICE CUDAINLINE BSDFHandle() { } 
+    BSDFHandle(BSDFType type, uint32_t index) : handle((static_cast<uint32_t>(type) << 16) | (index & 0xFFFF)){
+    }
+    HOSTDEVICE CUDAINLINE BSDFType type() const {
+        return static_cast<BSDFType>((handle >> 16) & 0xffff);
+    }
+    HOSTDEVICE CUDAINLINE uint32_t index() const {
+        return handle & 0xFFFF;
+    }
+    uint32_t handle;
+};
+
+struct DiffuseBSDF {
+    float3 reflectance;
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        wi = randCosineHemisphere(sampler);
+        output.bsdf = reflectance / M_PI;
+        output.pdf = cosineHemispherePdf(wi);
+        output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        output.bsdf = reflectance / M_PI;
+        output.pdf = cosineHemispherePdf(wi);
+        output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+};
+
+struct SmoothDielectricBSDF {
+    float iorIn;
+    float iorOut; // usually 1.0
+
+    // bsdf for reflection: F_r/|cos(th_o)|
+    // bsdf for refraction: (n_t^2/n_o^2)(1-F_r)/|cos(th_o)|
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        bool entering = wo.z > 0.0f;
+        float no = entering ? iorOut : iorIn;
+        float nt = entering ? iorIn : iorOut;
+        float cosTho = wo.z;
+        float3 wt;
+        if (!refract(wo, faceforward(make_float3(0.0f, 0.0f, 1.0f), wo, make_float3(0.0f, 0.0f, 1.0f)), no, nt, wt)) {
+            // total internal reflection
+            wi.z = wo.z;
+            wi.x = -wo.x;
+            wi.y = -wo.y;
+            output.bsdf = 1.0f * make_float3(1 / abs(cosTho));
+            output.isDelta = true;
+            output.pdf = 1.0f;
+            return;
+        }
+        float Fr = fresnel(no, abs(cosTho), nt, abs(wt.z));
+        float u = randUniform(sampler);
+        // reflection with prob Fr
+        // refraction with prob 1 - Fr
+        if (u < Fr) {
+            // reflect
+            wi.z = wo.z;
+            wi.x = -wo.x;
+            wi.y = -wo.y;
+            output.bsdf = Fr * make_float3(1 / abs(cosTho));
+            output.isDelta = true;
+            output.pdf = Fr;
+        } else {
+            // refract
+            wi = wt;
+
+            output.bsdf = make_float3(((no * no) / (nt * nt)) * (1.0f - Fr) / abs(wt.z));
+            output.isDelta = true;
+            output.pdf = 1.0f - Fr;
+        }
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        output.bsdf = make_float3(0.0f);
+        output.pdf = 1.0f;
+        output.isDelta = true;
+    }
+};
+
+struct SmoothConductorBSDF {
+    float iorIn;
+    float iorOut; // usually 1.0
+
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        float no = iorOut;
+        float nt = iorIn;
+        float Fr = nt == 0.0f ? 1.0f : fresnel(wo, no, nt);
         wi.z = wo.z;
         wi.x = -wo.x;
         wi.y = -wo.y;
-        float Fro = fresnel(fabs(wi.z), no, nt);
-        float Ri = internalScatterEscapeFraction(bsdf.R0, no, nt);
-        float eta = no / nt;
-        float3 diffuse = bsdf.diffuse * eta * eta *(1.0f - Fri) * (1.0f - Fro) / (M_PI * (1.0f - bsdf.diffuse * Ri));
-        output.bsdf = diffuse + Fri * make_float3(1.0f / abs(wo.z));
-        output.pdf = Fri;
+        output.bsdf = Fr*make_float3(1.0f/abs(wo.z));
         output.isDelta = true;
+        output.pdf = 1.0f;
         NUMBERCHECK(output.bsdf)
         NUMBERCHECK(output.pdf)
-    } 
-    else {
-        wi = randCosineHemisphere(sampler);
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        output.bsdf = make_float3(0.0f);
+        output.pdf = 1.0f;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+        output.isDelta = true;
+    }
+};
+
+struct SmoothFloorBSDF {
+    float3 diffuse;
+    float R0;
+
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        float Fr = schlickFresnel(R0, abs(wo.z));
+        float u = randUniform(sampler);
+        if (u < Fr) {
+            wi.z = wo.z;
+            wi.x = -wo.x;
+            wi.y = -wo.y;
+            output.bsdf = diffuse * coupledDiffuseTerm(R0, abs(wo.z), abs(wi.z)) + Fr * make_float3(1.0f / abs(wo.z));
+            output.pdf = Fr;
+            output.isDelta = true;
+            NUMBERCHECK(output.bsdf)
+            NUMBERCHECK(output.pdf)
+        } 
+        else {
+            wi = randCosineHemisphere(sampler);
+            output.bsdf = diffuse * coupledDiffuseTerm(R0, abs(wo.z), abs(wi.z));
+            output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
+            output.isDelta = false;
+            NUMBERCHECK(output.bsdf)
+            NUMBERCHECK(output.pdf)
+        }
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        float Fr = schlickFresnel(R0, fabs(wo.z));
+        output.bsdf = diffuse * coupledDiffuseTerm(R0, fabs(wo.z), fabs(wi.z));
+        output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
+        output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+};
+
+struct SmoothPlasticBSDF {
+    float3 diffuse;
+    float iorIn;
+    float iorOut; // usually 1.0
+    float R0;
+
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        float u = randUniform(sampler);
+        float no = iorOut;
+        float nt = iorIn;
+        float Fri = fresnel(fabs(wo.z), no, nt);
+        if (u < Fri) {
+            wi.z = wo.z;
+            wi.x = -wo.x;
+            wi.y = -wo.y;
+            float Fro = fresnel(fabs(wi.z), no, nt);
+            float Ri = internalScatterEscapeFraction(R0, no, nt);
+            float eta = no / nt;
+            float3 d = diffuse * eta * eta *(1.0f - Fri) * (1.0f - Fro) / (M_PI * (1.0f - diffuse * Ri));
+            output.bsdf = d + Fri * make_float3(1.0f / abs(wo.z));
+            output.pdf = Fri;
+            output.isDelta = true;
+            NUMBERCHECK(output.bsdf)
+            NUMBERCHECK(output.pdf)
+        } 
+        else {
+            wi = randCosineHemisphere(sampler);
+            float Fro = fresnel(fabs(wi.z), no, nt);
+            float Ri = internalScatterEscapeFraction(R0, no, nt);
+            float eta = no / nt;
+            float3 d= diffuse * eta * eta * (1.0f - Fri) * (1.0f - Fro)/ (M_PI * (1.0f - diffuse * Ri));
+            output.bsdf = d;
+            output.pdf = (1.0f - Fri) * cosineHemispherePdf(wi);
+            output.isDelta = false;
+            NUMBERCHECK(output.bsdf)
+            NUMBERCHECK(output.pdf)
+        }
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        float no = iorOut;
+        float nt = iorIn;
+        float Fri = fresnel(fabs(wo.z), no, nt);
         float Fro = fresnel(fabs(wi.z), no, nt);
-        float Ri = internalScatterEscapeFraction(bsdf.R0, no, nt);
+        float Ri = internalScatterEscapeFraction(R0, no, nt);
         float eta = no / nt;
-        float3 diffuse = bsdf.diffuse * eta * eta * (1.0f - Fri) * (1.0f - Fro)/ (M_PI * (1.0f - bsdf.diffuse * Ri));
+        float3 diffuse = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
         output.bsdf = diffuse;
         output.pdf = (1.0f - Fri) * cosineHemispherePdf(wi);
         output.isDelta = false;
         NUMBERCHECK(output.bsdf)
         NUMBERCHECK(output.pdf)
     }
-}
+};
 
-HOSTDEVICE CUDAINLINE void sampleSmoothFloorBSDF(const SmoothFloorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float Fr = schlickFresnel(bsdf.R0, abs(wo.z));
-    float u = randUniform(sampler);
-    if (u < Fr) {
-        wi.z = wo.z;
-        wi.x = -wo.x;
-        wi.y = -wo.y;
-        output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z)) + Fr * make_float3(1.0f / abs(wo.z));
-        output.pdf = Fr;
-        output.isDelta = true;
-        NUMBERCHECK(output.bsdf)
-        NUMBERCHECK(output.pdf)
-    } 
-    else {
-        wi = randCosineHemisphere(sampler);
-        output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z));
-        output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
-        output.isDelta = false;
-        NUMBERCHECK(output.bsdf)
-        NUMBERCHECK(output.pdf)
-    }
-}
+enum MicrofacetType : uint32_t {
+    BECKMANN,
+    GGX
+};
 
-HOSTDEVICE CUDAINLINE void sampleRoughConductorBSDF(const RoughConductorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float3 Fr = FresnelDieletricConductor(bsdf.eta, bsdf.k, fabs(wo.z));
-    float3 wh = sampleHalf(sampler, bsdf.alpha);
-    if (wh.z <= 0.0f) {
-        wh *= -1.0f;
-    }
-    wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-    output.bsdf = bsdf.reflectance * Fr * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha);
-    output.pdf = beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
-    output.isDelta = false;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-}
+struct RoughConductorBSDF {
+    float3 eta;
+    float3 k;
+    float3 reflectance;
+    float alpha;
+    MicrofacetType distribution;
 
-HOSTDEVICE CUDAINLINE void sampleRoughFloorBSDF(const RoughFloorBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float u = randUniform(sampler);
-    if (u < 0.5f) {
-        float3 wh = sampleHalf(sampler, bsdf.alpha);
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        float3 Fr = FresnelDieletricConductor(eta, k, fabs(wo.z));
+        float3 wh = sampleHalf(sampler, alpha);
         if (wh.z <= 0.0f) {
             wh *= -1.0f;
         }
         wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-    } 
-    else {
-        wi = randCosineHemisphere(sampler);
-    }
-    float3 wh = normalize(wi + wo);
-    float Fr = schlickFresnel(bsdf.R0, fabs(dot(wo, wh)));
-    float3 diffuse = bsdf.diffuse * fresnelBlendDiffuseTerm(bsdf.R0, fabs(wo.z), fabs(wi.z));
-    float3 specular = make_float3(Fr) * ggxD(wh, bsdf.alpha)/ (4.0f * fabs(dot(wo,wh))* fmaxf(fabs(wo.z), fabs(wi.z)));
-    output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
-    output.bsdf = diffuse + specular;
-    output.isDelta = false;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-}
-
-HOSTDEVICE CUDAINLINE void sampleRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) {
-    float u = randUniform(sampler);
-    float no = bsdf.iorOut;
-    float nt = bsdf.iorIn;
-    if (u < 0.5f) {
-        float3 wh = sampleHalf(sampler, bsdf.alpha);
-        if (wh.z <= 0.0f) {
-            wh *= -1.0f;
-        }
-        wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-    } 
-    else {
-        wi = randCosineHemisphere(sampler);
-    }
-    float3 wh = normalize(wi + wo);
-    float Fri = fresnel(fabs(dot(wh, wo)), no, nt);
-    float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
-    float Ri = internalScatterEscapeFraction(bsdf.R0, no, nt);
-    float eta = no / nt;
-    float3 specular = make_float3(Fri) * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
-    float3 diffuse = bsdf.diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - bsdf.diffuse * Ri));
-    output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
-    output.bsdf = diffuse + specular;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
-}
-
-
-HOSTDEVICE CUDAINLINE void evalDiffuseBSDF(const DiffuseBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    output.bsdf = bsdf.reflectance / M_PI;
-    output.pdf = cosineHemispherePdf(wi);
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
-}
-
-HOSTDEVICE CUDAINLINE void evalSmoothDielectricBSDF(const SmoothDielectricBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    output.bsdf = make_float3(0.0f);
-    output.pdf = 1.0f;
-    output.isDelta = true;
-}
-
-HOSTDEVICE CUDAINLINE void evalSmoothConductorBSDF(const SmoothConductorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    output.bsdf = make_float3(0.0f);
-    output.pdf = 1.0f;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = true;
-}
-
-HOSTDEVICE CUDAINLINE void evalSmoothPlasticBSDF(const SmoothPlasticBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    float no = bsdf.iorOut;
-    float nt = bsdf.iorIn;
-    float Fri = fresnel(fabs(wo.z), no, nt);
-    float Fro = fresnel(fabs(wi.z), no, nt);
-    float Ri = internalScatterEscapeFraction(bsdf.R0, no, nt);
-    float eta = no / nt;
-    float3 diffuse = bsdf.diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - bsdf.diffuse * Ri));
-    output.bsdf = diffuse;
-    output.pdf = (1.0f - Fri) * cosineHemispherePdf(wi);
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
-}
-
-HOSTDEVICE CUDAINLINE void evalSmoothFloorBSDF(const SmoothFloorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    float Fr = schlickFresnel(bsdf.R0, fabs(wo.z));
-    output.bsdf = bsdf.diffuse * coupledDiffuseTerm(bsdf.R0, fabs(wo.z), fabs(wi.z));
-    output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
-}
-
-HOSTDEVICE CUDAINLINE void evalRoughConductorBSDF(const RoughConductorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    float3 Fr = FresnelDieletricConductor(bsdf.eta, bsdf.k, fabs(wo.z));
-    float3 wh = normalize((wo + wi));
-    /*if (wh.z <= 0.0f) {
-        output.bsdf = make_float3(0.0f);
-        output.pdf = 1.0f;
+        output.bsdf = reflectance * Fr * ggxD(wh, alpha) * ggxMask(wo, wi, alpha);
+        output.pdf = beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
         output.isDelta = false;
-    }*/
-    output.bsdf = Fr * bsdf.reflectance * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha);
-    output.pdf = beckmannD(wh, bsdf.alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        float3 Fr = FresnelDieletricConductor(eta, k, fabs(wo.z));
+        float3 wh = normalize((wo + wi));
+        output.bsdf = Fr * reflectance * ggxD(wh, alpha) * ggxMask(wo, wi, alpha);
+        output.pdf = beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+        output.isDelta = false;
+    }
+};
+
+struct RoughPlasticBSDF {
+    float3 diffuse;
+    float iorIn;
+    float iorOut; // usually 1.0
+    float R0;
+    float alpha;
+    MicrofacetType distribution;
+
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        float u = randUniform(sampler);
+        float no = iorOut;
+        float nt = iorIn;
+        if (u < 0.5f) {
+            float3 wh = sampleHalf(sampler, alpha);
+            if (wh.z <= 0.0f) {
+                wh *= -1.0f;
+            }
+            wi = normalize(-wo + 2 * dot(wh, wo) * wh);
+        } 
+        else {
+            wi = randCosineHemisphere(sampler);
+        }
+        float3 wh = normalize(wi + wo);
+        float Fri = fresnel(fabs(dot(wh, wo)), no, nt);
+        float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
+        float Ri = internalScatterEscapeFraction(R0, no, nt);
+        float eta = no / nt;
+        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
+        float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
+        output.pdf = 0.5f * beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
+        output.bsdf = d + specular;
+        output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+    
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        float no = iorOut;
+        float nt = iorIn;
+        float3 wh = normalize(wi + wo);
+        float Fri = fresnel(fabs(dot(wh, wo)), no, nt);
+        float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
+        float Ri = internalScatterEscapeFraction(R0, no, nt);
+        float eta = no / nt;
+        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
+        float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
+        output.pdf = 0.5f * fmaxf(beckmannD(wh, alpha) * fabs(wh.z), 0.01) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
+        output.bsdf = d + specular;
+        output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+};
+
+struct RoughFloorBSDF {
+    float3 diffuse;
+    float R0;
+    float alpha;
+    MicrofacetType distribution;
+
+    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+        float u = randUniform(sampler);
+        if (u < 0.5f) {
+            float3 wh = sampleHalf(sampler, alpha);
+            if (wh.z <= 0.0f) {
+                wh *= -1.0f;
+            }
+            wi = normalize(-wo + 2 * dot(wh, wo) * wh);
+        } 
+        else {
+            wi = randCosineHemisphere(sampler);
+        }
+        float3 wh = normalize(wi + wo);
+        float Fr = schlickFresnel(R0, fabs(dot(wo, wh)));
+        float3 d = diffuse * fresnelBlendDiffuseTerm(R0, fabs(wo.z), fabs(wi.z));
+        float3 specular = make_float3(Fr) * ggxD(wh, alpha)/ (4.0f * fabs(dot(wo,wh))* fmaxf(fabs(wo.z), fabs(wi.z)));
+        output.pdf = 0.5f * beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
+        output.bsdf = d + specular;
+        output.isDelta = false;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+    }
+
+    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+        float3 wh = normalize(wi + wo);
+        float Fr = schlickFresnel(R0, fabs(dot(wo,wh)));
+        float3 d = diffuse * fresnelBlendDiffuseTerm(R0, abs(wo.z), abs(wi.z));
+        float ggx = ggxD(wh, alpha);
+        float3 specular = make_float3(Fr) * ggx / (4.0f * fabs(dot(wo,wh)) * fmaxf(fabs(wo.z), fabs(wi.z)));
+        output.pdf = 0.5f * beckmannD(wh, alpha) * abs(wh.z) / (4.0f * fabs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
+        output.bsdf = d + specular;
+        NUMBERCHECK(output.bsdf)
+        NUMBERCHECK(output.pdf)
+        output.isDelta = false;
+    }
+};
+
+HOSTDEVICE CUDAINLINE bool isTransimissionBSDF(BSDFType type) {
+    switch (type) {
+    case BSDF_SMOOTH_DIELECTRIC:
+        return true;
+    default:
+        return false;
+    }
 }
 
-HOSTDEVICE CUDAINLINE void evalRoughFloorBSDF(const RoughFloorBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    float3 wh = normalize(wi + wo);
-    float Fr = schlickFresnel(bsdf.R0, fabs(dot(wo,wh)));
-    float3 diffuse = bsdf.diffuse * fresnelBlendDiffuseTerm(bsdf.R0, abs(wo.z), abs(wi.z));
-    float ggx = ggxD(wh, bsdf.alpha);
-    float3 specular = make_float3(Fr) * ggx / (4.0f * fabs(dot(wo,wh)) * fmaxf(fabs(wo.z), fabs(wi.z)));
-    output.pdf = 0.5f * beckmannD(wh, bsdf.alpha) * abs(wh.z) / (4.0f * fabs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
-    output.bsdf = diffuse + specular;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
-}
-
-HOSTDEVICE CUDAINLINE void evalRoughPlasticBSDF(const RoughPlasticBSDF& bsdf, float3 wo, float3 wi, BSDFOutput& output) {
-    float no = bsdf.iorOut;
-    float nt = bsdf.iorIn;
-    float3 wh = normalize(wi + wo);
-    float Fri = fresnel(fabs(dot(wh, wo)), no, nt);
-    float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
-    float Ri = internalScatterEscapeFraction(bsdf.R0, no, nt);
-    float eta = no / nt;
-    float3 specular = make_float3(Fri) * ggxD(wh, bsdf.alpha) * ggxMask(wo, wi, bsdf.alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
-    float3 diffuse = bsdf.diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - bsdf.diffuse * Ri));
-    output.pdf = 0.5f * fmaxf(beckmannD(wh, bsdf.alpha) * fabs(wh.z), 0.01) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
-    output.bsdf = diffuse + specular;
-    NUMBERCHECK(output.bsdf)
-    NUMBERCHECK(output.pdf)
-    output.isDelta = false;
-}
+struct BSDFData {
+    #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) Array<BSDFNAME> BSDFFIELD##s;
+    #include "BSDF.inc"
+    #undef BSDFDefinition
+};
 
 HOSTDEVICE CUDAINLINE void sampleBSDF(const BSDFData& data, SamplerState& sampler, const BSDFHandle& handle, float3 wo, float3& wi, BSDFOutput& output) {
     switch (handle.type()) {
         #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
             case BSDF_##BSDFTYPE: { \
-                sample##BSDFNAME(data.BSDFFIELD##s[handle.index()], sampler, wo, wi, output); \
+                data.BSDFFIELD##s[handle.index()].sample(sampler, wo, wi, output); \
                 break; \
              }
         #include "BSDF.inc"
@@ -504,7 +498,7 @@ HOSTDEVICE CUDAINLINE void evalBSDF(const BSDFData& data, const BSDFHandle& hand
     switch (handle.type()) {
         #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
             case BSDF_##BSDFTYPE: { \
-                eval##BSDFNAME(data.BSDFFIELD##s[handle.index()], wo, wi, output); \
+                data.BSDFFIELD##s[handle.index()].eval(wo, wi, output); \
                 break; \
              }
         #include "BSDF.inc"

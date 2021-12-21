@@ -26,7 +26,7 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
         if (!found) {
             auto rgb = obj.property("reflectance").getColor();
             float3 reflectance = make_float3(rgb.r, rgb.g, rgb.b);
-            material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ pow(reflectance, make_float3(2.2f))});
+            material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ reflectance});
         }
     }
     else if (type == "roughplastic") {

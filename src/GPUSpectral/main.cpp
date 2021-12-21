@@ -14,10 +14,10 @@ std::filesystem::path basePath() {
 
 int main() {
     Renderer renderer(basePath().string());
-    auto scene = loadScene(renderer, "coffee/scene.xml");
+    auto scene = loadScene(renderer, "test/scene.xml");
     RenderConfig config = {
-        .width = 800,
-        .height = 1000
+        .width = 768,
+        .height = 768
     }; 
     renderer.setScene(scene, config); 
     int totalSamples = 248000;

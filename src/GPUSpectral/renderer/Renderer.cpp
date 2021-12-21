@@ -482,6 +482,7 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
         {
             const int sbt_idx = i * RAY_TYPE_COUNT + 1;  // SBT for occlusion ray-type for ith material
             memset(&hitgroup_records[sbt_idx], 0, hitgroup_record_size);
+            hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(tlas.devicePositions);
             hitgroup_records[sbt_idx].data.emission_color = scene.materials[i].emission;
             OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.shadowHitGroup, &hitgroup_records[sbt_idx]));
         }

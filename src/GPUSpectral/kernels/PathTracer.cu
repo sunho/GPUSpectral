@@ -83,7 +83,7 @@ static __forceinline__ __device__ bool traceOcclusion(
 )
 {
     unsigned int occluded = 0u;
-    unsigned int u0, u1, u2;
+    unsigned int u0 = 0u, u1 = 0u, u2 = 0u;
     optixTrace(
         handle,
         ray_origin,
@@ -107,12 +107,23 @@ static __forceinline__ __device__ bool traceOcclusion(
 
 extern "C" __global__ void __closesthit__occlusion() {
     HitGroupData* rt_data = (HitGroupData*)optixGetSbtDataPointer();
-    setPayloadOcclusion(true);
-    optixSetPayload_1(float_as_int(rt_data->emission_color.x));
-    optixSetPayload_2(float_as_int(rt_data->emission_color.y));
-    optixSetPayload_3(float_as_int(rt_data->emission_color.z));
-}
 
+    const int    prim_idx        = optixGetPrimitiveIndex();
+    const float3 ray_dir         = optixGetWorldRayDirection();
+    const int    vert_idx_offset = prim_idx*3;
+
+    const float3 v0   = make_float3( rt_data->vertices[ vert_idx_offset+0 ] );
+    const float3 v1   = make_float3( rt_data->vertices[ vert_idx_offset+1 ] );
+    const float3 v2   = make_float3( rt_data->vertices[ vert_idx_offset+2 ] );
+    const float3 N_0  = normalize( cross( v1-v0, v2-v0 ) );
+
+    setPayloadOcclusion(true);
+    if (dot(-ray_dir, N_0) > 0.0f) {
+        optixSetPayload_1(float_as_int(rt_data->emission_color.x));
+        optixSetPayload_2(float_as_int(rt_data->emission_color.y));
+        optixSetPayload_3(float_as_int(rt_data->emission_color.z));
+    }
+}
 
 extern "C" __global__ void __raygen__rg() {
     const int    w = params.width;
@@ -226,10 +237,10 @@ extern "C" __global__ void __closesthit__radiance() {
 
     float3 N = N_0;
     if (dot(N, -ray_dir) < 0) {
-        if (!isTransimissionBSDF(rt_data->bsdf.type())){
+        /*if (!isTransimissionBSDF(rt_data->bsdf.type())){
             prd->done = true;
             return;
-        }
+        }*/
         if (rt_data->twofaced) {
             N *= -1.0f;
             SN *= -1.0f;
@@ -279,7 +290,7 @@ extern "C" __global__ void __closesthit__radiance() {
             );
             if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
                 float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-                direct +=  NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+                direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
             }
         }
 
@@ -311,11 +322,12 @@ extern "C" __global__ void __closesthit__radiance() {
     float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
     onb.inverse_transform(wi);
 
+    float lightFlag = dot(N, -ray_dir) > 0 ? 1.0f : 0.0f;
     if( prd->countEmitted)
-        prd->emitted = prd->weight * rt_data->emission_color;
+        prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
 
     if (prd->wasDelta)
-        prd->emitted = prd->weight * rt_data->emission_color;
+        prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
 
     if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
         prd->done = true;
