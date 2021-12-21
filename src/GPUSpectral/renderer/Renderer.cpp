@@ -65,26 +65,26 @@ void Renderer::setScene(const Scene& scene, const RenderConfig& config) {
 RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene, const RenderConfig& config) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
 
-    params.subframe_index = 0u;
-    params.handle = tlas.gasHandle;
-    params.eye = scene.camera.eye;
-    params.U =scene.camera.u;
-    params.V = scene.camera.v;
-    params.W = scene.camera.w;
-    params.fov = scene.camera.fov;
+    params.subframeIndex = 0u;
+    params.scene.tlas= tlas.gasHandle;
+    params.camera.eye = scene.camera.eye;
+    params.camera.U =scene.camera.u;
+    params.camera.V = scene.camera.v;
+    params.camera.W = scene.camera.w;
+    params.camera.fov = scene.camera.fov;
     params.width = config.width;
     params.height = config.height;
 
     CUDA_CHECK(cudaMalloc(
-        reinterpret_cast<void**>(&params.accum_buffer),
+        reinterpret_cast<void**>(&params.accumBuffer),
         params.width * params.height * sizeof(float4)
     ));
 
-    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&params.frame_buffer), params.width * params.height * 4));
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&params.frameBuffer), params.width * params.height * 4));
 
     deviceLightData.triangleLights.allocDevice(scene.triangleLights.size());
     deviceLightData.triangleLights.upload(scene.triangleLights.data());
-    params.lightData = deviceLightData;
+    params.scene.lightData = deviceLightData;
 
     {
     #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
@@ -92,7 +92,7 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
         deviceBSDFData.BSDFFIELD##s.upload(scene.BSDFFIELD##s.data());
     #include "../kernels/BSDF.inc"
     #undef BSDFDefinition
-        params.bsdfData = deviceBSDFData;
+        params.scene.bsdfData = deviceBSDFData;
     }
 
     CUDA_CHECK(cudaStreamCreate(&stream));
@@ -101,8 +101,8 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
 
 
 void Renderer::render(int spp) {
-    state->params.samples_per_launch = spp;
-    state->params.subframe_index++;
+    state->params.spp= spp;
+    state->params.subframeIndex++;
     // Launch
     CUDA_CHECK(cudaMemcpyAsync(
         reinterpret_cast<void*>(state->dParams),
@@ -125,7 +125,7 @@ void Renderer::render(int spp) {
     std::vector<uint32_t> pixels(state->params.width * state->params.height);
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(pixels.data()),
-        reinterpret_cast<void*>(state->params.frame_buffer),
+        reinterpret_cast<void*>(state->params.frameBuffer),
         state->params.width * state->params.height * 4,
         cudaMemcpyDeviceToHost
     ));
@@ -133,7 +133,7 @@ void Renderer::render(int spp) {
         std::filesystem::create_directory("output");
     }
     stbi_flip_vertically_on_write(true);
-    auto filename = std::string("output/output") + std::to_string(state->params.subframe_index) + ".jpg";
+    auto filename = std::string("output/output") + std::to_string(state->params.subframeIndex) + ".jpg";
     stbi_write_jpg(filename.c_str(), state->params.width, state->params.height, 4, pixels.data(), state->params.width * 4);
 }
 

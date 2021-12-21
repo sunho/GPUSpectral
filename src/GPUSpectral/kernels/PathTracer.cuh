@@ -23,24 +23,31 @@ enum RayType
     RAY_TYPE_COUNT
 };
 
-struct Params
-{
-    unsigned int subframe_index;
-    float4* accum_buffer;
-    uchar4* frame_buffer;
-    unsigned int width;
-    unsigned int height;
-    unsigned int samples_per_launch;
-
+struct GPUCamera {
     float3       eye;
     float3       U;
     float3       V;
     float3       W;
     float fov;
+};
 
+struct GPUScene {
     LightData lightData;
     BSDFData bsdfData;
-    OptixTraversableHandle handle;
+    OptixTraversableHandle tlas;
+};
+
+struct Params
+{
+    unsigned int subframeIndex;
+    float4* accumBuffer;
+    uchar4* frameBuffer;
+    unsigned int width;
+    unsigned int height;
+    unsigned int spp;
+
+    GPUCamera camera;
+    GPUScene scene;
 };
 
 struct RayGenData

@@ -107,21 +107,21 @@ extern "C" __global__ void __closesthit__occlusion() {
 extern "C" __global__ void __raygen__rg() {
     const int    w = params.width;
     const int    h = params.height;
-    const float3 eye = params.eye;
-    const float3 U = params.U;
-    const float3 V = params.V;
-    const float3 W = params.W;
+    const float3 eye = params.camera.eye;
+    const float3 U = params.camera.U;
+    const float3 V = params.camera.V;
+    const float3 W = params.camera.W;
     const uint3  idx = optixGetLaunchIndex();
-    const int    subframe_index = params.subframe_index;
+    const int    subframe_index = params.subframeIndex;
     float imageAspectRatio = 1.0f;
-    SamplerState sampler(pcgHash(tea<4>(idx.y * w + idx.x, subframe_index)));
+    SamplerState sampler(pcgHash(tea<4>(idx.y * w + idx.x, params.subframeIndex)));
     float3 result = make_float3(0.0f);
-    int i = params.samples_per_launch;
+    int i = params.spp;
     do {
         const float2 subpixel_jitter = make_float2(randUniform(sampler), randUniform(sampler));
 
         const float2 fragcord = make_float2(static_cast<float>(idx.x) + subpixel_jitter.x, static_cast<float>(idx.y) + subpixel_jitter.y);
-        const float3 rd = rayDir(make_float2(w, h), fragcord, params.fov, imageAspectRatio);
+        const float3 rd = rayDir(make_float2(w, h), fragcord, params.camera.fov, imageAspectRatio);
         float3 ray_direction = normalize(rd.x * U + rd.y * V + rd.z * W);
         float3 ray_origin = eye;
 
@@ -139,7 +139,7 @@ extern "C" __global__ void __raygen__rg() {
             prd.emitted = make_float3(0.f);
             prd.radiance = make_float3(0.f);
             traceRadiance(
-                params.handle,
+                params.scene.tlas,
                 ray_origin,
                 ray_direction,
                 0.000f,
@@ -165,22 +165,22 @@ extern "C" __global__ void __raygen__rg() {
 
     const uint3    launch_index = optixGetLaunchIndex();
     const unsigned int image_index = launch_index.y * params.width + launch_index.x;
-    float3         accum_color = result / static_cast<float>(params.samples_per_launch);
+    float3         accum_color = result / static_cast<float>(params.spp);
 
     if (subframe_index > 0)
     {
         const float                 a = 1.0f / static_cast<float>(subframe_index + 1);
-        const float3 accum_color_prev = make_float3(params.accum_buffer[image_index]);
+        const float3 accum_color_prev = make_float3(params.accumBuffer[image_index]);
         accum_color = lerp(accum_color_prev, accum_color, a);
     }
     if (!isfinite(accum_color)) {
-        params.accum_buffer[image_index] = make_float4(accum_color, 1.0f);
-        params.frame_buffer[image_index] = make_color(make_float3(0.f, 0.0, 10.0));
+        params.accumBuffer[image_index] = make_float4(accum_color, 1.0f);
+        params.frameBuffer[image_index] = make_color(make_float3(0.f, 0.0, 10.0));
         printf("nan detected in framebuffer\n");
     }
     else {
-        params.accum_buffer[image_index] = make_float4(accum_color, 1.0f);
-        params.frame_buffer[image_index] = make_color(accum_color);
+        params.accumBuffer[image_index] = make_float4(accum_color, 1.0f);
+        params.frameBuffer[image_index] = make_color(accum_color);
     }
 }
 
@@ -230,7 +230,7 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 wo = normalize(onb.transform(-ray_dir));
 
     LightOutput lightRes;
-    sampleLight(params.lightData, sampler, &lightRes);
+    sampleLight(params.scene.lightData, sampler, &lightRes);
 
     float3 L = normalize(lightRes.position - P);
     float3 wL = onb.transform(L);
@@ -240,7 +240,7 @@ extern "C" __global__ void __closesthit__radiance() {
 
     BSDFOutput bsdfRes;
     float3 wi;
-    sampleBSDF(params.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
+    sampleBSDF(params.scene.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
     float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
     onb.inverse_transform(wi);
 
@@ -257,11 +257,11 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 direct = make_float3(0.0f);
     if (!bsdfRes.isDelta) {
         BSDFOutput lightBsdfRes;
-        evalBSDF(params.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
+        evalBSDF(params.scene.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
 
         if ((dot(N, L) > 0.0f && dot(lightRes.normal, -L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
             bool occluded = traceOcclusion(
-                params.handle,
+                params.scene.tlas,
                 P,
                 L,
                 0.00001f,
