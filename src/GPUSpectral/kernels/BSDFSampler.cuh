@@ -324,8 +324,8 @@ struct SmoothPlasticBSDF {
         float Fro = fresnel(fabs(wi.z), no, nt);
         float Ri = internalScatterEscapeFraction(R0, no, nt);
         float eta = no / nt;
-        float3 diffuse = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
-        output.bsdf = diffuse;
+        float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
+        output.bsdf = d;
         output.pdf = (1.0f - Fri) * cosineHemispherePdf(wi);
         output.isDelta = false;
         NUMBERCHECK(output.bsdf)
@@ -352,7 +352,7 @@ struct RoughConductorBSDF {
             wh *= -1.0f;
         }
         wi = normalize(-wo + 2 * dot(wh, wo) * wh);
-        output.bsdf = reflectance * Fr * ggxD(wh, alpha) * ggxMask(wo, wi, alpha);
+        output.bsdf = reflectance * Fr * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wi.z) * fabs(wo.z));
         output.pdf = beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
         output.isDelta = false;
         NUMBERCHECK(output.bsdf)
@@ -362,11 +362,11 @@ struct RoughConductorBSDF {
     HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
         float3 Fr = FresnelDieletricConductor(eta, k, fabs(wo.z));
         float3 wh = normalize((wo + wi));
-        output.bsdf = Fr * reflectance * ggxD(wh, alpha) * ggxMask(wo, wi, alpha);
+        output.bsdf = Fr * reflectance * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wi.z) * fabs(wo.z));
         output.pdf = beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * fabs(dot(wo,wh)));
+        output.isDelta = false;
         NUMBERCHECK(output.bsdf)
         NUMBERCHECK(output.pdf)
-        output.isDelta = false;
     }
 };
 
@@ -397,7 +397,7 @@ struct RoughPlasticBSDF {
         float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
         float Ri = internalScatterEscapeFraction(R0, no, nt);
         float eta = no / nt;
-        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
+        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z) * fabs(wi.z)); //TODO do we need cos wi too?
         float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
         output.pdf = 0.5f * beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
         output.bsdf = d + specular;
@@ -414,7 +414,7 @@ struct RoughPlasticBSDF {
         float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
         float Ri = internalScatterEscapeFraction(R0, no, nt);
         float eta = no / nt;
-        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z)); //TODO do we need cos wi too?
+        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z) * fabs(wi.z)); //TODO do we need cos wi too?
         float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
         output.pdf = 0.5f * fmaxf(beckmannD(wh, alpha) * fabs(wh.z), 0.01) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
         output.bsdf = d + specular;
