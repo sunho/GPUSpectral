@@ -117,9 +117,7 @@ extern "C" __global__ void __raygen__rg() {
     SamplerState sampler(pcgHash(tea<4>(idx.y * w + idx.x, subframe_index)));
     float3 result = make_float3(0.0f);
     int i = params.samples_per_launch;
-    do
-    {
-        // The center of each pixel is at fraction (0.5,0.5)
+    do {
         const float2 subpixel_jitter = make_float2(randUniform(sampler), randUniform(sampler));
 
         const float2 fragcord = make_float2(static_cast<float>(idx.x) + subpixel_jitter.x, static_cast<float>(idx.y) + subpixel_jitter.y);
@@ -144,15 +142,14 @@ extern "C" __global__ void __raygen__rg() {
                 params.handle,
                 ray_origin,
                 ray_direction,
-                0.000f,  // tmin       // TODO: smarter offset
-                1e16f,  // tmax
+                0.000f,
+                1e16f,
                 &prd);
 
             result += prd.emitted;
             result += prd.radiance;
 
             if (depth >= 17) {
-                //result += make_float3(0.0, 10.0f, 0.0);
                 break;
             }
 
@@ -164,7 +161,7 @@ extern "C" __global__ void __raygen__rg() {
 
             ++depth;
         }
-    }     while (--i);
+    } while (--i);
 
     const uint3    launch_index = optixGetLaunchIndex();
     const unsigned int image_index = launch_index.y * params.width + launch_index.x;
@@ -232,17 +229,14 @@ extern "C" __global__ void __closesthit__radiance() {
     Onb geoOnb(N);
     float3 wo = normalize(onb.transform(-ray_dir));
 
-    float3 lightPos;
-    float lightPdf;
-    float3 lightEmission;
-    float3 lightNormal;
-    sampleLight(params.lightData, sampler, lightPos, lightPdf, lightEmission, lightNormal);
+    LightOutput lightRes;
+    sampleLight(params.lightData, sampler, &lightRes);
 
-    float3 L = normalize(lightPos - P);
+    float3 L = normalize(lightRes.position - P);
     float3 wL = onb.transform(L);
-    float Ldist = length(lightPos - P);
+    float Ldist = length(lightRes.position - P);
     const float NoL = fabs(dot(SN, L));
-    lightPdf *= Ldist * Ldist / fabs(dot(-L, lightNormal));
+    float lightPdf = Ldist * Ldist / fabs(dot(-L, lightRes.normal)) * lightRes.pdf;
 
     BSDFOutput bsdfRes;
     float3 wi;
@@ -265,17 +259,17 @@ extern "C" __global__ void __closesthit__radiance() {
         BSDFOutput lightBsdfRes;
         evalBSDF(params.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
 
-        if ((dot(N, L) > 0.0f && dot(lightNormal, -L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
+        if ((dot(N, L) > 0.0f && dot(lightRes.normal, -L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
             bool occluded = traceOcclusion(
                 params.handle,
                 P,
                 L,
-                0.00001f,         // tmin
-                Ldist - 0.01f  // tmax
+                0.00001f,
+                Ldist - 0.01f
             );
             if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
                 float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-                direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightEmission / lightPdf;
+                direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
             }
         }
     }

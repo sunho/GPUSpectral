@@ -12,6 +12,13 @@ struct LightData {
     Array<TriangleLight> triangleLights;
 };
 
+struct LightOutput {
+    float3 position;
+    float3 emission;
+    float3 normal;
+    float pdf;
+};
+
 HOSTDEVICE CUDAINLINE float3 sampleTriangleLight(const TriangleLight& light, SamplerState& sampler, float& pdf, float3& normal) {
     // barycentric coordinates
     // u = 1 - sqrt(e_1)
@@ -30,10 +37,10 @@ HOSTDEVICE CUDAINLINE float3 sampleTriangleLight(const TriangleLight& light, Sam
     return u * light.positions[0] + v * light.positions[1] + w * light.positions[2];
 }
 
-HOSTDEVICE CUDAINLINE void sampleLight(const LightData& lightData, SamplerState& sampler, float3& p, float& pdf, float3& emission, float3& normal) {
+HOSTDEVICE CUDAINLINE void sampleLight(const LightData& lightData, SamplerState& sampler, LightOutput* output) {
     uint32_t lightIndex = randInt(sampler) % lightData.triangleLights.size();
     const TriangleLight& light = lightData.triangleLights[lightIndex];
-    emission = light.radinace;
-    p = sampleTriangleLight(light, sampler, pdf, normal);
-    pdf /= (float)lightData.triangleLights.size();
+    output->emission = light.radinace;
+    output->position = sampleTriangleLight(light, sampler, output->pdf, output->normal);
+    output->pdf /= (float)lightData.triangleLights.size();
 }
