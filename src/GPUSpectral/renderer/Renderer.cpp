@@ -47,15 +47,24 @@ std::string Renderer::loadKernel(const std::string& fileName) {
     return includedSource;
 }
 
-Mesh* Renderer::getMesh(int id) {
+Mesh* Renderer::getMesh(MeshId id) {
     return &meshes[id];
-       
 }
 
-int Renderer::addMesh(const Mesh& mesh) {
-    int id = meshes.size();
-    meshes.push_back(mesh);
-    return id;
+MeshId Renderer::addMesh(const Mesh& mesh) {
+    MeshId outId = nextHandleId++;
+    meshes.emplace(outId, mesh);
+    return outId;
+}
+
+TextureId Renderer::createTexture(TextureFormat format, uint32_t width, uint32_t height) {
+    TextureId outId = nextHandleId++;
+    textures.emplace(outId, std::move(Texture(*this, format, width, height)));
+    return outId;
+}
+
+Texture* Renderer::getTexture(TextureId id) {
+    return &textures[id];
 }
 
 void Renderer::setScene(const Scene& scene, const RenderConfig& config) {

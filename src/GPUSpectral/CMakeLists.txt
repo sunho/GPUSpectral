@@ -9,6 +9,8 @@ set(SOURCE
   renderer/CudaSBT.cpp
   renderer/CudaTLAS.h
   renderer/CudaTLAS.cpp
+  renderer/Texture.h
+  renderer/Texture.cpp
   renderer/Scene.h
   renderer/Scene.cpp
   utils/CudaUtil.h
@@ -17,6 +19,7 @@ set(SOURCE
 
 set(SHADERS_HEADERS
   kernels/BSDF.inc
+  kernels/BSDF.cuh
   kernels/VectorMath.cuh
   kernels/PathTracer.cuh
   kernels/Common.cuh

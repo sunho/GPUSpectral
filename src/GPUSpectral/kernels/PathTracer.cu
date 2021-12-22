@@ -180,7 +180,7 @@ extern "C" __global__ void __raygen__rg() {
     }
     else {
         params.accumBuffer[image_index] = make_float4(accum_color, 1.0f);
-        params.frameBuffer[image_index] = make_color(accum_color);
+        params.frameBuffer[image_index] = make_color(filmMap(accum_color));
     }
 }
 
@@ -206,8 +206,12 @@ extern "C" __global__ void __closesthit__radiance() {
     const float3 n0   = make_float3( rt_data->normals[ vert_idx_offset+0 ] );
     const float3 n1   = make_float3( rt_data->normals[ vert_idx_offset+1 ] );
     const float3 n2   = make_float3( rt_data->normals[ vert_idx_offset+2 ] );
+    const float2 u0   =  rt_data->uvs[vert_idx_offset + 0];
+    const float2 u1   =  rt_data->uvs[vert_idx_offset + 1];
+    const float2 u2   =  rt_data->uvs[vert_idx_offset + 2];
     float2 bary = optixGetTriangleBarycentrics();
     float3 SN = normalize(bary.x * n1 + bary.y * n2 + (1.0f - bary.x - bary.y) * n0);
+    float2 uv = bary.x * u1 + bary.y * u2 + (1.0f - bary.x - bary.y) * u0;
     const float3 N_0  = normalize( cross( v1-v0, v2-v0 ) );
     RadiancePRD* prd = getPRD();
 
@@ -225,6 +229,9 @@ extern "C" __global__ void __closesthit__radiance() {
     const float3 P    = optixGetWorldRayOrigin() + optixGetRayTmax()*ray_dir;
     SamplerState sampler = prd->sampler;
 
+    if (rt_data->facenormals) {
+        SN = N;
+    }
     Onb onb(SN);
     Onb geoOnb(N);
     float3 wo = normalize(onb.transform(-ray_dir));
@@ -240,14 +247,14 @@ extern "C" __global__ void __closesthit__radiance() {
 
     BSDFOutput bsdfRes;
     float3 wi;
-    sampleBSDF(params.scene.bsdfData, sampler, rt_data->bsdf, wo, wi, bsdfRes);
+    sampleBSDF(params.scene.bsdfData, sampler, uv, rt_data->bsdf, wo, wi, bsdfRes);
     float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
     onb.inverse_transform(wi);
 
-    if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
+    /*if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
         prd->done = true;
         return;
-    }
+    }*/
 
     if (!isvalid(bsdfRes.pdf) || !isvalid(bsdfRes.bsdf) || bsdfRes.pdf == 0.0f) {
         prd->done = true;
@@ -257,7 +264,7 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 direct = make_float3(0.0f);
     if (!bsdfRes.isDelta) {
         BSDFOutput lightBsdfRes;
-        evalBSDF(params.scene.bsdfData, rt_data->bsdf, wo, wL, lightBsdfRes);
+        evalBSDF(params.scene.bsdfData,rt_data->bsdf, uv, wo, wL, lightBsdfRes);
 
         if ((dot(N, L) > 0.0f && dot(lightRes.normal, -L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
             bool occluded = traceOcclusion(
@@ -286,7 +293,7 @@ extern "C" __global__ void __closesthit__radiance() {
     prd->radiance = direct;
     prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
     prd->countEmitted = false;
-    prd->origin = P + 0.0001f*faceforward(N, wi, N);
+    prd->origin = P + 0.001f*faceforward(N, wi, N);
     prd->direction = wi;
     prd->weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
     prd->wasDelta = bsdfRes.isDelta;

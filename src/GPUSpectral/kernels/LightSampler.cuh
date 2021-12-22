@@ -8,6 +8,10 @@ struct TriangleLight {
     float3 radinace;
 };
 
+struct DiskLight {
+    
+};
+
 struct LightData {
     Array<TriangleLight> triangleLights;
 };

@@ -52,8 +52,10 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
             hitgroup_records[sbt_idx].data.emission_color = scene.materials[i].emission;
             hitgroup_records[sbt_idx].data.bsdf = scene.materials[i].bsdf;
             hitgroup_records[sbt_idx].data.twofaced = scene.materials[i].twofaced;
+            hitgroup_records[sbt_idx].data.facenormals = scene.materials[i].facenormals;
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(tlas.devicePositions);
             hitgroup_records[sbt_idx].data.normals= reinterpret_cast<float4*>(tlas.deviceNormals);
+            hitgroup_records[sbt_idx].data.uvs = reinterpret_cast<float2*>(tlas.deviceUVs);
         }
 
         {
@@ -61,6 +63,7 @@ CudaSBT::CudaSBT(Renderer& renderer, OptixDeviceContext context, CudaTLAS& tlas,
             memset(&hitgroup_records[sbt_idx], 0, hitgroup_record_size);
             hitgroup_records[sbt_idx].data.vertices = reinterpret_cast<float4*>(tlas.devicePositions);
             hitgroup_records[sbt_idx].data.emission_color = scene.materials[i].emission;
+            hitgroup_records[sbt_idx].data.uvs = reinterpret_cast<float2*>(tlas.deviceUVs);
             OPTIX_CHECK(optixSbtRecordPackHeader(renderer.pipeline.shadowHitGroup, &hitgroup_records[sbt_idx]));
         }
     }

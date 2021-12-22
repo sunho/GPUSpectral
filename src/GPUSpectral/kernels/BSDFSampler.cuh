@@ -145,17 +145,20 @@ struct BSDFHandle {
 
 struct DiffuseBSDF {
     float3 reflectance;
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    cudaTextureObject_t reflectanceTex;
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
+        float3 kD = reflectanceTex != 0 ? make_float3(tex2D<float4>(reflectanceTex, uv.x, uv.y)) : reflectance;
         wi = randCosineHemisphere(sampler);
-        output.bsdf = reflectance / M_PI;
+        output.bsdf = kD / M_PI;
         output.pdf = cosineHemispherePdf(wi);
         output.isDelta = false;
         NUMBERCHECK(output.bsdf)
         NUMBERCHECK(output.pdf)
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
-        output.bsdf = reflectance / M_PI;
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
+        float3 kD = reflectanceTex != 0 ? make_float3(tex2D<float4>(reflectanceTex, uv.x, uv.y)) : reflectance;
+        output.bsdf = kD / M_PI;
         output.pdf = cosineHemispherePdf(wi);
         output.isDelta = false;
         NUMBERCHECK(output.bsdf)
@@ -169,7 +172,7 @@ struct SmoothDielectricBSDF {
 
     // bsdf for reflection: F_r/|cos(th_o)|
     // bsdf for refraction: (n_t^2/n_o^2)(1-F_r)/|cos(th_o)|
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         bool entering = wo.z > 0.0f;
         float no = entering ? iorOut : iorIn;
         float nt = entering ? iorIn : iorOut;
@@ -207,7 +210,7 @@ struct SmoothDielectricBSDF {
         }
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         output.bsdf = make_float3(0.0f);
         output.pdf = 1.0f;
         output.isDelta = true;
@@ -218,7 +221,7 @@ struct SmoothConductorBSDF {
     float iorIn;
     float iorOut; // usually 1.0
 
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         float no = iorOut;
         float nt = iorIn;
         float Fr = nt == 0.0f ? 1.0f : fresnel(wo, no, nt);
@@ -232,7 +235,7 @@ struct SmoothConductorBSDF {
         NUMBERCHECK(output.pdf)
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         output.bsdf = make_float3(0.0f);
         output.pdf = 1.0f;
         NUMBERCHECK(output.bsdf)
@@ -245,7 +248,7 @@ struct SmoothFloorBSDF {
     float3 diffuse;
     float R0;
 
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         float Fr = schlickFresnel(R0, abs(wo.z));
         float u = randUniform(sampler);
         if (u < Fr) {
@@ -268,7 +271,7 @@ struct SmoothFloorBSDF {
         }
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         float Fr = schlickFresnel(R0, fabs(wo.z));
         output.bsdf = diffuse * coupledDiffuseTerm(R0, fabs(wo.z), fabs(wi.z));
         output.pdf = (1.0f - Fr) * cosineHemispherePdf(wi);
@@ -284,7 +287,7 @@ struct SmoothPlasticBSDF {
     float iorOut; // usually 1.0
     float R0;
 
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         float u = randUniform(sampler);
         float no = iorOut;
         float nt = iorIn;
@@ -317,7 +320,7 @@ struct SmoothPlasticBSDF {
         }
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         float no = iorOut;
         float nt = iorIn;
         float Fri = fresnel(fabs(wo.z), no, nt);
@@ -345,7 +348,7 @@ struct RoughConductorBSDF {
     float alpha;
     MicrofacetType distribution;
 
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         float3 Fr = FresnelDieletricConductor(eta, k, fabs(wo.z));
         float3 wh = sampleHalf(sampler, alpha);
         if (wh.z <= 0.0f) {
@@ -359,7 +362,7 @@ struct RoughConductorBSDF {
         NUMBERCHECK(output.pdf)
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         float3 Fr = FresnelDieletricConductor(eta, k, fabs(wo.z));
         float3 wh = normalize((wo + wi));
         output.bsdf = Fr * reflectance * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wi.z) * fabs(wo.z));
@@ -372,16 +375,19 @@ struct RoughConductorBSDF {
 
 struct RoughPlasticBSDF {
     float3 diffuse;
+    cudaTextureObject_t diffuseTex;
     float iorIn;
     float iorOut; // usually 1.0
     float R0;
     float alpha;
     MicrofacetType distribution;
 
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         float u = randUniform(sampler);
         float no = iorOut;
         float nt = iorIn;
+        float eta = no / nt;
+
         if (u < 0.5f) {
             float3 wh = sampleHalf(sampler, alpha);
             if (wh.z <= 0.0f) {
@@ -392,21 +398,24 @@ struct RoughPlasticBSDF {
         else {
             wi = randCosineHemisphere(sampler);
         }
+
         float3 wh = normalize(wi + wo);
         float Fri = fresnel(fabs(dot(wh, wo)), no, nt);
         float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
         float Ri = internalScatterEscapeFraction(R0, no, nt);
-        float eta = no / nt;
-        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z) * fabs(wi.z)); //TODO do we need cos wi too?
-        float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
+    
+        float3 kD = diffuseTex != 0 ? make_float3(tex2DLod<float4>(diffuseTex, uv.x, uv.y, 0.0f)) : diffuse;
+        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z) * fabs(wi.z));
+        float3 d = kD * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - kD * Ri));
         output.pdf = 0.5f * beckmannD(wh, alpha) * fabs(wh.z) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
         output.bsdf = d + specular;
         output.isDelta = false;
+
         NUMBERCHECK(output.bsdf)
         NUMBERCHECK(output.pdf)
     }
     
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         float no = iorOut;
         float nt = iorIn;
         float3 wh = normalize(wi + wo);
@@ -414,8 +423,10 @@ struct RoughPlasticBSDF {
         float Fro = fresnel(fabs(dot(wh, wi)), no, nt);
         float Ri = internalScatterEscapeFraction(R0, no, nt);
         float eta = no / nt;
-        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z) * fabs(wi.z)); //TODO do we need cos wi too?
-        float3 d = diffuse * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - diffuse * Ri));
+
+        float3 kD = diffuseTex != 0 ? make_float3(tex2D<float4>(diffuseTex, uv.x, uv.y)) : diffuse;
+        float3 specular = make_float3(Fri) * ggxD(wh, alpha) * ggxMask(wo, wi, alpha) / (4.0f * fabs(wo.z) * fabs(wi.z));
+        float3 d = kD * (1.0f - Fri) * (1.0f - Fro) * eta * eta / (M_PI * (1.0f - kD * Ri));
         output.pdf = 0.5f * fmaxf(beckmannD(wh, alpha) * fabs(wh.z), 0.01) / (4.0f * abs(dot(wo, wh))) + 0.5f * cosineHemispherePdf(wi);
         output.bsdf = d + specular;
         output.isDelta = false;
@@ -430,7 +441,7 @@ struct RoughFloorBSDF {
     float alpha;
     MicrofacetType distribution;
 
-    HOSTDEVICE CUDAINLINE void sample(SamplerState& sampler, float3 wo, float3& wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void sample(SamplerState& sampler, float2 uv, float3 wo, float3& wi, BSDFOutput& output) const {
         float u = randUniform(sampler);
         if (u < 0.5f) {
             float3 wh = sampleHalf(sampler, alpha);
@@ -453,7 +464,7 @@ struct RoughFloorBSDF {
         NUMBERCHECK(output.pdf)
     }
 
-    HOSTDEVICE CUDAINLINE void eval(float3 wo, float3 wi, BSDFOutput& output) const {
+    DEVICE CUDAINLINE void eval(float2 uv, float3 wo, float3 wi, BSDFOutput& output) const {
         float3 wh = normalize(wi + wo);
         float Fr = schlickFresnel(R0, fabs(dot(wo,wh)));
         float3 d = diffuse * fresnelBlendDiffuseTerm(R0, abs(wo.z), abs(wi.z));
@@ -467,7 +478,7 @@ struct RoughFloorBSDF {
     }
 };
 
-HOSTDEVICE CUDAINLINE bool isTransimissionBSDF(BSDFType type) {
+DEVICE CUDAINLINE bool isTransimissionBSDF(BSDFType type) {
     switch (type) {
     case BSDF_SMOOTH_DIELECTRIC:
         return true;
@@ -482,11 +493,11 @@ struct BSDFData {
     #undef BSDFDefinition
 };
 
-HOSTDEVICE CUDAINLINE void sampleBSDF(const BSDFData& data, SamplerState& sampler, const BSDFHandle& handle, float3 wo, float3& wi, BSDFOutput& output) {
+DEVICE CUDAINLINE void sampleBSDF(const BSDFData& data, SamplerState& sampler, float2 uv, const BSDFHandle& handle, float3 wo, float3& wi, BSDFOutput& output) {
     switch (handle.type()) {
         #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
             case BSDF_##BSDFTYPE: { \
-                data.BSDFFIELD##s[handle.index()].sample(sampler, wo, wi, output); \
+                data.BSDFFIELD##s[handle.index()].sample(sampler, uv, wo, wi, output); \
                 break; \
              }
         #include "BSDF.inc"
@@ -494,11 +505,11 @@ HOSTDEVICE CUDAINLINE void sampleBSDF(const BSDFData& data, SamplerState& sample
     }
 }
 
-HOSTDEVICE CUDAINLINE void evalBSDF(const BSDFData& data, const BSDFHandle& handle, float3 wo, float3 wi, BSDFOutput& output) {
+DEVICE CUDAINLINE void evalBSDF(const BSDFData& data, const BSDFHandle& handle, float2 uv, float3 wo, float3 wi, BSDFOutput& output) {
     switch (handle.type()) {
         #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
             case BSDF_##BSDFTYPE: { \
-                data.BSDFFIELD##s[handle.index()].eval(wo, wi, output); \
+                data.BSDFFIELD##s[handle.index()].eval(uv, wo, wi, output); \
                 break; \
              }
         #include "BSDF.inc"

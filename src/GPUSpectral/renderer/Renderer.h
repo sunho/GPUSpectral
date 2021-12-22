@@ -3,6 +3,7 @@
 #include "../utils/CudaUtil.h"
 #include "../kernels/VectorMath.cuh"
 #include "../kernels/PathTracer.cuh"
+#include "Texture.h"
 #include "CudaSBT.h"
 #include "CudaTLAS.h"
 #include "CudaPipeline.h"
@@ -17,6 +18,9 @@ struct RenderConfig {
     int width;
     int height;
 };
+
+using MeshId = size_t;
+using TextureId = size_t;
 
 struct Mesh {
     std::vector<float3> positions;
@@ -45,8 +49,10 @@ public:
     Renderer(const std::string& basePath);
     ~Renderer();
 
-    int addMesh(const Mesh& mesh);
-    Mesh* getMesh(int meshId);
+    MeshId addMesh(const Mesh& mesh);
+    TextureId createTexture(TextureFormat format, uint32_t width, uint32_t height);
+    Mesh* getMesh(MeshId meshId);
+    Texture* getTexture(TextureId id);
 
     void setScene(const Scene& scene, const RenderConfig& config);
     void render(int spp);
@@ -60,9 +66,11 @@ private:
     std::string basePath;
     std::filesystem::path baseFsPath;
 
-    std::vector<Mesh> meshes;
+    std::unordered_map<MeshId, Mesh> meshes;
+    std::unordered_map<TextureId, Texture> textures;
     OptixDeviceContext context;
     CudaPipeline pipeline;
 
     std::unique_ptr<RenderState> state;
+    size_t nextHandleId = 1;
 };

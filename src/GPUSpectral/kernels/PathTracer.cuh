@@ -63,8 +63,10 @@ struct HitGroupData
 {
     float3  emission_color;
     uint32_t twofaced;
+    uint32_t facenormals;
     BSDFHandle bsdf;
     float4* vertices;
     float4* normals;
+    float2* uvs;
 };
 

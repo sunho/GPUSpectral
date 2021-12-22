@@ -25,6 +25,7 @@ struct RenderObject {
 struct Material {
     float3 emission = { 0.0f,0.0f,0.0f };
     bool twofaced = false;
+    bool facenormals = false;
     BSDFHandle bsdf;
 };
 

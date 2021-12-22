@@ -13,11 +13,11 @@ struct CudaTLAS {
     CUdeviceptr                    gasOutputBuffer;
     CUdeviceptr                    devicePositions;
     CUdeviceptr                    deviceNormals;
-    CUdeviceptr                    deviceUvs;
+    CUdeviceptr                    deviceUVs;
 
     std::vector<float4> positions;
     std::vector<float4> normals;
-    std::vector<float4> uvs;
+    std::vector<float2> uvs;
     std::vector<int> matIndices;
 private:
     void fillData(Renderer& renderer, const Scene& scene);

@@ -22,6 +22,14 @@ CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& 
         cudaMemcpyHostToDevice
     ));
 
+    const size_t uvVerticesSizeInBytes = uvs.size() * sizeof(float2);
+    CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&deviceUVs), uvVerticesSizeInBytes));
+    CUDA_CHECK(cudaMemcpy(
+        reinterpret_cast<void*>(deviceUVs),
+        uvs.data(), uvVerticesSizeInBytes,
+        cudaMemcpyHostToDevice
+    ));
+
     CUdeviceptr  d_mat_indices = 0;
     const size_t mat_indices_size_in_bytes = matIndices.size() * sizeof(uint32_t);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_mat_indices), mat_indices_size_in_bytes));
@@ -126,7 +134,7 @@ void CudaTLAS::fillData(Renderer& renderer, const Scene& scene) {
         }
         
         for (auto& uv : mesh->uvs) {
-            uvs.push_back(float4(uv.x, uv.y, 0.0f, 0.0f));
+            uvs.push_back(make_float2(uv.x, uv.y));
         }
 
         for (size_t i = 0; i < mesh->positions.size() / 3; ++i) {

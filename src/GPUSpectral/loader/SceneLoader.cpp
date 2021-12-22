@@ -1,68 +1,63 @@
 #include "SceneLoader.h"
 #include <tinyparser-mitsuba.h>
+#include <stb_image.h>
 #include <tiny_obj_loader.h>
 #include <iostream>
 #include <assert.h>
 
 #include <filesystem>
 
-static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
+static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
     std::string type = obj.pluginType();
     if (type == "twosided") {
         material->twofaced = true;
     }
     if (type == "diffuse") {
-        bool found = false;
-        /*for (auto [name, child] : obj.namedChildren()) {
+        auto rgb = obj.property("reflectance").getColor();
+        float3 reflectance = make_float3(rgb.r, rgb.g, rgb.b);
+        auto bsdf = DiffuseBSDF{ reflectance, 0 };
+        for (auto [name, child] : obj.namedChildren()) {
             if (name == "reflectance") {
-                found = true;
                 auto filename = child->property("filename").getString();
                 auto path = (basepath / filename).string();
-                auto tex = loadOrGetTexture(path);
-                material->materialData = DiffuseTextureMaterialData{ tex };
+                auto tex = loadTexture(renderer, path);
+                bsdf.reflectanceTex = renderer.getTexture(tex)->getTextureObject();
                 break;
             }
-        }*/
-        if (!found) {
-            auto rgb = obj.property("reflectance").getColor();
-            float3 reflectance = make_float3(rgb.r, rgb.g, rgb.b);
-            material->bsdf = scene.addDiffuseBSDF(DiffuseBSDF{ reflectance});
         }
+        material->bsdf = scene.addDiffuseBSDF(bsdf);
     }
     else if (type == "roughplastic") {
-        bool found = false;
-        /*for (auto [name, child] : obj.namedChildren()) {
+        auto rgb = obj.property("diffuse_reflectance").getColor();
+        float alpha = obj.property("alpha").getNumber();
+        float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
+        if (obj.property("ext_ior").isValid()) {
+            if (abs(obj.property("ext_ior").getNumber() - 1.0f) > 0.001f) {
+                std::cout << "unsupported ext ior of plastic" << std::endl;
+            }
+        }
+        float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
+        float R0 = (ior - 1.0f) / (ior + 1.0f);
+        R0 *= R0;
+        auto bsdf = RoughPlasticBSDF{
+            .diffuse = diffuse,
+            .diffuseTex = 0,
+            .iorIn = ior,
+            .iorOut = 1.0f,
+            .R0 = R0,
+            .alpha = (float)sqrt(2.0f) * alpha,
+            .distribution = GGX
+        };
+        for (auto [name, child] : obj.namedChildren()) {
             if (name == "diffuse_reflectance") {
-                found = true;
                 auto filename = child->property("filename").getString();
                 auto path = (basepath / filename).string();
-                auto tex = loadOrGetTexture(path);
-                material->materialData = DiffuseTextureMaterialData{ tex };
+                auto tex = loadTexture(renderer, path);
+                bsdf.diffuseTex = renderer.getTexture(tex)->getTextureObject();
                 break;
             }
-        }*/
-        if (!found) {
-            auto rgb = obj.property("diffuse_reflectance").getColor();
-            float alpha = obj.property("alpha").getNumber();
-            float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
-            if (obj.property("ext_ior").isValid()) {
-                if (abs(obj.property("ext_ior").getNumber() - 1.0f) > 0.001f) {
-                    std::cout << "unsupported ext ior of plastic" << std::endl;
-                }
-            }
-            float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
-            float R0 = (ior - 1.0f) / (ior + 1.0f);
-            R0 *= R0;
-            material->bsdf = scene.addRoughPlasticBSDF(RoughPlasticBSDF{
-                .diffuse = pow(diffuse,make_float3(1.0f)),
-                .iorIn = ior,
-                .iorOut = 1.0f,
-                .R0 = R0,
-                .alpha = (float)sqrt(2.0f)*alpha,
-                .distribution = GGX
-             });
-            //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
+        material->bsdf = scene.addRoughPlasticBSDF(bsdf);
     }
     else if (type == "dielectric") {
         float intIOR = obj.property("int_ior").getNumber();
@@ -107,16 +102,6 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
     }
     else if (type == "roughconductor") {
         bool found = false;
-        /*for (auto [name, child] : obj.namedChildren()) {
-            if (name == "diffuse_reflectance") {
-                found = true;
-                auto filename = child->property("filename").getString();
-                auto path = (basepath / filename).string();
-                auto tex = loadOrGetTexture(path);
-                material->materialData = DiffuseTextureMaterialData{ tex };
-                break;
-            }
-        }*/
         if (!found) {
             auto eta_ = obj.property("eta").getColor();
             auto k_ = obj.property("k").getColor();
@@ -138,7 +123,7 @@ static void loadMaterial(Scene& scene, Material* material, tinyparser_mitsuba::O
 
     for (auto child : obj.anonymousChildren()) {
         if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-            loadMaterial(scene, material, *child, basepath);
+            loadMaterial(renderer, scene, material, *child, basepath);
         }
     }
 }
@@ -171,12 +156,15 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             }
             else if (obj->pluginType() == "cube") {
                 filename = renderer.assetPath("box.obj");
+            } else if (obj->pluginType() == "disk") {
+                filename = renderer.assetPath("rect.obj");
             }
             else {
                 filename = (parentPath / filename).string();
             }
             auto mesh = loadOrGetMesh(filename);
             auto transform = obj->property("to_world").getTransform();
+            bool faceNormals = obj->property("face_normals").getBool(false);
             auto matrix = mat4(transform.matrix.data());
             if (obj->property("center").isValid()) {
                 auto point = obj->property("center").getVector();
@@ -191,7 +179,7 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             Material material = {};
             for (auto child : obj->anonymousChildren()) {
                 if (child->type() == tinyparser_mitsuba::OT_BSDF) {
-                    loadMaterial(outScene, &material, *child, parentPath);
+                    loadMaterial(renderer, outScene, &material, *child, parentPath);
                 } else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
                     auto col = child->property("radiance").getColor();
                     material.emission = make_float3(col.r, col.g, col.b);
@@ -202,6 +190,7 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             renderObject.meshId = mesh;
             renderObject.transform = matrix;
             renderObject.material = outScene.addMaterial(material);
+            outScene.getMaterial(renderObject.material).facenormals = faceNormals;
             outScene.addRenderObject(renderObject);
 
             if (emitting) {
@@ -232,6 +221,29 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
     }
     return outScene;
 }
+
+TextureId loadTexture(Renderer& renderer, const std::string& path) {
+    int width, height, comp;
+    unsigned char* data =
+        stbi_load(path.c_str(), &width, &height, &comp, 0);
+    if (!data) {
+        throw std::runtime_error("FUCK");
+    }
+    std::vector<char> textureData;
+    for (int j = height - 1; j >= 0; --j) {
+        for (int i = 0; i < width; ++i) {
+            textureData.push_back(data[(j * width + i) * comp]);
+            textureData.push_back(data[(j * width + i) * comp + 1]);
+            textureData.push_back(data[(j * width + i) * comp + 2]);
+            textureData.push_back(0xFF);
+        }
+    }
+    stbi_image_free(data);
+    auto texId = renderer.createTexture(TextureFormat::SRGB8_A8, width, height);
+    renderer.getTexture(texId)->upload(textureData.data());
+    return texId;
+}
+
 
 Mesh loadMesh(const std::string& path) {
     Mesh outMesh = {};

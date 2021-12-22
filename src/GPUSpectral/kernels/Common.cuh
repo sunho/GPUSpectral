@@ -6,17 +6,34 @@
 #include <stdint.h>
 #include <cassert>
 #include <cuda_runtime.h>
+#include <vector_types.h>
+#include <driver_functions.h>
+#include <cuda_runtime.h>
 #include <math.h>
 #if defined(__CUDACC__) || defined(__CUDABE__)
 #define HOST __host__
+#define DEVICE __device__
 #define HOSTDEVICE __host__ __device__
 #define CUDAINLINE __forceinline__
 #define CONST_STATIC_INIT( ... )
 #else
 #define HOST 
+#define DEVICE __device__
 #define HOSTDEVICE 
 #define CUDAINLINE inline 
 #define CONST_STATIC_INIT( ... ) = __VA_ARGS__
+
+// TODO figure out better way
+template <typename T>
+static __device__ typename T tex2DLod(cudaTextureObject_t obj, float x, float y, float level)
+{
+}
+
+template <typename T>
+static __device__ typename T tex2D(cudaTextureObject_t obj, float x, float y)
+{
+}
+
 #endif
 #define NUMBERCHECK(num) if (isnan(num)) { printf("nan detected; %s line %d\n", __FILE__, __LINE__); }
 #define isvalid(num) (!isnan(num) && !isinf(num))
