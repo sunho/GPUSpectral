@@ -217,8 +217,8 @@ HOSTDEVICE CUDAINLINE float3 filmMap(float3 c) {
 
 HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov, float ratio) {
     float2 xy = fragCoord - size / 2.0f;
-    float z = size.y / tan(fov);
-    auto dir = normalize(make_float3(-xy.x, xy.y * ratio, z));
+    float z = (size.y/2.0f) / tan(fov / 2.0f);
+    auto dir = normalize(make_float3(-xy.x, xy.y, z));
     return dir;
 }
 
@@ -265,7 +265,8 @@ HOSTDEVICE CUDAINLINE float ggxMask(float3 wo, float3 wi, float alpha) {
 }
 
 HOSTDEVICE CUDAINLINE float powerHeuristic(int nf, float fPdf, int ng, float gPdf) {
-    float f = nf * fPdf, g = ng * gPdf;
+    float f = nf * fPdf;
+    float g = ng * gPdf;
     return (f * f) / (f * f + g * g);
 }
 
