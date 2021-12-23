@@ -157,7 +157,7 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             else if (obj->pluginType() == "cube") {
                 filename = renderer.assetPath("box.obj");
             } else if (obj->pluginType() == "disk") {
-                filename = renderer.assetPath("rect.obj");
+                filename = renderer.assetPath("disk.obj");
             }
             else {
                 filename = (parentPath / filename).string();
