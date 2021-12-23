@@ -127,6 +127,7 @@ extern "C" __global__ void __raygen__rg() {
 
         RadiancePRD prd;
         prd.weight = make_float3(1.f);
+        prd.directWeight = 1.0f;
         prd.countEmitted = true;
         prd.wasDelta = false;
         prd.done = false;
@@ -151,6 +152,12 @@ extern "C" __global__ void __raygen__rg() {
 
             if (depth >= 17) {
                 break;
+            // russian rullete
+            if (depth > 3) {
+                const float q = fmaxf(0.05f, 1.0f - prd.weight.y);
+                if (randUniform(prd.sampler) < q || 1.0f - q == 0.0f)
+                    break;
+                prd.weight /= 1.0f - q;
             }
 
             if (prd.done || depth >= 17) // TODO RR, variable for depth
