@@ -147,11 +147,15 @@ extern "C" __global__ void __raygen__rg() {
                 1e16f,
                 &prd);
 
-            result += prd.emitted;
-            result += prd.radiance;
+            // TODO do proper filter
+            float cutoff = 10.0f;
+            if (prd.emitted.x < cutoff && prd.emitted.y < cutoff && prd.emitted.z < cutoff) {
+                result += prd.emitted;
+            }
+            if (prd.radiance.x < cutoff && prd.radiance.y < cutoff && prd.radiance.z < cutoff) {
+                result += prd.radiance;
+            }
 
-            if (depth >= 17) {
-                break;
             // russian rullete
             if (depth > 3) {
                 const float q = fmaxf(0.05f, 1.0f - prd.weight.y);
@@ -160,7 +164,7 @@ extern "C" __global__ void __raygen__rg() {
                 prd.weight /= 1.0f - q;
             }
 
-            if (prd.done || depth >= 17) // TODO RR, variable for depth
+            if (prd.done)
                 break;
 
             ray_origin = prd.origin;
@@ -224,10 +228,6 @@ extern "C" __global__ void __closesthit__radiance() {
 
     float3 N = N_0;
     if (dot(N, -ray_dir) < 0) {
-        /*if (!isTransimissionBSDF(rt_data->bsdf.type())) {
-            prd->done = true;
-            return;
-        }*/
         if (rt_data->twofaced) {
             N *= -1.0f;
             SN *= -1.0f;
@@ -258,47 +258,56 @@ extern "C" __global__ void __closesthit__radiance() {
     float NoW = abs(dot(wi, make_float3(0.0f, 0.0f, 1.0f)));
     onb.inverse_transform(wi);
 
-    /*if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
-        prd->done = true;
-        return;
-    }*/
-
-    if (!isvalid(bsdfRes.pdf) || !isvalid(bsdfRes.bsdf) || bsdfRes.pdf == 0.0f) {
-        prd->done = true;
-        return;
-    }
+    BSDFOutput lightBsdfRes;
+    evalBSDF(params.scene.bsdfData,rt_data->bsdf, uv, wo, wL, lightBsdfRes);
 
     float3 direct = make_float3(0.0f);
     if (!bsdfRes.isDelta) {
-        BSDFOutput lightBsdfRes;
-        evalBSDF(params.scene.bsdfData,rt_data->bsdf, uv, wo, wL, lightBsdfRes);
-
-        if ((dot(N, L) > 0.0f && dot(lightRes.normal, -L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
+        if ((dot(N, -ray_dir) > 0 && dot(N, L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
             bool occluded = traceOcclusion(
                 params.scene.tlas,
                 P,
                 L,
-                0.00001f,
+                0.001f,
                 Ldist - 0.01f
             );
             if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
-                float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-                direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
-            }
+                //float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
+                float w = 0.5f;
+                direct +=  w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
+             }
         }
     }
+
     float lightFlag = dot(N, -ray_dir) > 0 ? 1.0f : 0.0f;
-    if (prd->countEmitted) {
-        prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
-    } else {
-        if (prd->wasDelta) {
-            prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
-        } else {
-            direct += rt_data->emission_color * lightFlag * prd->directWeight * prd->weight;
-        }
+    // This is adding term for the last path
+    // we should account for it before termninating by invalid path tests
+    if (!prd->countEmitted && !prd->wasDelta) {
+        direct += prd->directWeight * rt_data->emission_color * lightFlag * prd->weight;
     }
     prd->radiance = direct;
-    prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+
+    // sampled invalid hemisphere becase we used shading normal
+    if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
+        prd->done = true;
+        return;
+    }
+    // light leak from self intersection
+    // TODO this is not working for two faced mesh
+    if (dot(N, -ray_dir) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
+        prd->done = true;
+        return;
+    }
+    // singular bsdf or pdf
+    if (!isvalid(bsdfRes.pdf) || !isvalid(bsdfRes.bsdf) || bsdfRes.pdf == 0.0f) {
+        prd->done = true;
+        return;
+    }
+    if (prd->countEmitted || prd->wasDelta) {
+        prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
+    }
+    //prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+    prd->directWeight = 0.5f;
     prd->countEmitted = false;
     prd->origin = P + 0.001f*faceforward(N, wi, N);
     prd->direction = wi;
