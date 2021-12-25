@@ -6,36 +6,35 @@
 #include <optix_stubs.h>
 
 CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& scene) {
-    fillData(renderer, scene);
-    const size_t vertices_size_in_bytes = positions.size() * sizeof(float4);
+    const size_t vertices_size_in_bytes = scene.sceneData.positions.size() * sizeof(float4);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&devicePositions), vertices_size_in_bytes));
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(devicePositions),
-        positions.data(), vertices_size_in_bytes,
+        scene.sceneData.positions.data(), vertices_size_in_bytes,
         cudaMemcpyHostToDevice
     ));
 
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&deviceNormals), vertices_size_in_bytes));
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(deviceNormals),
-        normals.data(), vertices_size_in_bytes,
+        scene.sceneData.normals.data(), vertices_size_in_bytes,
         cudaMemcpyHostToDevice
     ));
 
-    const size_t uvVerticesSizeInBytes = uvs.size() * sizeof(float2);
+    const size_t uvVerticesSizeInBytes = scene.sceneData.uvs.size() * sizeof(float2);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&deviceUVs), uvVerticesSizeInBytes));
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(deviceUVs),
-        uvs.data(), uvVerticesSizeInBytes,
+        scene.sceneData.uvs.data(), uvVerticesSizeInBytes,
         cudaMemcpyHostToDevice
     ));
 
     CUdeviceptr  d_mat_indices = 0;
-    const size_t mat_indices_size_in_bytes = matIndices.size() * sizeof(uint32_t);
+    const size_t mat_indices_size_in_bytes = scene.sceneData.matIndices.size() * sizeof(uint32_t);
     CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_mat_indices), mat_indices_size_in_bytes));
     CUDA_CHECK(cudaMemcpy(
         reinterpret_cast<void*>(d_mat_indices),
-        matIndices.data(),
+        scene.sceneData.matIndices.data(),
         mat_indices_size_in_bytes,
         cudaMemcpyHostToDevice
     ));
@@ -49,7 +48,7 @@ CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& 
     triangle_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
     triangle_input.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
     triangle_input.triangleArray.vertexStrideInBytes = sizeof(float4);
-    triangle_input.triangleArray.numVertices = static_cast<uint32_t>(positions.size());
+    triangle_input.triangleArray.numVertices = static_cast<uint32_t>(scene.sceneData.positions.size());
     triangle_input.triangleArray.vertexBuffers = &devicePositions;
     triangle_input.triangleArray.flags = triangle_input_flags.data();
     triangle_input.triangleArray.numSbtRecords = scene.materials.size();
@@ -118,27 +117,5 @@ CudaTLAS::CudaTLAS(Renderer& renderer, OptixDeviceContext context, const Scene& 
     else
     {
         gasOutputBuffer = d_buffer_temp_output_gas_and_compacted_size;
-    }
-}
-
-void CudaTLAS::fillData(Renderer& renderer, const Scene& scene) {
-    for (auto& obj : scene.renderObjects) {
-        auto mesh = renderer.getMesh(obj.meshId);
-        for (auto& pos : mesh->positions) {
-            positions.push_back(obj.transform * float4(pos.x, pos.y, pos.z, 1.0f));
-        }
-
-        auto invT = obj.transform.transpose().inverse();
-        for (auto& nor : mesh->normals) {
-            normals.push_back(invT * float4(nor.x, nor.y, nor.z, 0.0f));
-        }
-        
-        for (auto& uv : mesh->uvs) {
-            uvs.push_back(make_float2(uv.x, uv.y));
-        }
-
-        for (size_t i = 0; i < mesh->positions.size() / 3; ++i) {
-            matIndices.push_back(obj.material);
-        }
     }
 }

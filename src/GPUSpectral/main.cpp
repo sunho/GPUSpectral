@@ -14,11 +14,12 @@ std::filesystem::path basePath() {
 
 int main() {
     Renderer renderer(basePath().string());
-    auto scene = loadScene(renderer, "coffee/scene.xml");
+    auto scene = loadScene(renderer, "staircase2/scene.xml");
     RenderConfig config = {
         .width = 1024,
-        .height =1024 
+        .height = 1024 
     }; 
+    scene.prepare(renderer);
     renderer.setScene(scene, config); 
     int totalSamples = 248000;
     int spp = 256;

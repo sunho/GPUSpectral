@@ -20,6 +20,7 @@ struct RadiancePRD {
     SamplerState sampler;
     int          wasDelta;
     int          countEmitted;
+    int          printDebug;
     int          done;
     int          pad;
 };
@@ -132,6 +133,7 @@ extern "C" __global__ void __raygen__rg() {
         prd.wasDelta = false;
         prd.done = false;
         prd.sampler = sampler;
+        prd.printDebug = idx.x == 100 && idx.y == 800;
         prd.direction = ray_direction;
 
         int depth = 0;
@@ -148,7 +150,7 @@ extern "C" __global__ void __raygen__rg() {
                 &prd);
 
             // TODO do proper filter
-            float cutoff = 10.0f;
+            float cutoff = 1000.0f;
             if (prd.emitted.x < cutoff && prd.emitted.y < cutoff && prd.emitted.z < cutoff) {
                 result += prd.emitted;
             }
@@ -244,13 +246,13 @@ extern "C" __global__ void __closesthit__radiance() {
     float3 wo = normalize(onb.transform(-ray_dir));
 
     LightOutput lightRes;
-    sampleLight(params.scene.lightData, sampler, &lightRes);
+    sampleLight(params.scene.lightData, sampler, P, &lightRes);
 
     float3 L = normalize(lightRes.position - P);
     float3 wL = onb.transform(L);
     float Ldist = length(lightRes.position - P);
     const float NoL = fabs(dot(SN, L));
-    float lightPdf = Ldist * Ldist / fabs(dot(-L, lightRes.normal)) * lightRes.pdf;
+    float lightPdf = lightRes.pdf;
 
     BSDFOutput bsdfRes;
     float3 wi;
@@ -272,21 +274,41 @@ extern "C" __global__ void __closesthit__radiance() {
                 Ldist - 0.01f
             );
             if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
-                //float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-                float w = 0.5f;
+                float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
                 direct +=  w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
+                /*if (prd->printDebug && direct.x > 0.5) {
+                    printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
+                    printf("light pdf: %f %f bsdf pdf: %f \n", lightPdf, lightRes.pdf, bsdfRes.pdf);
+                    printf("NEE: %f %f %f\n", direct.x, direct.y, direct.z);
+                    printf("first hit: %d \n", prd->countEmitted);
+                }*/
              }
         }
     }
+
+    /*if (prd->printDebug) {
+        printf("bsdf: %f %f %f\n", bsdfRes.bsdf.x, bsdfRes.bsdf.y, bsdfRes.bsdf.z);
+        printf("light bsdf: %f %f %f\n", lightBsdfRes.bsdf.x, lightBsdfRes.bsdf.y, lightBsdfRes.bsdf.z);
+        printf("first hit: %d \n", prd->countEmitted);
+    }*/
 
     float lightFlag = dot(N, -ray_dir) > 0 ? 1.0f : 0.0f;
     // This is adding term for the last path
     // we should account for it before termninating by invalid path tests
     if (!prd->countEmitted && !prd->wasDelta) {
-        direct += prd->directWeight * rt_data->emission_color * lightFlag * prd->weight;
+        float3 est = prd->directWeight * rt_data->emission_color * lightFlag * prd->weight;
+        direct += est;
+        /*if (prd->printDebug && est.x > 0.5) {
+            printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
+            printf("light pdf: %f bsdf pdf: %f \n", lightPdf, bsdfRes.pdf);
+            printf("BSDF estimate: %f %f %f\n", est.x, est.y, est.z);
+            printf("first hit: %d \n", prd->countEmitted);
+        }*/
     }
     prd->radiance = direct;
-
+    if (prd->countEmitted || prd->wasDelta) {
+        prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
+    }
     // sampled invalid hemisphere becase we used shading normal
     if (dot(wi, N) <= 0.0f && !isTransimissionBSDF(rt_data->bsdf.type())) {
         prd->done = true;
@@ -303,11 +325,8 @@ extern "C" __global__ void __closesthit__radiance() {
         prd->done = true;
         return;
     }
-    if (prd->countEmitted || prd->wasDelta) {
-        prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
-    }
-    //prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
-    prd->directWeight = 0.5f;
+    prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+    //prd->directWeight = 0.5f;
     prd->countEmitted = false;
     prd->origin = P + 0.001f*faceforward(N, wi, N);
     prd->direction = wi;

@@ -1,4 +1,5 @@
 #include "Renderer.h"
+#include <numeric>
 
 #include <filesystem>
 #include <fstream>
@@ -71,6 +72,60 @@ void Renderer::setScene(const Scene& scene, const RenderConfig& config) {
     state = std::make_unique<RenderState>(*this, context, scene, config);
 }
 
+static EnvmapLight createEnvmapLight(Texture& envmap, const Scene& scene) {
+    EnvmapLight outLight = {
+        .envmap = envmap.getTextureObject(),
+        .size = make_float2(envmap.getWidth(), envmap.getHeight()),
+    };
+    const auto bbox = scene.sceneData.getBoundingBox();
+    outLight.center = (bbox.maxs + bbox.mins) / 2.0f;
+    outLight.radius = fmaxf((bbox.maxs - bbox.mins) / 2.0f);
+    float yTotalWeight = 0.0f;
+    std::vector<float> ypdf;
+    std::vector<PieceDist> xDists;
+    for (size_t i = 0; i < envmap.getHeight(); ++i) {
+        std::vector<float> xpdf;
+        float xTotalWeight = 0.0f;
+        for (size_t j = 0; j < envmap.getWidth(); ++j) {
+            float3 tex = make_float3(envmap.texelFetch(j, i));
+            float v = static_cast<float>(i) / envmap.getHeight();
+            float weight = length(tex) * sin(v * M_PI);
+            xTotalWeight += weight;
+            xpdf.push_back(weight);
+        }
+        for (size_t j = 0; j < envmap.getWidth(); ++j) {
+            xpdf[j] /= xTotalWeight;
+        }
+        PieceDist xdist{};
+        xdist.pdfs.allocDevice(xpdf.size());
+        xdist.pdfs.upload(xpdf.data());
+        xDists.push_back(xdist);
+        ypdf.push_back(xTotalWeight);
+        yTotalWeight += xTotalWeight;
+    }
+    for (size_t i = 0; i < envmap.getHeight(); ++i) {
+        ypdf[i] /= yTotalWeight;
+    }
+    PieceDist yDist;
+    yDist.pdfs.allocDevice(ypdf.size());
+    yDist.pdfs.upload(ypdf.data());
+    outLight.xDists.allocDevice(xDists.size());
+    outLight.xDists.upload(xDists.data());
+    outLight.yDist = yDist;
+    return outLight;
+}
+
+static std::vector<float> getTriangleLightWeights(const std::vector<TriangleLight>& lights) {
+    std::vector<float> outTable;
+    for (auto& light : lights) {
+        float3 power = light.getPower();
+        float pp = length(power);
+        outTable.push_back(pp);
+    }
+    return outTable;
+}
+
+
 RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const Scene& scene, const RenderConfig& config) :
     scene(scene), tlas(renderer, context, scene), sbt(renderer, context, tlas, scene) {
 
@@ -93,6 +148,24 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
 
     deviceLightData.triangleLights.allocDevice(scene.triangleLights.size());
     deviceLightData.triangleLights.upload(scene.triangleLights.data());
+
+    auto pdfs = getTriangleLightWeights(scene.triangleLights);
+    if (scene.envMap) {
+        Texture& envMapTex = *renderer.getTexture(scene.envMap);
+        auto envLight = createEnvmapLight(envMapTex, scene);
+        float mediumWeight = length(make_float3(envMapTex.texelFetch(envMapTex.getWidth() / 2, envMapTex.getHeight() / 2)));
+        float power = M_PI * M_PI * 4.0f * envLight.radius * envLight.radius * mediumWeight;
+        pdfs.push_back(power);
+        deviceLightData.envmapLight = envLight;
+    }
+    const float totalPdf = std::accumulate(pdfs.begin(), pdfs.end(), 0.0f);
+    for (size_t i = 0; i < pdfs.size(); ++i) {
+        pdfs[i] /= totalPdf;
+    }
+    PieceDist lightDist{};
+    lightDist.pdfs.allocDevice(pdfs.size());
+    lightDist.pdfs.upload(pdfs.data());
+    deviceLightData.lightDist = lightDist;
     params.scene.lightData = deviceLightData;
 
     {

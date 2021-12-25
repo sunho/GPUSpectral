@@ -203,7 +203,7 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
                     light.positions[0] = make_float3(renderObject.transform * float4(pos0.x, pos0.y, pos0.z, 1.0f));
                     light.positions[1] = make_float3(renderObject.transform * float4(pos1.x, pos1.y, pos1.z, 1.0f));
                     light.positions[2] = make_float3(renderObject.transform * float4(pos2.x, pos2.y, pos2.z, 1.0f));
-                    light.radinace = material.emission;
+                    light.radiance = material.emission;
                     outScene.addTriangleLight(light);
                 }
             }
@@ -240,6 +240,27 @@ TextureId loadTexture(Renderer& renderer, const std::string& path) {
     }
     stbi_image_free(data);
     auto texId = renderer.createTexture(TextureFormat::SRGB8_A8, width, height);
+    renderer.getTexture(texId)->upload(textureData.data());
+    return texId;
+}
+
+TextureId loadHdrTexture(Renderer& renderer, const std::string& path) {
+    int width, height, comp;
+    float* data = stbi_loadf(path.c_str(), &width, &height, &comp, 0);
+    if (!data) {
+        throw std::runtime_error("FUCK");
+    }
+    std::vector<float> textureData;
+    for (int j = height - 1; j >= 0; --j) {
+        for (int i = 0; i < width; ++i) {
+            textureData.push_back(data[(j * width + i) * comp]);
+            textureData.push_back(data[(j * width + i) * comp + 1]);
+            textureData.push_back(data[(j * width + i) * comp + 2]);
+            textureData.push_back(1.0f);
+        }
+    }
+    stbi_image_free(data);
+    auto texId = renderer.createTexture(TextureFormat::RGBA32F, width, height);
     renderer.getTexture(texId)->upload(textureData.data());
     return texId;
 }

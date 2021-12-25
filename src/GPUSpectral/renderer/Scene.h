@@ -13,7 +13,9 @@ struct Camera {
     float3 w;
     float fov;
 };
+class Renderer;
 
+using TextureId = size_t;
 using MaterialHandle = int;
 
 struct RenderObject {
@@ -27,6 +29,30 @@ struct Material {
     bool twofaced = false;
     bool facenormals = false;
     BSDFHandle bsdf;
+};
+
+struct BoundingBox {
+    float3 mins;
+    float3 maxs;
+};
+
+struct SceneData {
+    std::vector<float4> positions;
+    std::vector<float4> normals;
+    std::vector<float2> uvs;
+    std::vector<int> matIndices;
+
+    BoundingBox getBoundingBox() const {
+        BoundingBox outBox = {
+            .mins = make_float3(INFINITY, INFINITY, INFINITY),
+            .maxs = make_float3(-INFINITY, -INFINITY, -INFINITY),
+        };
+        for (auto pos : positions) {
+            outBox.mins = fminf(outBox.mins, make_float3(pos));
+            outBox.maxs = fmaxf(outBox.maxs, make_float3(pos));
+        }
+        return outBox;
+    }
 };
 
 struct Scene {
@@ -63,12 +89,18 @@ struct Scene {
     void addTriangleLight(const TriangleLight& light) {
         triangleLights.push_back(light);
     }
+
+    void prepare(Renderer& renderer);
     
     Camera camera;
     std::vector<RenderObject> renderObjects;
     std::vector<Material> materials;
     std::vector<TriangleLight> triangleLights;
+    TextureId envMap{ 0 };
     #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) std::vector<BSDFNAME> BSDFFIELD##s;
     #include "../kernels/BSDF.inc"
     #undef BSDFDefinition
+
+    // baked data
+    SceneData sceneData;
 };

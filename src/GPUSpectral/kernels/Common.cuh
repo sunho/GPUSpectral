@@ -235,6 +235,15 @@ HOSTDEVICE CUDAINLINE float3 sampleHalf(SamplerState& sampler, float alpha) {
     return make_float3(cos(phi) * sint, sin(phi) * sint, cost);
 }
 
+HOSTDEVICE CUDAINLINE float sphericalPhi(float3 wi) {
+    float p = atan2(wi.y, wi.x);
+    return p < 0.0f ? (p + 2 * M_PI) : p;
+}
+
+HOSTDEVICE CUDAINLINE float sphericalTheta(float3 wi) {
+    return acos(clamp(wi.z,-1.0f, 1.0f));
+}
+
 HOSTDEVICE CUDAINLINE float beckmannD(float3 wh, float alpha) {
     float cos2 = wh.z * wh.z;
     float tan2 = (wh.x * wh.x + wh.y * wh.y) / cos2;
