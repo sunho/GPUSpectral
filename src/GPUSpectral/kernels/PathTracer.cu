@@ -114,7 +114,7 @@ extern "C" __global__ void __raygen__rg() {
     const float3 W = params.camera.W;
     const uint3  idx = optixGetLaunchIndex();
     const int    subframe_index = params.subframeIndex;
-    float imageAspectRatio = 1.0f;
+    float imageAspectRatio = params.width / (float)params.height;
     SamplerState sampler(pcgHash(tea<4>(idx.y * w + idx.x, params.subframeIndex)));
     float3 result = make_float3(0.0f);
     int i = params.spp;
@@ -150,7 +150,7 @@ extern "C" __global__ void __raygen__rg() {
                 &prd);
 
             // TODO do proper filter
-            float cutoff = 1000.0f;
+            float cutoff = 100000.0f;
             if (prd.emitted.x < cutoff && prd.emitted.y < cutoff && prd.emitted.z < cutoff) {
                 result += prd.emitted;
             }
@@ -193,7 +193,12 @@ extern "C" __global__ void __raygen__rg() {
     }
     else {
         params.accumBuffer[image_index] = make_float4(accum_color, 1.0f);
-        params.frameBuffer[image_index] = make_color(filmMap(accum_color));
+        if (params.toneMap) {
+            params.frameBuffer[image_index] = make_color(filmMap(accum_color));
+        }
+        else {
+            params.frameBuffer[image_index] = make_color(gammaCorrect(accum_color));
+        }
     }
 }
 
@@ -205,7 +210,7 @@ extern "C" __global__ void __miss__radiance() {
     if (params.scene.lightData.envmapLight.envmap) {
         prd->radiance = make_float3(0.0, 0.0, 0.0);
         float3 emission = params.scene.lightData.envmapLight.lookupEmission(ray_dir);
-        if (!prd->countEmitted && !prd->wasDelta) {
+        if (params.nee && !prd->countEmitted && !prd->wasDelta) {
             prd->emitted = prd->directWeight * emission * prd->weight;
         }
         else {
@@ -277,25 +282,27 @@ extern "C" __global__ void __closesthit__radiance() {
     evalBSDF(params.scene.bsdfData,rt_data->bsdf, uv, wo, wL, lightBsdfRes);
 
     float3 direct = make_float3(0.0f);
-    if (!bsdfRes.isDelta) {
-        if ((dot(N, -ray_dir) > 0 && dot(N, L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
-            bool occluded = traceOcclusion(
-                params.scene.tlas,
-                P,
-                L,
-                0.001f,
-                Ldist - 0.01f
-            );
-            if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
-                float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-                direct +=  w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
-                /*if (prd->printDebug && direct.x > 0.5) {
-                    printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
-                    printf("light pdf: %f %f bsdf pdf: %f \n", lightPdf, lightRes.pdf, bsdfRes.pdf);
-                    printf("NEE: %f %f %f\n", direct.x, direct.y, direct.z);
-                    printf("first hit: %d \n", prd->countEmitted);
-                }*/
-             }
+    if (params.nee) {
+        if (!bsdfRes.isDelta) {
+            if ((dot(N, -ray_dir) > 0 && dot(N, L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
+                bool occluded = traceOcclusion(
+                    params.scene.tlas,
+                    P,
+                    L,
+                    0.001f,
+                    Ldist - 0.01f
+                );
+                if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
+                    float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
+                    direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
+                    /*if (prd->printDebug && direct.x > 0.5) {
+                        printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
+                        printf("light pdf: %f %f bsdf pdf: %f \n", lightPdf, lightRes.pdf, bsdfRes.pdf);
+                        printf("NEE: %f %f %f\n", direct.x, direct.y, direct.z);
+                        printf("first hit: %d \n", prd->countEmitted);
+                    }*/
+                }
+            }
         }
     }
 
@@ -308,7 +315,7 @@ extern "C" __global__ void __closesthit__radiance() {
     float lightFlag = dot(N, -ray_dir) > 0 ? 1.0f : 0.0f;
     // This is adding term for the last path
     // we should account for it before termninating by invalid path tests
-    if (!prd->countEmitted && !prd->wasDelta) {
+    if (params.nee && !prd->countEmitted && !prd->wasDelta) {
         float3 est = prd->directWeight * rt_data->emission_color * lightFlag * prd->weight;
         direct += est;
         /*if (prd->printDebug && est.x > 0.5) {
@@ -319,7 +326,7 @@ extern "C" __global__ void __closesthit__radiance() {
         }*/
     }
     prd->radiance = direct;
-    if (prd->countEmitted || prd->wasDelta) {
+    if (!params.nee || prd->countEmitted || prd->wasDelta) {
         prd->emitted = prd->weight * rt_data->emission_color * lightFlag;
     }
     // sampled invalid hemisphere becase we used shading normal

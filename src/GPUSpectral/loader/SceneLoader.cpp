@@ -1,4 +1,5 @@
 #include "SceneLoader.h"
+#include "../renderer/Procedural.h"
 #include <tinyparser-mitsuba.h>
 #include <stb_image.h>
 #include <tiny_obj_loader.h>
@@ -7,6 +8,33 @@
 
 #include <fstream>
 #include <filesystem>
+
+static float3 convertRgb(tinyparser_mitsuba::Color color) {
+    return make_float3(color.r, color.g, color.b);
+}
+
+static TextureId loadTexture(Renderer& renderer, Scene& scene, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
+    std::string type = obj.pluginType();
+    if (type == "bitmap") {
+        auto filename = obj.property("filename").getString();
+        auto path = (basepath / filename).string();
+        return loadTexture(renderer, path);
+    }
+    else if (type == "checkerboard") {
+        const uint32_t uSize = obj.property("uscale").getNumber(1);
+        const uint32_t vSize = obj.property("vscale").getNumber(1);
+        const float3 colorOn = convertRgb(obj.property("color0").getColor());
+        const float3 colorOff = convertRgb(obj.property("color1").getColor());
+        const uint32_t texWidth = uSize * 100 * 2; 
+        const uint32_t texHeight = vSize * 100 * 2;
+        Image image = Procedural::createCheckerborad(2*uSize, 2*vSize, texWidth, texHeight, colorOn, colorOff);
+        auto buf = image.pack();
+        auto texId = renderer.createTexture(TextureFormat::RGBA8, texWidth, texHeight);
+        renderer.getTexture(texId)->upload(buf.data());
+        return texId;
+    }
+    assert(false);
+}
 
 static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
     std::string type = obj.pluginType();
@@ -19,9 +47,7 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
         auto bsdf = DiffuseBSDF{ reflectance, 0 };
         for (auto [name, child] : obj.namedChildren()) {
             if (name == "reflectance") {
-                auto filename = child->property("filename").getString();
-                auto path = (basepath / filename).string();
-                auto tex = loadTexture(renderer, path);
+                auto tex = loadTexture(renderer, scene, *child, basepath);
                 bsdf.reflectanceTex = renderer.getTexture(tex)->getTextureObject();
                 break;
             }
@@ -51,9 +77,7 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
         };
         for (auto [name, child] : obj.namedChildren()) {
             if (name == "diffuse_reflectance") {
-                auto filename = child->property("filename").getString();
-                auto path = (basepath / filename).string();
-                auto tex = loadTexture(renderer, path);
+                auto tex = loadTexture(renderer, scene, *child, basepath);
                 bsdf.diffuseTex = renderer.getTexture(tex)->getTextureObject();
                 break;
             }
@@ -70,36 +94,22 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
         material->bsdf = scene.addSmoothConductorBSDF(SmoothConductorBSDF{ ior, 1.0f });
     }
     else if (type == "plastic") {
-        bool found = false;
-        /*for (auto [name, child] : obj.namedChildren()) {
-            if (name == "diffuse_reflectance") {
-                found = true;
-                auto filename = child->property("filename").getString();
-                auto path = (basepath / filename).string();
-                auto tex = loadOrGetTexture(path);
-                material->materialData = DiffuseTextureMaterialData{ tex };
-                break;
+        auto rgb = obj.property("diffuse_reflectance").getColor();
+        float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
+        if (obj.property("ext_ior").isValid()) {
+            if (abs(obj.property("ext_ior").getNumber() - 1.0f) > 0.001f) {
+                std::cout << "unsupported ext ior of plastic" << std::endl;
             }
-        }*/
-        if (!found) {
-            auto rgb = obj.property("diffuse_reflectance").getColor();
-            float3 diffuse = make_float3(rgb.r, rgb.g, rgb.b);
-            if (obj.property("ext_ior").isValid()) {
-                if (abs(obj.property("ext_ior").getNumber() - 1.0f) > 0.001f) {
-                    std::cout << "unsupported ext ior of plastic" << std::endl;
-                }
-            }
-            float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
-            float R0 = (ior - 1.0f) / (ior + 1.0f);
-            R0 *= R0;
-            material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{
-                .diffuse=pow(diffuse,make_float3(1.0f)),
-                .iorIn = ior,
-                .iorOut = 1.0f,
-                .R0 = R0,
-                });
-            //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
+        float ior = obj.property("int_ior").isValid() ? obj.property("int_ior").getNumber() : 1.3f;
+        float R0 = (ior - 1.0f) / (ior + 1.0f);
+        R0 *= R0;
+        material->bsdf = scene.addSmoothPlasticBSDF(SmoothPlasticBSDF{
+            .diffuse=diffuse,
+            .iorIn = ior,
+            .iorOut = 1.0f,
+            .R0 = R0,
+            });
     }
     else if (type == "roughconductor") {
         bool found = false;
@@ -118,7 +128,6 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
                 .alpha = (float)sqrt(2)*alpha,
                 .distribution = GGX
             });
-            //material->color = make_float3(rgb.r, rgb.g, rgb.b);
         }
     }
 
@@ -279,9 +288,11 @@ TextureId loadHdrTexture(Renderer& renderer, const std::string& path) {
     if (path.find(".pfm") != std::string::npos) {
         loadPfm(path, textureData, width, height);
     } else {
-        float* data = stbi_loadf(path.c_str(), &width, &height, &comp, 0);
         stbi_hdr_to_ldr_gamma(1.0f);
         stbi_hdr_to_ldr_scale(1.0f);
+        stbi_ldr_to_hdr_gamma(1.0f);
+        stbi_ldr_to_hdr_scale(1.0f);
+        float* data = stbi_loadf(path.c_str(), &width, &height, &comp, 0);
         if (!data) {
             throw std::runtime_error("FUCK");
         }

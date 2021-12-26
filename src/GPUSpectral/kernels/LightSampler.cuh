@@ -74,15 +74,24 @@ struct EnvmapLight {
         return make_float3(tex2D<float4>(envmap, 0.5, 0.5)) * M_PI * M_PI * 4.0 * radius * radius;
     }
 
+    // Mitsuba env map coordinate system
+    // -Z axis is mapped to u = 0
+    // +X axis is mapped to u = pi /2
+    // and v is 0.0 if y is positive (y axis looks down to the bottom)
+    // When we load texture, y axis is opposite (y axsis looks up to the top)
+    // atan2f(z,x) = 0 when it's at +X axis
+    // u = (phi + pi/2) / (2 * pi)
+    // v = -theta / pi
     HOSTDEVICE CUDAINLINE float3 sample(SamplerState& sampler, float3 pos, LightOutput *output) const {
         float ypdf;
         int y = yDist.sample(sampler, ypdf);
         float xpdf;
         int x = xDists[y].sample(sampler, xpdf);
         float2 uv = make_float2(x, y) / size;
-        float phi = uv.x * 2 * M_PI;
-        float theta = uv.y * M_PI;
+        float phi = uv.x * 2 * M_PI - M_PI/2.0f;
+        float theta = -uv.y * M_PI;
         float3 w = make_float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
+        w = normalize(make_float3(toWorld * make_float4(w, 0.0f)));
         output->position = center + w * radius;
         output->emission = make_float3(tex2D<float4>(envmap, uv.x, uv.y));
         /*printf("e: %f %f %f\n", output->emission.x, output->emission.y, output->emission.z);
@@ -93,10 +102,10 @@ struct EnvmapLight {
 
     HOSTDEVICE CUDAINLINE float3 lookupEmission(float3 wi) const {
         wi = normalize(make_float3(toWorldInv * make_float4(wi, 0.0f)));
-        float2 uv = make_float2(atan2(wi.x, -wi.z) / (2.0f * M_PI),
+        float2 uv = make_float2(atan2f(wi.z, wi.x) / (2.0f * M_PI),
             acos(clamp(wi.y, -1.0f, 1.0f))/ M_PI);
-        uv -= floor(uv);
-        return make_float3(tex2D<float4>(envmap, uv.x, uv.y));
+        uv.y *= -1;
+        return make_float3(tex2D<float4>(envmap, uv.x + 0.25f, uv.y));
     }
 };
 

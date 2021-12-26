@@ -17,6 +17,8 @@
 struct RenderConfig {
     int width;
     int height;
+    bool toneMap{ false };
+    bool nee{ true };
 };
 
 using MeshId = size_t;

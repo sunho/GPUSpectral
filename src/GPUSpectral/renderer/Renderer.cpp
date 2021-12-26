@@ -138,6 +138,8 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     params.camera.fov = scene.camera.fov;
     params.width = config.width;
     params.height = config.height;
+    params.toneMap = config.toneMap;
+    params.nee = config.nee;
 
     CUDA_CHECK(cudaMalloc(
         reinterpret_cast<void**>(&params.accumBuffer),

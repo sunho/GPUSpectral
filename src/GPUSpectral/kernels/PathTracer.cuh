@@ -45,6 +45,8 @@ struct Params
     unsigned int width;
     unsigned int height;
     unsigned int spp;
+    unsigned int toneMap;
+    unsigned int nee;
 
     GPUCamera camera;
     GPUScene scene;

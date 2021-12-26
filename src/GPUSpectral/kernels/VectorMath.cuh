@@ -2630,7 +2630,7 @@ HOSTDEVICE CUDAINLINE float3 gammaCorrect(float3 c) {
 __forceinline__ __device__ uchar4 make_color(const float3& c)
 {
     // first apply gamma, then convert to unsigned char
-    float3 srgb = (clamp(c, 0.0f, 1.0f));
+    float3 srgb = clamp(c, 0.0f, 1.0f);
     return make_uchar4(quantizeUnsigned8Bits(srgb.x), quantizeUnsigned8Bits(srgb.y), quantizeUnsigned8Bits(srgb.z), 255u);
 }
 __forceinline__ __device__ uchar4 make_color(const float4& c)
