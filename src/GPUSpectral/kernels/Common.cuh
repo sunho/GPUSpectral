@@ -211,13 +211,14 @@ HOSTDEVICE CUDAINLINE float3 reinhard(float3 c) {
 }
 
 HOSTDEVICE CUDAINLINE float3 filmMap(float3 c) {
+    c *= 1.0f;
     float3 x = fmaxf(make_float3(0.0f), c - 0.004f);
     return (x * (6.2f * x + 0.5f)) / (x * (6.2f * x + 1.7f) + 0.06f);
 }
 
 HOSTDEVICE CUDAINLINE float3 rayDir(float2 size, float2 fragCoord, float fov, float ratio) {
     float2 xy = fragCoord - size / 2.0f;
-    float z = (size.y/2.0f) / tan(fov / 2.0f);
+    float z = (fmaxf(size.x,size.y)/2.0f) / tan(fov / 2.0f);
     auto dir = normalize(make_float3(-xy.x, xy.y, z));
     return dir;
 }
