@@ -11,8 +11,12 @@ set(SOURCE
   renderer/CudaTLAS.cpp
   renderer/Texture.h
   renderer/Texture.cpp
+  renderer/Image.h
+  renderer/Image.cpp
   renderer/Scene.h
   renderer/Scene.cpp
+  renderer/Procedural.h
+  renderer/Procedural.cpp
   utils/CudaUtil.h
   main.cpp
 )
