@@ -299,8 +299,7 @@ struct SmoothPlasticBSDF {
             float Fro = fresnel(fabs(wi.z), no, nt);
             float Ri = internalScatterEscapeFraction(R0, no, nt);
             float eta = no / nt;
-            float3 d = diffuse * eta * eta *(1.0f - Fri) * (1.0f - Fro) / (M_PI * (1.0f - diffuse * Ri));
-            output.bsdf = d + Fri * make_float3(1.0f / abs(wo.z));
+            output.bsdf = Fri * make_float3(1.0f / abs(wo.z));
             output.pdf = Fri;
             output.isDelta = true;
             NUMBERCHECK(output.bsdf)
