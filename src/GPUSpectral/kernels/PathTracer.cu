@@ -199,10 +199,23 @@ extern "C" __global__ void __raygen__rg() {
 
 extern "C" __global__ void __miss__radiance() {
     MissData* rt_data  = reinterpret_cast<MissData*>( optixGetSbtDataPointer() );
+    const float3 ray_dir         = optixGetWorldRayDirection();
     RadiancePRD* prd = getPRD();
 
-    prd->radiance = make_float3(0.0, 0.0, 0.0);
-    prd->emitted = make_float3(0.0f);
+    if (params.scene.lightData.envmapLight.envmap) {
+        prd->radiance = make_float3(0.0, 0.0, 0.0);
+        float3 emission = params.scene.lightData.envmapLight.lookupEmission(ray_dir);
+        if (!prd->countEmitted && !prd->wasDelta) {
+            prd->emitted = prd->directWeight * emission * prd->weight;
+        }
+        else {
+            prd->emitted = emission * prd->weight;
+        }
+    }
+    else {
+        prd->radiance = make_float3(0.0, 0.0, 0.0);
+        prd->emitted = make_float3(0.0f);
+    }
     prd->done      = true;
 }
 

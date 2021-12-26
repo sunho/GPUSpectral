@@ -153,6 +153,8 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     if (scene.envMap) {
         Texture& envMapTex = *renderer.getTexture(scene.envMap);
         auto envLight = createEnvmapLight(envMapTex, scene);
+        envLight.toWorld = scene.envMapTransform;
+        envLight.toWorldInv = scene.envMapTransform.inverse();
         float mediumWeight = length(make_float3(envMapTex.texelFetch(envMapTex.getWidth() / 2, envMapTex.getHeight() / 2)));
         float power = M_PI * M_PI * 4.0f * envLight.radius * envLight.radius * mediumWeight;
         pdfs.push_back(power);

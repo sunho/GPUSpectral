@@ -67,6 +67,8 @@ struct EnvmapLight {
     float radius;
     PieceDist yDist;
     Array<PieceDist> xDists;
+    mat4 toWorld;
+    mat4 toWorldInv;
 
     HOSTDEVICE CUDAINLINE float3 getPower() const {
         return make_float3(tex2D<float4>(envmap, 0.5, 0.5)) * M_PI * M_PI * 4.0 * radius * radius;
@@ -83,15 +85,18 @@ struct EnvmapLight {
         float3 w = make_float3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
         output->position = center + w * radius;
         output->emission = make_float3(tex2D<float4>(envmap, uv.x, uv.y));
+        /*printf("e: %f %f %f\n", output->emission.x, output->emission.y, output->emission.z);
+        printf("p: %f %f %f\n", output->position.x, output->position.y, output->position.z);
+        printf("pdf: %f %f\n", xpdf, ypdf);*/
         output->pdf = ypdf * xpdf / (fabs(2.0f * M_PI * M_PI* sin(theta))); // jacobian 2 * pi^2 from scaling, sin from unifrom sphere mapping
     }
 
     HOSTDEVICE CUDAINLINE float3 lookupEmission(float3 wi) const {
-        float phi = sphericalPhi(wi);
-        float theta = sphericalTheta(wi);
-        float u = phi / (2*M_PI);
-        float v = theta / M_PI;
-        return make_float3(tex2D<float4>(envmap, u, v));
+        wi = normalize(make_float3(toWorldInv * make_float4(wi, 0.0f)));
+        float2 uv = make_float2(atan2(wi.x, -wi.z) / (2.0f * M_PI),
+            acos(clamp(wi.y, -1.0f, 1.0f))/ M_PI);
+        uv -= floor(uv);
+        return make_float3(tex2D<float4>(envmap, uv.x, uv.y));
     }
 };
 

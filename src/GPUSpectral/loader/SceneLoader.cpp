@@ -5,6 +5,7 @@
 #include <iostream>
 #include <assert.h>
 
+#include <fstream>
 #include <filesystem>
 
 static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, tinyparser_mitsuba::Object& obj, const std::filesystem::path& basepath) {
@@ -128,6 +129,23 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
     }
 }
 
+void loadPfm(const std::string& path, std::vector<float>& data, int& width, int& height) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open file");
+    }
+    std::string header;
+    file >> header;
+    if (header != "PF") {
+        throw std::runtime_error("invalid pfm file");
+    }
+    file >> width >> height;
+    data.resize(width * height * 4);
+    for (uint32_t i = 0; i < width * height; ++i) {
+        file >> data[i * 4 + 0] >> data[i * 4 + 1] >> data[i * 4 + 2];
+    }
+}
+
 Scene loadScene(Renderer& renderer, const std::string& path) {
     std::unordered_map<std::string, int> meshCache;
     auto loadOrGetMesh = [&](const std::string& objPath) {
@@ -181,9 +199,11 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
                 if (child->type() == tinyparser_mitsuba::OT_BSDF) {
                     loadMaterial(renderer, outScene, &material, *child, parentPath);
                 } else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
-                    auto col = child->property("radiance").getColor();
-                    material.emission = make_float3(col.r, col.g, col.b);
-                    emitting = true;
+                    if (child->pluginType() == "area") {
+                        auto col = child->property("radiance").getColor();
+                        material.emission = make_float3(col.r, col.g, col.b);
+                        emitting = true;
+                    }
                 }
             }
 
@@ -218,6 +238,15 @@ Scene loadScene(Renderer& renderer, const std::string& path) {
             outScene.camera.v = make_float3(matrix[1][0], matrix[1][1], matrix[1][2]);
             outScene.camera.w = make_float3(matrix[2][0], matrix[2][1], matrix[2][2]);
         }
+        else if (obj->type() == tinyparser_mitsuba::OT_EMITTER) {
+            auto filename = obj->property("filename").getString();
+            auto path = (parentPath / filename).string();
+            auto tex = loadHdrTexture(renderer, path);
+            auto transform = obj->property("to_world").getTransform();
+            auto matrix = mat4(transform.matrix.data());
+            outScene.envMap = tex;
+            outScene.envMapTransform = matrix;
+        }
     }
     return outScene;
 }
@@ -246,20 +275,26 @@ TextureId loadTexture(Renderer& renderer, const std::string& path) {
 
 TextureId loadHdrTexture(Renderer& renderer, const std::string& path) {
     int width, height, comp;
-    float* data = stbi_loadf(path.c_str(), &width, &height, &comp, 0);
-    if (!data) {
-        throw std::runtime_error("FUCK");
-    }
     std::vector<float> textureData;
-    for (int j = height - 1; j >= 0; --j) {
-        for (int i = 0; i < width; ++i) {
-            textureData.push_back(data[(j * width + i) * comp]);
-            textureData.push_back(data[(j * width + i) * comp + 1]);
-            textureData.push_back(data[(j * width + i) * comp + 2]);
-            textureData.push_back(1.0f);
+    if (path.find(".pfm") != std::string::npos) {
+        loadPfm(path, textureData, width, height);
+    } else {
+        float* data = stbi_loadf(path.c_str(), &width, &height, &comp, 0);
+        stbi_hdr_to_ldr_gamma(1.0f);
+        stbi_hdr_to_ldr_scale(1.0f);
+        if (!data) {
+            throw std::runtime_error("FUCK");
         }
+        for (int j = height - 1; j >= 0; --j) {
+            for (int i = 0; i < width; ++i) {
+                textureData.push_back(data[(j * width + i) * comp]);
+                textureData.push_back(data[(j * width + i) * comp + 1]);
+                textureData.push_back(data[(j * width + i) * comp + 2]);
+                textureData.push_back(1.0f);
+            }
+        }
+        stbi_image_free(data);
     }
-    stbi_image_free(data);
     auto texId = renderer.createTexture(TextureFormat::RGBA32F, width, height);
     renderer.getTexture(texId)->upload(textureData.data());
     return texId;

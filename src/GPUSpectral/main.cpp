@@ -14,7 +14,7 @@ std::filesystem::path basePath() {
 
 int main() {
     Renderer renderer(basePath().string());
-    auto scene = loadScene(renderer, "staircase2/scene.xml");
+    auto scene = loadScene(renderer, "teapot/scene.xml");
     RenderConfig config = {
         .width = 1024,
         .height = 1024 

@@ -43,7 +43,7 @@ Texture::Texture(Renderer& renderer, TextureFormat format, uint32_t width, uint3
     texDesc.addressMode[0] = cudaAddressModeWrap;
     texDesc.addressMode[1] = cudaAddressModeWrap;
     texDesc.filterMode = cudaFilterModeLinear;
-    texDesc.readMode = cudaReadModeNormalizedFloat;
+    texDesc.readMode = format == TextureFormat::RGBA32F ? cudaReadModeElementType : cudaReadModeNormalizedFloat;
     texDesc.sRGB = format == TextureFormat::SRGB8_A8 ? 1 : 0;
     texDesc.normalizedCoords = 1;
 

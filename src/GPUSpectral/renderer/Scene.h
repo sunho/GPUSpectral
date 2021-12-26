@@ -97,6 +97,7 @@ struct Scene {
     std::vector<Material> materials;
     std::vector<TriangleLight> triangleLights;
     TextureId envMap{ 0 };
+    mat4 envMapTransform;
     #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) std::vector<BSDFNAME> BSDFFIELD##s;
     #include "../kernels/BSDF.inc"
     #undef BSDFDefinition
