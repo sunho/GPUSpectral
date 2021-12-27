@@ -14,11 +14,11 @@ std::filesystem::path basePath() {
 
 int main() {
     Renderer renderer(basePath().string());
-    auto scene = loadScene(renderer, "cornell-box/scene.xml");
+    auto scene = loadScene(renderer, "staircase2/scene.xml");
     RenderConfig config = {
         .width = 1024,
         .height = 1024,
-        .toneMap = false,
+        .toneMap = true,
         .nee = true
     }; 
     scene.prepare(renderer);

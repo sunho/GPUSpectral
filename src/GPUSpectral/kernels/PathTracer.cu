@@ -150,7 +150,7 @@ extern "C" __global__ void __raygen__rg() {
                 &prd);
 
             // TODO do proper filter
-            float cutoff = 100000.0f;
+            float cutoff = 10000.0f;
             if (prd.emitted.x < cutoff && prd.emitted.y < cutoff && prd.emitted.z < cutoff) {
                 result += prd.emitted;
             }
@@ -282,6 +282,7 @@ extern "C" __global__ void __closesthit__radiance() {
     evalBSDF(params.scene.bsdfData,rt_data->bsdf, uv, wo, wL, lightBsdfRes);
 
     float3 direct = make_float3(0.0f);
+    bool neeDone = false;
     if (params.nee) {
         if (!bsdfRes.isDelta) {
             if ((dot(N, -ray_dir) > 0 && dot(N, L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
@@ -295,10 +296,11 @@ extern "C" __global__ void __closesthit__radiance() {
                 if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
                     float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
                     direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
+                    neeDone = true;
                     /*if (direct.x > 100.0) {
                         printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
                         printf("light pdf: %f %f bsdf pdf: %f \n", lightPdf, lightRes.pdf, bsdfRes.pdf);
-                        printf("weight: %f\n", prd->weight.x);
+                        printf("bsdf: %f %f %f\n", lightBsdfRes.bsdf.x, lightBsdfRes.bsdf.y, lightBsdfRes.bsdf.z);
                         printf("NEE: %f %f %f\n", direct.x, direct.y, direct.z);
                         printf("first hit: %d \n", prd->countEmitted);
                     }*/
@@ -346,7 +348,12 @@ extern "C" __global__ void __closesthit__radiance() {
         prd->done = true;
         return;
     }
-    prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+    if (neeDone) {
+        prd->directWeight = powerHeuristic(1, bsdfRes.pdf, 1, lightPdf);
+    }
+    else {
+        prd->directWeight = 1.0f;
+    }
     //prd->directWeight = 0.5f;
     prd->countEmitted = false;
     prd->origin = P + 0.001f*faceforward(N, wi, N);
