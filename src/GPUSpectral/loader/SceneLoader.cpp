@@ -112,23 +112,20 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             });
     }
     else if (type == "roughconductor") {
-        bool found = false;
-        if (!found) {
-            auto eta_ = obj.property("eta").getColor();
-            auto k_ = obj.property("k").getColor();
-            auto reflectance_ = obj.property("specular_reflectance").getColor();
-            float3 eta = make_float3(eta_.r, eta_.g, eta_.b);
-            float3 k = make_float3(k_.r, k_.g, k_.b);
-            float3 reflectance = make_float3(reflectance_.r, reflectance_.g, reflectance_.b);
-            float alpha = obj.property("alpha").getNumber();
-            material->bsdf = scene.addRoughConductorBSDF(RoughConductorBSDF{
-                .eta = eta,
-                .k = k,
-                .reflectance = reflectance,
-                .alpha = (float)sqrt(2)*alpha,
-                .distribution = GGX
-            });
-        }
+        auto eta_ = obj.property("eta").getColor();
+        auto k_ = obj.property("k").getColor();
+        auto reflectance_ = obj.property("specular_reflectance").getColor();
+        float3 eta = make_float3(eta_.r, eta_.g, eta_.b);
+        float3 k = make_float3(k_.r, k_.g, k_.b);
+        float3 reflectance = make_float3(reflectance_.r, reflectance_.g, reflectance_.b);
+        float alpha = obj.property("alpha").getNumber();
+        material->bsdf = scene.addRoughConductorBSDF(RoughConductorBSDF{
+            .eta = eta,
+            .k = k,
+            .reflectance = reflectance,
+            .alpha = (float)sqrt(2)*alpha,
+            .distribution = GGX
+        });
     }
 
     for (auto child : obj.anonymousChildren()) {

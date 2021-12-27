@@ -14,12 +14,12 @@ std::filesystem::path basePath() {
 
 int main() {
     Renderer renderer(basePath().string());
-    auto scene = loadScene(renderer, "teapot/scene.xml");
+    auto scene = loadScene(renderer, "cornell-box/scene.xml");
     RenderConfig config = {
-        .width = 1280,
-        .height = 720,
-        .toneMap = true,
-        .nee = false
+        .width = 1024,
+        .height = 1024,
+        .toneMap = false,
+        .nee = true
     }; 
     scene.prepare(renderer);
     renderer.setScene(scene, config); 

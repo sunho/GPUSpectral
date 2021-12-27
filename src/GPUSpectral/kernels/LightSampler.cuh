@@ -37,7 +37,7 @@ struct TriangleLight {
         float3 l = normalize(lightPos - pos);
         output->pdf = ldist * ldist / (fabs(dot(-l, normal)) * A);
         output->position = lightPos;
-        output->emission = radiance;
+        output->emission = radiance * float(dot(-l, normal) > 0);
     }
 };
 

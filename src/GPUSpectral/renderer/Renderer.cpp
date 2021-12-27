@@ -152,6 +152,7 @@ RenderState::RenderState(Renderer& renderer, OptixDeviceContext context, const S
     deviceLightData.triangleLights.upload(scene.triangleLights.data());
 
     auto pdfs = getTriangleLightWeights(scene.triangleLights);
+    deviceLightData.envmapLight.envmap = 0;
     if (scene.envMap) {
         Texture& envMapTex = *renderer.getTexture(scene.envMap);
         auto envLight = createEnvmapLight(envMapTex, scene);

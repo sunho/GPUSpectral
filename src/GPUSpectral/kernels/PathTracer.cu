@@ -160,10 +160,10 @@ extern "C" __global__ void __raygen__rg() {
 
             // russian rullete
             if (depth > 3) {
-                const float q = fmaxf(0.05f, 1.0f - prd.weight.y);
-                if (randUniform(prd.sampler) < q || 1.0f - q == 0.0f)
+                const float q = clamp(fmaxf(prd.weight), 0.05f, 1.0f);
+                if (randUniform(prd.sampler) > q || q != 0.0f)
                     break;
-                prd.weight /= 1.0f - q;
+                prd.weight /= q;
             }
 
             if (prd.done)
@@ -295,9 +295,10 @@ extern "C" __global__ void __closesthit__radiance() {
                 if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
                     float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
                     direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
-                    /*if (prd->printDebug && direct.x > 0.5) {
+                    /*if (direct.x > 100.0) {
                         printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
                         printf("light pdf: %f %f bsdf pdf: %f \n", lightPdf, lightRes.pdf, bsdfRes.pdf);
+                        printf("weight: %f\n", prd->weight.x);
                         printf("NEE: %f %f %f\n", direct.x, direct.y, direct.z);
                         printf("first hit: %d \n", prd->countEmitted);
                     }*/
