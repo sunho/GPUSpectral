@@ -8,4 +8,3 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
 
 add_subdirectory(external)
 add_subdirectory(src/VKGIRenderer)
-add_subdirectory(demo)

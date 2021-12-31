@@ -34,7 +34,6 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
                     .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
-                    .add_required_extension(VK_AMD_SHADER_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
                     .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
 

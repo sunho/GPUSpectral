@@ -53,21 +53,23 @@ set(SOURCE_LIST
     Mesh.h
     Mesh.cpp
     BSDF.inc
+    main.cpp
 )
 
+
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
-add_library(VKGIRenderer ${SOURCE_LIST}) 
-target_link_libraries(VKGIRenderer PUBLIC TracyClient tinyparser_mitsuba VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader radeonrays)
-target_link_libraries(VKGIRenderer PRIVATE spirv-cross-core shaderc)
+add_executable(VKGIRenderer ${SOURCE_LIST}) 
+target_link_libraries(VKGIRenderer PUBLIC fmt spirv-cross-core TracyClient tinyparser_mitsuba VulkanMemoryAllocator vk-bootstrap::vk-bootstrap glfw glm Vulkan tinygltf tinyobjloader)
+set_property(TARGET VKGIRenderer PROPERTY INCLUDE_DIRECTORIES  ${CMAKE_SOURCE_DIR}/external/SPIRV-Cross)
 target_include_directories(VKGIRenderer PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..)
 
 add_executable(embedfile utils/EmbedFile.c)
-
-function(add_shader TARGET SHADENAME SHADER)
+set(SHADER_BINARIES "")
+function(add_shader TARGET SHADER)
     find_program(GLSLC glslc)
 
-	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/renderer/shaders/${SHADER})
-    set(current-output-path ${CMAKE_BINARY_DIR}/renderer/shaders/${SHADER}.spv)
+	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/${SHADER})
+    set(current-output-path ${CMAKE_BINARY_DIR}/shaders/${SHADER}.spv)
 
 	# Add a custom command to compile GLSL to SPIR-V.
 	get_filename_component(current-output-dir ${current-output-path} DIRECTORY)
@@ -75,22 +77,31 @@ function(add_shader TARGET SHADENAME SHADER)
 	add_custom_command(
 		OUTPUT ${current-output-path}
 		COMMAND ${GLSLC} --target-env=vulkan1.2 -o ${current-output-path} ${current-shader-path}
+        COMMAND ${CMAKE_COMMAND} -E echo "COMIPLE SHADRS"
 		DEPENDS ${current-shader-path}
 		IMPLICIT_DEPENDS CXX ${current-shader-path}
 		VERBATIM)
 
 	# Make sure our native build depends on this output.
 	set_source_files_properties(${current-output-path} PROPERTIES GENERATED TRUE)
-
-    set(COUT ${CMAKE_CURRENT_BINARY_DIR}/${SHADENAME}.c)
-    set(CHEAD ${CMAKE_CURRENT_BINARY_DIR}/renderer/shaders/${SHADENAME}.h)
-    add_custom_command(
-        OUTPUT ${COUT}
-        COMMAND embedfile ${SHADENAME} ${current-output-path}
-        DEPENDS ${current-output-path})
-    target_sources(${TARGET} PRIVATE ${COUT})
-
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/renderer/shaders)
-    file(WRITE ${CHEAD} "#pragma once\nextern \"C\" const char ${SHADENAME}[]; extern \"C\" const size_t ${SHADENAME}Size;")
-
+    set(SHADER_BINARIES ${SHADER_BINARIES} ${current-output-path} PARENT_SCOPE)
 endfunction(add_shader)
+
+add_shader(VKGIRenderer DDGIProbeRayShade.comp)
+
+add_custom_target(shader_binary DEPENDS ${SHADER_BINARIES})
+message("shader: ${SHADER_BINARIES}")
+add_dependencies(VKGIRenderer shader_binary)
+
+add_custom_command(
+    TARGET VKGIRenderer
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets "$<TARGET_FILE_DIR:VKGIRenderer>/assets"
+)
+
+add_custom_command(
+    TARGET VKGIRenderer
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/shaders "$<TARGET_FILE_DIR:VKGIRenderer>/assets/shaders"
+    COMMAND ${CMAKE_COMMAND} -E echo "COPY SHADERS to lib"
+)

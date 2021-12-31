@@ -3,6 +3,7 @@
 #include <VKGIRenderer/utils/HalfFloat/umHalf.h>
 #include <tiny_gltf.h>
 #include <iostream>
+#include <fstream>
 
 #include "../Engine.h"
 #include "../Scene.h"
@@ -24,15 +25,26 @@ Renderer::Renderer(Engine& engine, Window* window)
     registerPrograms();
 }
 
+static std::vector<uint32_t> loadCompiledShader(const std::string& path) {
+    std::ifstream cacheFile(path, std::ifstream::binary);
+    if (cacheFile.is_open()) {
+        std::vector<uint8_t> cacheFileContent((std::istreambuf_iterator<char>(cacheFile)), std::istreambuf_iterator<char>());
+        CompiledCode compiledCode(cacheFileContent.size() / 4);
+        memcpy(compiledCode.data(), cacheFileContent.data(), cacheFileContent.size());
+        return compiledCode;
+    }
+    throw std::runtime_error("Could not open shader file: " + path);
+}
+
 Handle<HwProgram> Renderer::loadComputeShader(const std::string& filename) {
-    auto code = driver.compileCode(engine.assetPath(filename).c_str());
+    auto code = loadCompiledShader(engine.assetPath(filename)+".spv");
     Program prog{ code };
     return driver.createProgram(prog);
 }
 
 Handle<HwProgram> Renderer::loadGraphicsShader(const std::string& vertFilename, const std::string& fragFilename) {
-    auto vertCode = driver.compileCode(engine.assetPath(vertFilename).c_str());
-    auto fragCode = driver.compileCode(engine.assetPath(fragFilename).c_str());
+    auto vertCode = loadCompiledShader(engine.assetPath(vertFilename) + ".spv");
+    auto fragCode = loadCompiledShader(engine.assetPath(fragFilename) + ".spv");
     Program prog{ vertCode, fragCode };
     return driver.createProgram(prog);
 }
@@ -50,19 +62,7 @@ Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
 }
 
 void Renderer::registerPrograms() {
-    registerGraphicsShader("ForwardPhong", "shaders/ForwardPhong.vert", "shaders/ForwardPhong.frag");
-    registerGraphicsShader("DisplayTexture", "shaders/DisplayTexture.vert", "shaders/DisplayTexture.frag");
-    registerGraphicsShader("ToneMap", "shaders/ToneMap.vert", "shaders/ToneMap.frag");
-    registerGraphicsShader("ForwardRT", "shaders/ForwardRT.vert", "shaders/ForwardRT.frag");
-    registerComputeShader("DDGIProbeRayGen", "shaders/DDGIProbeRayGen.comp");
     registerComputeShader("DDGIProbeRayShade", "shaders/DDGIProbeRayShade.comp");
-    registerGraphicsShader("PointShadowGen", "shaders/PointShadowGen.vert", "shaders/PointShadowGen.frag");
-    registerGraphicsShader("GBufferGen", "shaders/GBufferGen.vert", "shaders/GBufferGen.frag");
-    registerGraphicsShader("DeferredRender", "shaders/DeferredRender.vert", "shaders/DeferredRender.frag");
-    registerGraphicsShader("DDGIShade", "shaders/DDGIShade.vert", "shaders/DDGIShade.frag");
-    registerComputeShader("DDGIProbeDepthUpdate", "shaders/DDGIProbeDepthUpdate.comp");
-    registerComputeShader("DDGIProbeIrradianceUpdate", "shaders/DDGIProbeIrradianceUpdate.comp");
-    registerGraphicsShader("ProbeDebug", "shaders/ProbeDebug.vert", "shaders/ProbeDebug.frag");
 }
 
 Renderer::~Renderer() {

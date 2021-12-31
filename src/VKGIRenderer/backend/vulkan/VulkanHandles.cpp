@@ -1,5 +1,5 @@
 #include "VulkanHandles.h"
-#include <spirv_cross/spirv_cross.hpp>
+#include <spirv_cross.hpp>
 
 inline static VkShaderModule createShaderModule(VulkanDevice& device, const uint32_t* code,
     uint32_t codeSize) {

@@ -14,6 +14,7 @@
 #define DEPTH_MAP_TEX_SIZE 26
 #define RAYS_PER_PROBE 64
 
+
 struct Vertex {
     vec3 pos;
     vec3 normal;

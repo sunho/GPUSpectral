@@ -16,7 +16,7 @@
 #include <filesystem>
 using namespace VKGIRenderer;
 
-void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
+static void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
     std::string warn;
     std::string err;
     std::vector<tinyobj::shape_t> shapes;
@@ -113,7 +113,7 @@ void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
 }
 
 
-Handle<HwTexture> loadTexture(Renderer& renderer, const std::string& path) {
+static Handle<HwTexture> loadTexture(Renderer& renderer, const std::string& path) {
     int width, height, comp;
     unsigned char* data =
         stbi_load(path.c_str(), &width, &height, &comp, 0);
@@ -309,7 +309,7 @@ void loadPfm(const std::string& path, std::vector<float>& data, int& width, int&
     }
 }
 
-Scene loadScene(Engine& engine, Renderer& renderer, const std::string& path) {
+Scene VKGIRenderer::loadScene(Engine& engine, Renderer& renderer, const std::string& path) {
     std::unordered_map<std::string, Mesh*> meshCache;
     auto loadOrGetMesh = [&](const std::string& objPath) {
         if (meshCache.find(objPath) != meshCache.end()) {

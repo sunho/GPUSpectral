@@ -59,7 +59,7 @@ int main() {
    */
  
 
-    auto scene = loadScene(engine, *renderer, (basePath() / "assets" / "cornell-box" / "scene.xml").string());
+    auto scene = loadScene(engine, *renderer, (basePath() / "assets" / "scenes" / "cornell-box" / "scene.xml").string());
     glm::vec3 cameraPos = glm::vec3(0.0, 1.0, 13.0f);
     glm::vec3 origin = glm::vec3(0.0, 1.0, 0.0);
 

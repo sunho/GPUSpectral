@@ -1,7 +1,6 @@
 #include "VulkanDriver.h"
 
-#include <shaderc/shaderc.hpp>
-#include <spirv-tools/libspirv.hpp>
+#include <fmt/format.h>
 #include <GLFW/glfw3.h>
 #include <VKGIRenderer/utils/Log.h>
 #include <VKGIRenderer/utils/Util.h>
@@ -313,7 +312,7 @@ void VulkanDriver::setProfileSectionName(const char* name) {
 }
 
 std::string VKGIRenderer::VulkanDriver::profileZoneName(std::string zoneName) {
-    return std::format("[{}] {}", context.profileSectionName, zoneName);
+    return fmt::format("[{}] {}", context.profileSectionName, zoneName);
 }
 
 static inline void preprocessShader(std::string& preprocessedSource, const std::string& source, const std::filesystem::path& basePath, uint64_t& hash) {
@@ -340,7 +339,7 @@ static inline void preprocessShader(std::string& preprocessedSource, const std::
     }
 }
 
-CompiledCode VulkanDriver::compileCode(const char* path) {
+/*CompiledCode VulkanDriver::compileCode(const char* path) {
     shaderc::SpvCompilationResult result;
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
@@ -394,9 +393,9 @@ CompiledCode VulkanDriver::compileCode(const char* path) {
     {
         Log("validation error");
         throw std::runtime_error("shader validation error");
-    }*/
+    }
     return compiledCode;
-}
+}*/
 
 void VulkanDriver::destroyVertexBuffer(VertexBufferHandle handle) {
     destructHandle<VulkanVertexBuffer>(handle);

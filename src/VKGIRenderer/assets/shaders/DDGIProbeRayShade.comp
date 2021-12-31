@@ -18,6 +18,7 @@ layout(std140, binding = 0) uniform _SceneBuffer {
     SceneBuffer sceneBuffer;
 };
 
+
 layout(std430,set=1,binding = 0) buffer VertexPositionBuffer {
     float position[];
 } vertexPositionBuffer[MAX_MESH_COUNT];
