@@ -6,7 +6,7 @@
 #include <memory>
 #include <filesystem>
 
-#include "Entity.h"
+#include "Mesh.h"
 #include "renderer/Renderer.h"
 #include "Scene.h"
 #include "Window.h"
@@ -19,11 +19,8 @@ class Engine {
     ~Engine();
 
     Window *createWindow(size_t width, size_t height);
-    Entity *createEntity();
     Mesh *createMesh();
     Renderer *createRenderer(Window *window);
-    Scene *createScene(Renderer *renderer);
-    Material *createMaterial();
     std::string assetPath(const std::string& assetName);
     std::filesystem::path getBasePath() { return basePath;  }
 
@@ -32,9 +29,6 @@ class Engine {
   private:
     ResourceList<Window> windows;
     ResourceList<Renderer> renderers;
-    ResourceList<Entity> entities;
-    ResourceList<Scene> scenes;
-    ResourceList<Material> materials;
     ResourceList<Mesh> meshes;
     
     std::filesystem::path basePath;

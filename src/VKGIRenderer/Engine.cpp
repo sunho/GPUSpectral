@@ -16,18 +16,6 @@ Renderer *Engine::createRenderer(Window *window) {
     return renderers.construct(*this, window);
 }
 
-Entity *Engine::createEntity() {
-    return entities.construct();
-}
-
-Scene *Engine::createScene(Renderer *renderer) {
-    return scenes.construct(renderer);
-}
-
-Material *Engine::createMaterial() {
-    return materials.construct();
-}
-
 std::string VKGIRenderer::Engine::assetPath(const std::string& assetName) {
     auto path = assetBasePath / assetName;
     return path.string();

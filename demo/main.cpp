@@ -1,6 +1,5 @@
 #include <VKGIRenderer/Engine.h>
 #include <VKGIRenderer/Loader.h>
-#include <VKGIRenderer/Light.h>
 
 #include <Windows.h>
 #include <filesystem>
@@ -18,7 +17,6 @@ int main() {
     VKGIRenderer::Engine engine(basePath(), basePath() / "assets");
     VKGIRenderer::Window* window = engine.createWindow(1200, 1200);
     VKGIRenderer::Renderer* renderer = engine.createRenderer(window);
-    VKGIRenderer::Loader loader(engine, *renderer);
    
 
     //VKGIRenderer::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
@@ -61,10 +59,7 @@ int main() {
    */
  
 
-    auto scene = loader.loadMitsuba((basePath() / "assets" / "cornell-box" / "scene.xml").string());
-    scene->ddgi.gridNum = glm::uvec3(16, 16, 16);
-    scene->ddgi.worldSize = glm::vec3(1.5f, 1.5f, 1.5f);
-    scene->ddgi.gridOrigin = glm::vec3(0.0f, 1.0f, 0.0f);
+    auto scene = loadScene(engine, *renderer, (basePath() / "assets" / "cornell-box" / "scene.xml").string());
     glm::vec3 cameraPos = glm::vec3(0.0, 1.0, 13.0f);
     glm::vec3 origin = glm::vec3(0.0, 1.0, 0.0);
 
@@ -91,7 +86,7 @@ int main() {
         {
             cameraPos.x -= 0.05f;
         }
-        scene->getCamera().lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
+        scene.camera.lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
         renderer->run(scene);
     });
     

@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 
+#define M_PI       3.14159265358979323846f
+
 inline static std::vector<std::string> Split(const std::string& str, const char* delim, bool allow_empty)
 {
 	if (str.empty())

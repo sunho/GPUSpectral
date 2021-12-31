@@ -43,19 +43,16 @@ set(SOURCE_LIST
     Engine.cpp
     Window.h
     Window.cpp
-    Entity.h
-    Entity.cpp
     Transform.h
-    Light.h
-    Light.cpp
     Camera.h
     Camera.cpp
     Scene.h
     Scene.cpp
     Loader.h
     Loader.cpp
-    Material.h
-    Material.cpp
+    Mesh.h
+    Mesh.cpp
+    BSDF.inc
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCE_LIST})
