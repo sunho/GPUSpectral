@@ -34,9 +34,7 @@ struct VulkanProgram : public HwProgram {
     VulkanProgram() = default;
     explicit VulkanProgram(VulkanDevice& device, const Program& program);
 
-    VkShaderModule vertex;
-    VkShaderModule fragment;
-    VkShaderModule compute;
+    VkShaderModule shaderModule;
 private:
     void parseParameterLayout(const CompiledCode& code);
 };

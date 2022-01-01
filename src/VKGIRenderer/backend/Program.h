@@ -8,7 +8,8 @@
 #include <VKGIRenderer/utils/FixedVector.h>
 
 enum class ProgramType {
-    PIPELINE,
+    VERTEX,
+    FRAGMENT,
     COMPUTE
 };
 
@@ -17,7 +18,8 @@ enum class ProgramParameterType : uint8_t {
     TEXTURE,
     IMAGE,
     ATTACHMENT,
-    STORAGE
+    STORAGE,
+    TLAS
 };
 
 struct ProgramParameterLayout {
@@ -112,35 +114,19 @@ struct ProgramParameter {
 };
 
 struct Program {
-    Program(CompiledCode vertCode, CompiledCode fragCode)
-        : type(ProgramType::PIPELINE) {
-        codes[0] = vertCode;
-        codes[1] = fragCode;
-        hash = hashBuffer<uint32_t>(codes[0].data(), codes[0].size()) ^ hashBuffer<uint32_t>(codes[1].data(), codes[1].size());
+    Program(CompiledCode compCode) {
+        _code = compCode;
+        hash = hashBuffer<uint32_t>(_code.data(), _code.size());
     }
 
-    Program(CompiledCode compCode)
-        : type(ProgramType::COMPUTE) {
-        codes[0] = compCode;
-        hash = hashBuffer<uint32_t>(codes[0].data(), codes[0].size());
-    }
-
-    const CompiledCode& vertex() const {
-        return codes[0];
-    }
-    
-    const CompiledCode& frag() const {
-        return codes[1];
-    }
-    
-    const CompiledCode& compute() const {
-        return codes[0];
+    const CompiledCode& code() const {
+        return _code;
     }
 
     ProgramParameterLayout parameterLayout;
     ProgramType type;
     ProgramHash hash;
   private:
-    std::array<CompiledCode, 2> codes;
+    CompiledCode _code;
 };
 

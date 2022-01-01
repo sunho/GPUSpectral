@@ -8,13 +8,14 @@
 #include "VulkanDevice.h"
 
 struct VulkanBufferObject : public HwBufferObject {
-    explicit VulkanBufferObject(VulkanDevice &device, uint32_t size, BufferUsage usage);
+    explicit VulkanBufferObject(VulkanDevice &device, uint32_t size, BufferUsage usage, BufferType type);
     ~VulkanBufferObject();
-    void upload(const BufferDescriptor &descriptor);
     void uploadSync(const BufferDescriptor &descriptor);
     void copy(vk::CommandBuffer cmd, const VulkanBufferObject &obj);
     std::vector<char> download();
+    void* mapped{ nullptr };
     vk::Buffer buffer;
+    BufferType type;
 
   private:
     VulkanDevice &device;

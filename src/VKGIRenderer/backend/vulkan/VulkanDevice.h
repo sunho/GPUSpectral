@@ -62,10 +62,13 @@ public:
     VmaAllocator allocator{};
     SemaphorePool semaphorePool;
     vk::DispatchLoaderDynamic dld;
+    size_t shaderGroupHandleSize;
+    size_t shaderGroupHandleSizeAligned;
 
     void immediateSubmit(std::function<void(vk::CommandBuffer)> func);
     AllocatedBuffer allocateBuffer(vk::BufferCreateInfo info, VmaMemoryUsage usage);
     AllocatedImage allocateImage(vk::ImageCreateInfo info, VmaMemoryUsage usage);
+    uint64_t getBufferDeviceAddress(vk::Buffer buffer);
 private:
     vkb::Device vkbDevice{};
     vkb::Instance vkbInstance{};

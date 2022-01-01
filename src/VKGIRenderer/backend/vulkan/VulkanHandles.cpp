@@ -18,16 +18,8 @@ inline static VkShaderModule createShaderModule(VulkanDevice& device, const uint
 
 VulkanProgram::VulkanProgram(VulkanDevice& device, const Program& program)
     : HwProgram(program) {
-    if (program.type == ProgramType::PIPELINE) {
-        vertex = createShaderModule(device, program.vertex().data(), program.vertex().size() * 4);
-        fragment = createShaderModule(device, program.frag().data(), program.frag().size() * 4);
-        parseParameterLayout(program.vertex());
-        parseParameterLayout(program.frag());
-    }
-    else {
-        compute = createShaderModule(device, program.compute().data(), program.compute().size() * 4);
-        parseParameterLayout(program.compute());
-    }
+        shaderModule = createShaderModule(device, program.code().data(), program.code().size() * 4);
+        parseParameterLayout(program.code());
 
 }
 

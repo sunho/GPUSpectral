@@ -31,3 +31,7 @@ inline static std::vector<std::string> Split(const std::string& str, const char*
 {
 	return Split(str, delim, true);
 }
+
+inline static size_t align(size_t size, size_t alignment) {
+	return (size + alignment - 1) & ~(alignment - 1);
+}

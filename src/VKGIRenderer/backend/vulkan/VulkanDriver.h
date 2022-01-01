@@ -34,8 +34,8 @@ struct VulkanInflight : public HwInflight {
     }
     VulkanInflight(VulkanDevice& device, VulkanRayTracer& tracer) : 
             device(device), 
-            cmd(createCommandBuffer(device)), 
-            rayFrameContext(tracer, device, cmd) {
+            cmd(createCommandBuffer(device))
+    {
         imageSemaphore = device.semaphorePool.acquire();
         renderSemaphore = device.semaphorePool.acquire();
     }
@@ -49,7 +49,6 @@ struct VulkanInflight : public HwInflight {
     vk::Semaphore renderSemaphore{};
     VulkanDevice& device;
     vk::CommandBuffer cmd{};
-    VulkanRayFrameContext rayFrameContext;
 };
 
 struct DriverContext { 

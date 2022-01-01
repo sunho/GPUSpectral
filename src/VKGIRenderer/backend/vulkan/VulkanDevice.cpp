@@ -1,6 +1,7 @@
 #include "VulkanDevice.h"
 #include "VulkanWSI.h"
 #include "VulkanPipelineCache.h"
+#include <VKGIRenderer/utils/Util.h>
 
 VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) {
     // Init vulkan instance
@@ -91,6 +92,15 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
     vk::DynamicLoader dl;
     PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     dld = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr, device);
+
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties;
+    rayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+    VkPhysicalDeviceProperties2 deviceProperties2{};
+    deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    deviceProperties2.pNext = &rayTracingPipelineProperties;
+    vkGetPhysicalDeviceProperties2(physicalDevice, &deviceProperties2);
+    shaderGroupHandleSize = rayTracingPipelineProperties.shaderGroupHandleSize;
+    shaderGroupHandleSizeAligned = align(rayTracingPipelineProperties.shaderGroupHandleSize, rayTracingPipelineProperties.shaderGroupHandleAlignment);
 }
 
 VulkanDevice::~VulkanDevice() {
@@ -155,6 +165,12 @@ AllocatedImage VulkanDevice::allocateImage(vk::ImageCreateInfo info, VmaMemoryUs
     }
     out.image = image;
     return out;
+}
+
+uint64_t VulkanDevice::getBufferDeviceAddress(vk::Buffer buffer) {
+    vk::BufferDeviceAddressInfoKHR ai{};
+    ai.buffer = buffer;
+    return device.getBufferAddressKHR(ai);
 }
 
 SemaphorePool::~SemaphorePool() {

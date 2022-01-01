@@ -5,34 +5,30 @@
 #include <stdexcept>
 #include <Tracy.hpp>
 
-VulkanBufferObject::VulkanBufferObject(VulkanDevice &device, uint32_t size, BufferUsage usage)
-    : device(device), HwBufferObject(size) {
+VulkanBufferObject::VulkanBufferObject(VulkanDevice &device, uint32_t size, BufferUsage usage, BufferType type)
+    : device(device), HwBufferObject(size), type(type) {
     ZoneScopedN("Buffer create")
     auto bufferInfo = vk::BufferCreateInfo()
         .setSize(size)
-                          .setUsage(translateBufferUsage(usage) | vk::BufferUsageFlagBits::eTransferSrc);
-    auto type = VMA_MEMORY_USAGE_GPU_ONLY;
-    if (usage & BufferUsage::STAGING) {
-        type = VMA_MEMORY_USAGE_CPU_ONLY;
+        .setUsage(translateBufferUsage(usage) | vk::BufferUsageFlagBits::eTransferSrc);
+    auto allocType = VMA_MEMORY_USAGE_GPU_ONLY;
+    if (type == BufferType::HOST_COHERENT) {
+        allocType = VMA_MEMORY_USAGE_CPU_ONLY;
     } else {
         bufferInfo.usage |= vk::BufferUsageFlagBits::eTransferDst;
     }
-    _buffer = device.allocateBuffer(bufferInfo, type);
+    _buffer = device.allocateBuffer(bufferInfo, allocType);
     buffer = _buffer.buffer;
+    if (type == BufferType::HOST_COHERENT) {
+        _buffer.map(device, &mapped);
+    }
 }
 
 VulkanBufferObject::~VulkanBufferObject() {
+    if (mapped) {
+        _buffer.unmap(device);
+    }
     _buffer.destroy(device);
-}
-
-void VulkanBufferObject::upload(const BufferDescriptor &descriptor) {
-    ZoneScopedN("Buffer upload") 
-    size_t uploadSize = descriptor.size ? descriptor.size : size;
-
-     void* data;
-    _buffer.map(device, &data);
-    memcpy(data, descriptor.data, uploadSize);
-    _buffer.unmap(device);
 }
 
 void VulkanBufferObject::uploadSync(const BufferDescriptor& descriptor) {

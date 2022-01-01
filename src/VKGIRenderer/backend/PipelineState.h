@@ -38,6 +38,7 @@ struct BindingIndex {
 union BindingHandle {
     Handle<HwTexture> texture;
     Handle<HwBufferObject> buffer;
+    Handle<HwTLAS> tlas;
 };
 
 struct Binding {
@@ -53,10 +54,6 @@ using BindingMap = std::map<BindingIndex, Binding>;
 
 struct PipelineState {
     PipelineState() = default;
-    Handle<HwProgram> program{};
-    Viewport scissor{ 0, 0, (uint32_t)std::numeric_limits<int32_t>::max(),
-                      (uint32_t)std::numeric_limits<int32_t>::max() };
-    DepthTest depthTest{};
     BindingMap bindings{};
     std::vector<uint8_t> pushConstants{};
 
@@ -73,6 +70,15 @@ struct PipelineState {
         bindings[{ set, binding }] = b;
         return *this;
     }
+
+    PipelineState& bindTLAS(uint32_t set, uint32_t binding, Handle<HwTLAS> tlas) {
+        Binding b = {};
+        b.type = ProgramParameterType::TLAS;
+        b.handles[0] = {.tlas = tlas};
+        bindings[{ set, binding }] = b;
+        return *this;
+    }
+
 
     template <typename It>
     PipelineState& bindStorageBufferArray(uint32_t set, uint32_t binding, It it, It end) {
@@ -147,3 +153,21 @@ struct PipelineState {
     }
 };
 
+struct GraphicsPipeline : public PipelineState {
+    Handle<HwProgram> vertex{};
+    Handle<HwProgram> fragment{};
+    Viewport scissor{ 0, 0, (uint32_t)std::numeric_limits<int32_t>::max(),
+                      (uint32_t)std::numeric_limits<int32_t>::max() };
+    DepthTest depthTest{};
+};
+ 
+struct ComputePipeline : public PipelineState {
+    Handle<HwProgram> program{};
+};
+
+struct RTPipeline : public PipelineState {
+    Handle<HwProgram> raygenGroup;
+    std::vector<Handle<HwProgram>> hitGroups;
+    std::vector<Handle<HwProgram>> missGroups;
+    std::vector<Handle<HwProgram>> callableGroups;
+};

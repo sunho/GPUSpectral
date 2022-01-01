@@ -154,14 +154,20 @@ enum class PrimitiveMode {
     TRIANGLE_STRIPS
 };
 
-enum class BufferUsage : uint8_t {
+enum class BufferUsage : uint16_t {
     INDEX = 0x1,
     UNIFORM = 0x2,
     TRANSFER_SRC = 0x4,
     TRANSFER_DST = 0x8,
     STORAGE = 0x10,
     VERTEX = 0x20,
-    STAGING = 0x40
+    SBT = 0x80,
+    BDA = 0x100,
+};
+
+enum class BufferType : uint8_t {
+    DEVICE,
+    HOST_COHERENT
 };
 
 static BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {

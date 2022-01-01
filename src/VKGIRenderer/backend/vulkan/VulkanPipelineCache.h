@@ -27,18 +27,82 @@ inline uint64_t hashStruct<VulkanAttachments>(const VulkanAttachments& attachmen
     return hashBase(seed);
 }
 
+struct VulkanRTPipelineState {
+    VulkanProgram* raygenGroup;
+    std::vector<VulkanProgram*> missGroups;
+    std::vector<VulkanProgram*> hitGroups;
+    std::vector<VulkanProgram*> callableGroups;
+    ProgramParameterLayout parameterLayout;
+
+    size_t getGroupCount() const {
+        return 1 + missGroups.size() + hitGroups.size() + callableGroups.size();
+    }
+
+    bool operator==(const VulkanRTPipelineState& other) const {
+        if (raygenGroup->program.hash != other.raygenGroup->program.hash) {
+            return false;
+        }
+        if (missGroups.size() != other.missGroups.size()) {
+            return false;
+        }
+        if (hitGroups.size() != other.hitGroups.size()) {
+            return false;
+        }
+        if (callableGroups.size() != other.callableGroups.size()) {
+            return false;
+        }
+        if (parameterLayout != other.parameterLayout) {
+            return false;
+        }
+        for (size_t i = 0; i < missGroups.size(); ++i) {
+            if (missGroups[i]->program.hash != other.missGroups[i]->program.hash) {
+                return false;
+            }
+        }
+        for (size_t i = 0; i < hitGroups.size(); ++i) {
+            if (hitGroups[i]->program.hash != other.hitGroups[i]->program.hash) {
+                return false;
+            }
+        }
+        for (size_t i = 0; i < callableGroups.size(); ++i) {
+            if (callableGroups[i]->program.hash != other.callableGroups[i]->program.hash) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
+template <>
+inline uint64_t hashStruct<VulkanRTPipelineState>(const VulkanRTPipelineState &state) {
+    uint64_t seed = hashStruct(state.raygenGroup->program.hash);
+    for (auto& p : state.hitGroups) {
+        seed ^= hashStruct(p->program.hash);
+    }
+    for (auto& p : state.missGroups) {
+        seed ^= hashStruct(p->program.hash);
+    }
+    for (auto& p : state.callableGroups) {
+        seed ^= hashStruct(p->program.hash);
+    }
+    seed ^= hashStruct(state.parameterLayout);
+    return hashBase(seed);
+}
+
 struct VulkanPipelineState {
     AttributeArray attributes;
     size_t attributeCount;
-    VulkanProgram *program;
+    VulkanProgram *vertex;
+    VulkanProgram *fragment;
     Viewport viewport;
     VkRenderPass renderPass;
     size_t attachmentCount;
     DepthTest depthTest;
+    ProgramParameterLayout parameterLayout;
 
     bool operator==(const VulkanPipelineState &other) const {
-        return attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && program->program.hash == other.program->program.hash
-            && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
+        return parameterLayout == other.parameterLayout && attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && vertex->program.hash == other.vertex->program.hash && 
+            fragment->program.hash == other.fragment->program.hash && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
 };
 
@@ -60,11 +124,13 @@ inline uint64_t hashStruct<VulkanPipelineState>(const VulkanPipelineState &pipel
     for (size_t i = 0; i < MAX_VERTEX_ATTRIBUTE_COUNT; ++i) {
         seed ^= hashStruct(pipelineKey.attributes[i]);
     }
-    seed ^= hashStruct(pipelineKey.program);
+    seed ^= hashStruct(pipelineKey.vertex->program.hash);
+    seed ^= hashStruct(pipelineKey.fragment->program.hash);
     seed ^= hashStruct(pipelineKey.renderPass);
     seed ^= hashStruct(pipelineKey.viewport);
     seed ^= hashStruct(pipelineKey.attachmentCount);
     seed ^= hashStruct(pipelineKey.depthTest);
+    seed ^= hashStruct(pipelineKey.parameterLayout);
     return hashBase(seed);
 }
 
@@ -124,17 +190,45 @@ struct VulkanPipeline {
     vk::PipelineLayout layout;
 };
 
+static inline vk::StridedDeviceAddressRegionKHR getSbtEntryStridedDeviceAddressRegion(VulkanDevice& device, vk::Buffer buffer, uint32_t handleCount) {
+    VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
+    stridedDeviceAddressRegion.deviceAddress = device.getBufferDeviceAddress(buffer);
+    stridedDeviceAddressRegion.stride = device.shaderGroupHandleSizeAligned;
+    stridedDeviceAddressRegion.size = handleCount * device.shaderGroupHandleSizeAligned;
+    return stridedDeviceAddressRegion;
+}
+
+// TODO RAII
+struct VulkanShaderBindingTable {
+    VulkanShaderBindingTable() = default;
+    VulkanShaderBindingTable(VulkanDevice& device, size_t handlesCount) {
+        buffer = new VulkanBufferObject(device, device.shaderGroupHandleSize * handlesCount, BufferUsage::SBT | BufferUsage::BDA, BufferType::HOST_COHERENT);
+        stridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(device,buffer->buffer, handlesCount);
+    }
+    vk::StridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
+    VulkanBufferObject* buffer{ nullptr };
+};
+
+struct VulkanShaderBindingTables {
+    VulkanShaderBindingTable raygen;
+    VulkanShaderBindingTable miss;
+    VulkanShaderBindingTable hit;
+    VulkanShaderBindingTable callable;
+};
+
 class VulkanPipelineCache {
   public:
     VulkanPipelineCache(VulkanDevice &device);
     VulkanPipeline getOrCreateGraphicsPipeline(const VulkanPipelineState &state);
     VulkanPipeline getOrCreateComputePipeline(const VulkanProgram &program);
+    VulkanPipeline getOrCreateRTPipeline(const VulkanRTPipelineState& state);
+    VulkanShaderBindingTables getOrCreateSBT(const VulkanRTPipelineState& state);
 
     vk::Framebuffer getOrCreateFrameBuffer(vk::RenderPass renderPass,
                                          VulkanSwapChain swapchain, 
                                          VulkanRenderTarget *renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
-    void bindDescriptor(vk::CommandBuffer cmd, const VulkanProgram &program, const VulkanBindings& bindings);
+    void bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const VulkanProgram &program, const VulkanBindings& bindings);
     void tick();
 
   private:
@@ -148,7 +242,7 @@ class VulkanPipelineCache {
     VulkanDescriptorAllocator &currentDescriptorAllocator() {
         return descriptorAllocators[currentFrame % descriptorAllocators.size()];
     }
-    PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute);
+    PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout);
    
     struct KeyHasher {
         std::size_t operator()(const VulkanAttachments& k) const {
@@ -172,6 +266,8 @@ class VulkanPipelineCache {
     };
 
     GCPool<ProgramHash, VkPipeline, KeyHasher> computePipelines;
+    GCPool<VulkanRTPipelineState, VkPipeline, KeyHasher> rtPipelines;
+    GCPool<VulkanRTPipelineState, VulkanShaderBindingTables, KeyHasher> rtSBTs;
     GCPool<VulkanPipelineState, VkPipeline, KeyHasher> graphicsPipelines;
     GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, KeyHasher> framebuffers;
     GCPool<VulkanAttachments, VkRenderPass, KeyHasher> renderpasses;

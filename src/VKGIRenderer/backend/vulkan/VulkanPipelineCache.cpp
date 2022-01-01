@@ -120,7 +120,7 @@ void VulkanPipelineCache::tick() {
     currentDescriptorAllocator().resetPools();
 }
 
-VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout, bool compute) {
+VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout) {
     ZoneScopedN("PipelineCache create layout")
     auto it = pipelineLayouts.get(layout);
     
@@ -163,10 +163,9 @@ VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayo
     return pipelineLayout;
 }
 
-void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanProgram &program, const VulkanBindings& bindings) {
+void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const VulkanProgram &program, const VulkanBindings& bindings) {
     ZoneScopedN("PipelineCache bind descriptor")
-    const bool compute = program.program.type == ProgramType::COMPUTE;
-    auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout, program.program.type == ProgramType::COMPUTE);
+    auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout);
     DescriptorSets descriptorSets{};
     for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
         descriptorSets[i] = currentDescriptorAllocator().allocate(pipelineLayout.descriptorSetLayout[i]);
@@ -186,24 +185,24 @@ void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const VulkanProg
         writes.push_back(write);
     }
     device.device.updateDescriptorSets(writes.size(), writes.data(), 0, nullptr);
-    cmd.bindDescriptorSets(compute ? vk::PipelineBindPoint::eCompute : vk::PipelineBindPoint::eGraphics, pipelineLayout.pipelineLayout, 0, ProgramParameterLayout::MAX_SET, descriptorSets.data(), 0, nullptr);
+    cmd.bindDescriptorSets(bindPoint, pipelineLayout.pipelineLayout, 0, ProgramParameterLayout::MAX_SET, descriptorSets.data(), 0, nullptr);
 }
 
 VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipelineState &state) {
     ZoneScopedN("PipelineCache create graphics pipeline")
-    auto pipelineLayout = getOrCreatePipelineLayout(state.program->program.parameterLayout, false);
+    auto pipelineLayout = getOrCreatePipelineLayout(state.parameterLayout);
     auto it = graphicsPipelines.get(state);
     if (it) {
         return { *it, pipelineLayout.pipelineLayout };
     }
     vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
     vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
-    vertShaderStageInfo.module = state.program->vertex;
+    vertShaderStageInfo.module = state.vertex->shaderModule;
     vertShaderStageInfo.pName = "main";
 
     vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
     fragShaderStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
-    fragShaderStageInfo.module = state.program->fragment;
+    fragShaderStageInfo.module = state.fragment->shaderModule;
     fragShaderStageInfo.pName = "main";
     vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
@@ -344,14 +343,14 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
 
 VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgram &program) {
     ZoneScopedN("PipelineCache create compute pipeline")
-    auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout, true);
+    auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout);
     auto it = computePipelines.get(program.program.hash);
     if (it) {
         return { *it, pipelineLayout.pipelineLayout };
     }
     vk::PipelineShaderStageCreateInfo shaderStageInfo{};
     shaderStageInfo.stage = vk::ShaderStageFlagBits::eCompute;
-    shaderStageInfo.module = program.compute;
+    shaderStageInfo.module = program.shaderModule;
     shaderStageInfo.pName = "main";
 
     vk::ComputePipelineCreateInfo createInfo;
@@ -364,11 +363,103 @@ VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgr
     };
 }
 
+VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipelineState& state) {
+    auto it = rtPipelines.get(state);
+    auto pipelineLayout = getOrCreatePipelineLayout(state.parameterLayout);
+    if (it) {
+        return { *it, pipelineLayout.pipelineLayout };
+    }
+    const size_t MAX_RECURSION_DEPTH = 2;
+    const auto wrapShaderModule = [](const vk::ShaderModule& shaderModule, const vk::ShaderStageFlagBits& flags) {
+        return vk::PipelineShaderStageCreateInfo()
+            .setStage(flags)
+            .setPName("main")
+            .setModule(shaderModule);
+    };
+    std::vector<vk::PipelineShaderStageCreateInfo> stages;
+    std::vector<vk::RayTracingShaderGroupCreateInfoKHR> groups;
+    {
+        stages.push_back(wrapShaderModule(state.raygenGroup->shaderModule, vk::ShaderStageFlagBits::eRaygenKHR));
+        auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
+            .setGeneralShader(stages.size() - 1)
+            .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+        groups.push_back(gi);
+    }
+    for (auto& hitGroup : state.hitGroups) {
+        stages.push_back(wrapShaderModule(hitGroup->shaderModule, vk::ShaderStageFlagBits::eClosestHitKHR));
+        auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
+            .setGeneralShader(stages.size() - 1)
+            .setType(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup);
+        groups.push_back(gi);
+    }
+    for (auto& missGroup: state.missGroups) {
+        stages.push_back(wrapShaderModule(missGroup->shaderModule, vk::ShaderStageFlagBits::eMissKHR));
+        auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
+            .setGeneralShader(stages.size() - 1)
+            .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+        groups.push_back(gi);
+    }
+    for (auto& callGroup : state.callableGroups) {
+        stages.push_back(wrapShaderModule(callGroup->shaderModule, vk::ShaderStageFlagBits::eCallableKHR));
+        auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
+            .setGeneralShader(stages.size() - 1)
+            .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+        groups.push_back(gi);
+    }
+    auto createInfo = vk::RayTracingPipelineCreateInfoKHR()
+        .setStages(stages)
+        .setGroups(groups)
+        .setMaxPipelineRayRecursionDepth(MAX_RECURSION_DEPTH)
+        .setLayout(pipelineLayout.pipelineLayout);
+    auto pipeline = device.device.createRayTracingPipelineKHR(nullptr, nullptr, createInfo);
+    if (pipeline.result != vk::Result::eSuccess) {
+        throw std::runtime_error("failed to create rt pipeline");
+    }
+    rtPipelines.add(state, pipeline.value);
+    return {
+        pipeline.value, pipelineLayout.pipelineLayout
+    };
+}
+
+VulkanShaderBindingTables VulkanPipelineCache::getOrCreateSBT(const VulkanRTPipelineState& state) {
+    auto pipeline = getOrCreateRTPipeline(state);
+    auto it = rtSBTs.get(state);
+    if (it) {
+        return *it;
+    }
+    const uint32_t sbtSize = state.getGroupCount() * device.shaderGroupHandleSizeAligned;
+
+    std::vector<uint8_t> shaderHandleStorage(sbtSize);
+    vkGetRayTracingShaderGroupHandlesKHR(device.device, pipeline.pipeline, 0, state.getGroupCount(), sbtSize, shaderHandleStorage.data());
+    VulkanShaderBindingTables tables{};
+    const uint32_t handleSize = device.shaderGroupHandleSize;
+    const uint32_t handleSizeAligned = device.shaderGroupHandleSizeAligned;
+    tables.raygen = VulkanShaderBindingTable(device, 1);
+    memcpy(tables.raygen.buffer->mapped, shaderHandleStorage.data(), handleSize);
+    uint32_t index = 1;
+    if (!state.hitGroups.empty()) {
+        tables.hit = VulkanShaderBindingTable(device, state.hitGroups.size());
+        memcpy(tables.hit.buffer->mapped, shaderHandleStorage.data() + handleSizeAligned * index, state.hitGroups.size() * handleSize);
+        index += state.hitGroups.size();
+    }
+    if (!state.missGroups.empty()) {
+        tables.miss = VulkanShaderBindingTable(device, state.missGroups.size());
+        memcpy(tables.miss.buffer->mapped, shaderHandleStorage.data() + handleSizeAligned * index, state.missGroups.size() * handleSize);
+        index += state.missGroups.size();
+    }
+    if (!state.callableGroups.empty()) {
+        tables.callable = VulkanShaderBindingTable(device, state.callableGroups.size());
+        memcpy(tables.callable.buffer->mapped, shaderHandleStorage.data() + handleSizeAligned * index, state.callableGroups.size() * handleSize);
+        index += state.callableGroups.size();
+    }
+    rtSBTs.add(state, tables);
+    return tables;
+}
+
 VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget) {
     ZoneScopedN("PipelineCache create renderpass")
     auto it = renderpasses.get(renderTarget->attachments);
     if (it) {
-        std::cout << hashStruct<VulkanAttachments>(renderTarget->attachments) << " " << * it << std::endl;
         return *it;
     }
     VkRenderPass out;
@@ -486,4 +577,5 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
                      framebuffer);
     return framebuffer;
 }
+
 
