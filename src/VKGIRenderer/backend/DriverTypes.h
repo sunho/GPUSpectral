@@ -154,13 +154,14 @@ enum class PrimitiveMode {
     TRIANGLE_STRIPS
 };
 
-enum class BufferUsage : uint16_t {
+enum class BufferUsage : uint32_t {
     INDEX = 0x1,
     UNIFORM = 0x2,
     TRANSFER_SRC = 0x4,
     TRANSFER_DST = 0x8,
     STORAGE = 0x10,
     VERTEX = 0x20,
+    ACCELERATION_STRUCTURE = 0x40,
     SBT = 0x80,
     BDA = 0x100,
 };
@@ -172,11 +173,11 @@ enum class BufferType : uint8_t {
 };
 
 static BufferUsage operator|(BufferUsage lhs, BufferUsage rhs) {
-    return static_cast<BufferUsage>(static_cast<uint8_t>(lhs) | static_cast<uint8_t>(rhs));
+    return static_cast<BufferUsage>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
 }
 
-static uint8_t operator&(BufferUsage lhs, BufferUsage rhs) {
-    return static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs);
+static uint32_t operator&(BufferUsage lhs, BufferUsage rhs) {
+    return static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs);
 }
 
 struct Attribute {

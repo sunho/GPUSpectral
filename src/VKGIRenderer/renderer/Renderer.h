@@ -134,6 +134,7 @@ class Renderer : public IdResource {
   private:
     Handle<HwProgram> loadShader(const std::string& filename);
     void registerShader(const std::string& shaderName, const std::string& filename);
+    void render(InflightContext& context, const Scene& scene);
     Handle<HwProgram> getShaderProgram(const std::string& shaderName);
     void registerPrograms();
     void prepareSceneData(InflightContext& context);
@@ -143,6 +144,7 @@ class Renderer : public IdResource {
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
 
+    std::unordered_map<uint32_t, Handle<HwBLAS>> blasCache;
     std::unordered_map<std::string, Handle<HwProgram> > programs;
 
     VulkanDriver driver;

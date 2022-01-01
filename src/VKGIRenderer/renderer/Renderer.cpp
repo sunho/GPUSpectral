@@ -80,12 +80,31 @@ void Renderer::run(const Scene& scene) {
     ctx.rg = inflight.rg.get();
 
     prepareSceneData(ctx);
+    render(ctx, scene);
 
     ctx.rg->submit();
     driver.endFrame();
 
     ++currentFrame;
     FrameMarkEnd("Frame")
+}
+
+void Renderer::render(InflightContext& ctx, const Scene& scene) {
+    std::vector<RTInstance> instances;
+    for (auto& obj: scene.renderObjects) {
+        Handle<HwBLAS> blas;
+        auto it = blasCache.find(obj.mesh->id());
+        if (it == blasCache.end()) {
+            blas = driver.createBLAS(obj.mesh->hwInstance);
+            blasCache.emplace(obj.mesh->id(), blas);
+        } else {
+            blas = it->second;
+        }
+        RTInstance instance;
+        instance.blas = blas;
+        instance.transfom = obj.transform;
+    }
+    ctx.data->tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
 }
 
 void Renderer::prepareSceneData(InflightContext& ctx) {

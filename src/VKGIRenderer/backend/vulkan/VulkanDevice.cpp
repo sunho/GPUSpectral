@@ -12,8 +12,12 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
     physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray                     = VK_TRUE;
     physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount   = VK_TRUE;
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+    accelFeature.accelerationStructure = VK_TRUE;
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-
+    rtPipelineFeature.rayTracingPipeline = VK_TRUE;
+    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bdaFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR };
+    bdaFeature.bufferDeviceAddress = VK_TRUE;
+    
    
     vkb::InstanceBuilder builder;
 
@@ -38,6 +42,7 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
                     .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
                     //.add_required_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME)
         .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+        .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
                     .add_required_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
@@ -46,6 +51,7 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
                     .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
                     .add_required_extension_features(accelFeature)
                     .add_required_extension_features(rtPipelineFeature)
+        .add_required_extension_features(bdaFeature)
 
                        .select ();
     if (!physRet) {
@@ -94,6 +100,7 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
     allocatorInfo.physicalDevice = vkbDevice.physical_device.physical_device;
     allocatorInfo.device = vkbDevice.device;
     allocatorInfo.instance = vkbInstance.instance;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
     vmaCreateAllocator(&allocatorInfo, &allocator);
 
     cache = std::make_unique<VulkanPipelineCache>(*this);
@@ -102,7 +109,7 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
     PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
     dld = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr, device);
 
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipelineProperties = {};
     rayTracingPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
     VkPhysicalDeviceProperties2 deviceProperties2{};
     deviceProperties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;

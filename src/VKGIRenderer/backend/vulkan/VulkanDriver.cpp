@@ -148,7 +148,7 @@ FenceHandle VulkanDriver::createFence(int) {
 
 void VulkanDriver::waitFence(FenceHandle handle) {
     std::array<vk::Fence, 1> fences = {handleCast<VulkanFence>(handle)->fence};
-    device->device.waitForFences(fences, true, UINT64_MAX); 
+    //device->device.waitForFences(fences, true, UINT64_MAX); 
     device->device.resetFences(fences);
 }
 

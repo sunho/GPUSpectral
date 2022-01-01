@@ -11,12 +11,13 @@ VulkanBufferObject::VulkanBufferObject(VulkanDevice &device, uint32_t size, Buff
     auto bufferInfo = vk::BufferCreateInfo()
         .setSize(size)
         .setUsage(translateBufferUsage(usage) | vk::BufferUsageFlagBits::eTransferSrc);
-    auto allocType = VMA_MEMORY_USAGE_GPU_ONLY;
+    VmaMemoryUsage allocType = VMA_MEMORY_USAGE_GPU_ONLY;
     if (type == BufferType::HOST_COHERENT) {
         allocType = VMA_MEMORY_USAGE_CPU_ONLY;
     } else {
         bufferInfo.usage |= vk::BufferUsageFlagBits::eTransferDst;
     }
+
     _buffer = device.allocateBuffer(bufferInfo, allocType);
     buffer = _buffer.buffer;
     if (type == BufferType::HOST_COHERENT) {
