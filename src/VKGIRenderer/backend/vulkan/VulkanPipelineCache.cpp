@@ -163,9 +163,9 @@ VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayo
     return pipelineLayout;
 }
 
-void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const VulkanProgram &program, const VulkanBindings& bindings) {
+void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const ProgramParameterLayout& layout, const VulkanBindings& bindings) {
     ZoneScopedN("PipelineCache bind descriptor")
-    auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout);
+    auto pipelineLayout = getOrCreatePipelineLayout(layout);
     DescriptorSets descriptorSets{};
     for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
         descriptorSets[i] = currentDescriptorAllocator().allocate(pipelineLayout.descriptorSetLayout[i]);
@@ -376,8 +376,8 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
             .setPName("main")
             .setModule(shaderModule);
     };
-    std::vector<vk::PipelineShaderStageCreateInfo> stages;
-    std::vector<vk::RayTracingShaderGroupCreateInfoKHR> groups;
+    std::vector<VkPipelineShaderStageCreateInfo> stages;
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups;
     {
         stages.push_back(wrapShaderModule(state.raygenGroup->shaderModule, vk::ShaderStageFlagBits::eRaygenKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
@@ -406,18 +406,21 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
             .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
-    auto createInfo = vk::RayTracingPipelineCreateInfoKHR()
-        .setStages(stages)
-        .setGroups(groups)
-        .setMaxPipelineRayRecursionDepth(MAX_RECURSION_DEPTH)
-        .setLayout(pipelineLayout.pipelineLayout);
-    auto pipeline = device.device.createRayTracingPipelineKHR(nullptr, nullptr, createInfo);
-    if (pipeline.result != vk::Result::eSuccess) {
+    VkRayTracingPipelineCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+    createInfo.stageCount = stages.size();
+    createInfo.pStages = stages.data();
+    createInfo.groupCount = groups.size();
+    createInfo.pGroups = groups.data();
+    createInfo.maxPipelineRayRecursionDepth = MAX_RECURSION_DEPTH;
+    VkPipeline pipeline;
+    auto res = device.dld.vkCreateRayTracingPipelinesKHR(device.device, nullptr, nullptr, 1, &createInfo, nullptr, &pipeline);
+    if (res != VK_SUCCESS) {
         throw std::runtime_error("failed to create rt pipeline");
     }
-    rtPipelines.add(state, pipeline.value);
+    rtPipelines.add(state, pipeline);
     return {
-        pipeline.value, pipelineLayout.pipelineLayout
+        pipeline, pipelineLayout.pipelineLayout
     };
 }
 
@@ -430,7 +433,7 @@ VulkanShaderBindingTables VulkanPipelineCache::getOrCreateSBT(const VulkanRTPipe
     const uint32_t sbtSize = state.getGroupCount() * device.shaderGroupHandleSizeAligned;
 
     std::vector<uint8_t> shaderHandleStorage(sbtSize);
-    vkGetRayTracingShaderGroupHandlesKHR(device.device, pipeline.pipeline, 0, state.getGroupCount(), sbtSize, shaderHandleStorage.data());
+    device.dld.vkGetRayTracingShaderGroupHandlesKHR(device.device, pipeline.pipeline, 0, state.getGroupCount(), sbtSize, shaderHandleStorage.data());
     VulkanShaderBindingTables tables{};
     const uint32_t handleSize = device.shaderGroupHandleSize;
     const uint32_t handleSizeAligned = device.shaderGroupHandleSizeAligned;

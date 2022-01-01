@@ -32,7 +32,7 @@ struct VulkanInflight : public HwInflight {
             .setCommandPool(device.commandPool);
         return device.device.allocateCommandBuffers(cmdInfo).front();
     }
-    VulkanInflight(VulkanDevice& device, VulkanRayTracer& tracer) : 
+    VulkanInflight(VulkanDevice& device) : 
             device(device), 
             cmd(createCommandBuffer(device))
     {
@@ -142,7 +142,6 @@ class VulkanDriver {
     HandleBase::HandleId nextId{ 0 };
 
     std::unique_ptr<VulkanDevice> device;
-    std::unique_ptr<VulkanRayTracer> rayTracer;
     std::unique_ptr<VulkanTexture> dummyTex;
     std::unique_ptr<VulkanBufferObject> dummyBuf;
     DriverContext context;

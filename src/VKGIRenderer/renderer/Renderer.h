@@ -132,10 +132,8 @@ class Renderer : public IdResource {
     void run(const Scene& scene);
 
   private:
-    Handle<HwProgram> loadComputeShader(const std::string& filename);
-    Handle<HwProgram> loadGraphicsShader(const std::string& vertFilename, const std::string& fragFilename);
-    void registerComputeShader(const std::string& shaderName, const std::string& filename);
-    void registerGraphicsShader(const std::string& shaderName, const std::string& vertFilename, const std::string& fragFilename);
+    Handle<HwProgram> loadShader(const std::string& filename);
+    void registerShader(const std::string& shaderName, const std::string& filename);
     Handle<HwProgram> getShaderProgram(const std::string& shaderName);
     void registerPrograms();
     void prepareSceneData(InflightContext& context);

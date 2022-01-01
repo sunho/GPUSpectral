@@ -40,7 +40,6 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
 
 VulkanDriver::VulkanDriver(Window *window, const std::filesystem::path& basePath) : basePath(basePath) {
     device = std::make_unique<VulkanDevice>(window);
-    rayTracer = std::make_unique<VulkanRayTracer>(*device);
     dummyTex = std::make_unique<VulkanTexture>(*device, SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT, 1, TextureFormat::RGBA8, 1, 1, 1);
     uint32_t zero = 0;
     dummyTex->copyInitialData({ .data = &zero }, ImageLayout::GENERAL);
@@ -56,7 +55,7 @@ VulkanDriver::~VulkanDriver() {
 InflightHandle VulkanDriver::beginFrame(FenceHandle handle) {
     VulkanFence* fence = handleCast<VulkanFence>(handle);
     Handle<HwInflight> inflightHandle = allocHandle<VulkanInflight, HwInflight>();
-    constructHandle<VulkanInflight>(inflightHandle, *device, *rayTracer);
+    constructHandle<VulkanInflight>(inflightHandle, *device);
     auto inflight = handleCast<VulkanInflight>(inflightHandle);
     context.inflight = inflight;
     inflight->inflightFence = fence->fence;
@@ -133,9 +132,9 @@ ProgramHandle VulkanDriver::createProgram(Program program) {
     return handle;
 }
 
-BufferObjectHandle VulkanDriver::createBufferObject(uint32_t size, BufferUsage usage) {
+BufferObjectHandle VulkanDriver::createBufferObject(uint32_t size, BufferUsage usage, BufferType type) {
     Handle<HwBufferObject> handle = allocHandle<VulkanBufferObject, HwBufferObject>();
-    constructHandle<VulkanBufferObject>(handle, *device, size, usage);
+    constructHandle<VulkanBufferObject>(handle, *device, size, usage, type);
 
     return handle;
 }
@@ -165,9 +164,13 @@ void VulkanDriver::updateIndexBuffer(IndexBufferHandle handle, BufferDescriptor 
 
 }
 
-void VulkanDriver::updateStagingBufferObject(BufferObjectHandle handle, BufferDescriptor data,
+void VulkanDriver::updateCPUBufferObject(BufferObjectHandle handle, BufferDescriptor data,
                                       uint32_t offset) {
-    handleCast<VulkanBufferObject>(handle)->upload(data);
+    auto buffer = handleCast<VulkanBufferObject>(handle);
+    if (data.size == 0) {
+        data.size = buffer->size;
+    }
+    memcpy(buffer->mapped, data.data, data.size);
 }
 
 void VulkanDriver::updateBufferObjectSync(BufferObjectHandle handle, BufferDescriptor data,
@@ -252,7 +255,7 @@ void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle
     handleCast<VulkanPrimitive>(handle)->vertex = vertex;
 }
 
-void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
+void VulkanDriver::draw(GraphicsPipeline pipeline, PrimitiveHandle handle) {
     auto& cmd = context.inflight->cmd;
     ZoneScopedN("Draw")
     TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("draw").c_str(), true)
@@ -268,20 +271,24 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
         offsets[i] = attrib.offset;
     }
 
-    VulkanProgram *program = handleCast<VulkanProgram>(pipeline.program);
+    VulkanProgram *vertex = handleCast<VulkanProgram>(pipeline.vertex);
+    VulkanProgram *fragment = handleCast<VulkanProgram>(pipeline.fragment);
+    ProgramParameterLayout parameterLayout = vertex->program.parameterLayout + fragment->program.parameterLayout;
 
     VulkanPipelineState state = {
         .attributes = prim->vertex->attributes,
         .attributeCount = prim->vertex->attributeCount,
-        .program = program,
+        .vertex = vertex,
+        .fragment = fragment,
         .viewport = context.viewport,
         .renderPass = context.currentRenderPass,
         .attachmentCount = context.currentRenderTarget->attachmentCount,
-        .depthTest = pipeline.depthTest
+        .depthTest = pipeline.depthTest,
+        .parameterLayout = parameterLayout
     };
 
     VulkanPipeline vkpipe = device->cache->getOrCreateGraphicsPipeline(state);
-    device->cache->bindDescriptor(cmd, *program, translateBindingMap(program->program.parameterLayout, pipeline.bindings));
+    device->cache->bindDescriptor(cmd, vk::PipelineBindPoint::eGraphics, parameterLayout, translateBindingMap(parameterLayout, pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
         cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data()); 
@@ -291,14 +298,14 @@ void VulkanDriver::draw(PipelineState pipeline, PrimitiveHandle handle) {
     cmd.drawIndexed(prim->index->count, 1, 0, 0, 0);
 }
 
-void VulkanDriver::dispatch(PipelineState pipeline, size_t groupCountX, size_t groupCountY, size_t groupCountZ) {
+void VulkanDriver::dispatch(ComputePipeline pipeline, size_t groupCountX, size_t groupCountY, size_t groupCountZ) {
     auto& cmd = context.inflight->cmd;
     ZoneScopedN("Dispatch")
     TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("dispatch").c_str(), true)
 
     VulkanProgram* program = handleCast<VulkanProgram>(pipeline.program);
     VulkanPipeline vkpipe = device->cache->getOrCreateComputePipeline(*program);
-    device->cache->bindDescriptor(cmd, *program, translateBindingMap(program->program.parameterLayout, pipeline.bindings));
+    device->cache->bindDescriptor(cmd, vk::PipelineBindPoint::eCompute, program->program.parameterLayout, translateBindingMap(program->program.parameterLayout, pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
         ZoneScopedN("Push constants");
@@ -426,25 +433,30 @@ void VulkanDriver::endRenderPass(int dummy) {
     vkCmdEndRenderPass(cmd);
 }
 
-Handle<HwBLAS> VulkanDriver::createBLAS(int dummy) {
-    Handle<HwBLAS> handle = allocHandle<VulkanBLAS, HwBLAS>();
-    constructHandle<VulkanBLAS>(handle, *rayTracer);
-    return handle;
-}
-
-Handle<HwTLAS> VulkanDriver::createTLAS(int dummy) {
-    Handle<HwTLAS> handle = allocHandle<VulkanTLAS, HwTLAS>();
-    constructHandle<VulkanTLAS>(handle, *rayTracer);
-    return handle;
-}
-
-void VulkanDriver::buildBLAS(Handle<HwBLAS> handle, Handle<HwPrimitive> primitiveHandle) {
+Handle<HwBLAS> VulkanDriver::createBLAS(Handle<HwPrimitive> primitiveHandle) {
     auto& cmd = context.inflight->cmd;
-    VulkanBLAS* blas = handleCast<VulkanBLAS>(handle);
     VulkanPrimitive* primitive = handleCast<VulkanPrimitive>(primitiveHandle);
 
-    TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("build blas").c_str(), true)
-    rayTracer->buildBLAS(context.inflight->rayFrameContext, blas, primitive);
+    VulkanBufferObject* scratch;
+    Handle<HwBLAS> handle = allocHandle<VulkanBLAS, HwBLAS>();
+    constructHandle<VulkanBLAS>(handle, *device, cmd, primitive, &scratch);
+    return handle;
+}
+
+Handle<HwTLAS> VulkanDriver::createTLAS(RTSceneDescriptor descriptor) {
+    auto& cmd = context.inflight->cmd;
+    VulkanRTSceneDescriptor desc = {};
+
+    for (size_t i = 0; i < descriptor.count; ++i) {
+        VulkanRTInstance instance = {};
+        instance.blas = handleCast<VulkanBLAS>(descriptor.instances[i].blas);
+        instance.transfom = descriptor.instances[i].transfom;
+        desc.instances.push_back(instance);
+    }
+    VulkanBufferObject* scratch;
+    Handle<HwTLAS> handle = allocHandle<VulkanTLAS, HwTLAS>();
+    constructHandle<VulkanTLAS>(handle, *device, cmd, desc, &scratch);
+    return handle;
 }
 
 void VulkanDriver::copyBufferObject(Handle<HwBufferObject> destHandle, Handle<HwBufferObject> srcHandle) {
@@ -452,21 +464,6 @@ void VulkanDriver::copyBufferObject(Handle<HwBufferObject> destHandle, Handle<Hw
     VulkanBufferObject* dest = handleCast<VulkanBufferObject>(destHandle);
     VulkanBufferObject* src = handleCast<VulkanBufferObject>(srcHandle);
     dest->copy(cmd, *src);
-}
-
-void VulkanDriver::buildTLAS(Handle<HwTLAS> handle, RTSceneDescriptor descriptor) {
-    auto& cmd = context.inflight->cmd;
-    VulkanTLAS* tlas = handleCast<VulkanTLAS>(handle);
-    VulkanRTSceneDescriptor desc = {};
-
-    TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("build tlas").c_str(), true)
-    for (size_t i = 0; i < descriptor.count; ++i) {
-        VulkanRTInstance instance = {};
-        instance.blas = handleCast<VulkanBLAS>(descriptor.instances[i].blas);
-        instance.transfom = descriptor.instances[i].transfom;
-        desc.instances.push_back(instance);
-    }
-    rayTracer->buildTLAS(context.inflight->rayFrameContext, tlas, desc);
 }
 
 ImageLayout VulkanDriver::getTextureImageLayout(Handle<HwTexture> handle) {
@@ -482,7 +479,7 @@ void VulkanDriver::intersectRays(Handle<HwTLAS> tlasHandle, uint32_t rayCount, H
 
     ZoneScopedN("Intersect")
     TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("intersect").c_str(), true)
-    rayTracer->intersectRays(context.inflight->rayFrameContext, tlas, rayCount, rays, hits);
+    //rayTracer->intersectRays(context.inflight->rayFrameContext, tlas, rayCount, rays, hits);
 }
 
 void VulkanDriver::destroyBLAS(Handle<HwBLAS> handle) {

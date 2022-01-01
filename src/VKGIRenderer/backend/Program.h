@@ -100,6 +100,19 @@ struct ProgramParameterLayout {
         return fields == other.fields;
     }
 
+    ProgramParameterLayout operator+(const ProgramParameterLayout& other) const {
+        ProgramParameterLayout outLayout = *this;
+        for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
+            for (size_t j = 0; j < ProgramParameterLayout::MAX_BINDINGS; ++j) {
+                auto& field = other.fields[i * ProgramParameterLayout::MAX_BINDINGS + j];
+                if (field) {
+                    outLayout.fields[i * ProgramParameterLayout::MAX_BINDINGS + j]= field;
+                }
+            }
+        }
+        return outLayout;
+    }
+
     std::array<LayoutField, TABLE_SIZE> fields{};
 };
 

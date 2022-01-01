@@ -167,6 +167,7 @@ enum class BufferUsage : uint16_t {
 
 enum class BufferType : uint8_t {
     DEVICE,
+    CPU_TO_GPU,
     HOST_COHERENT
 };
 

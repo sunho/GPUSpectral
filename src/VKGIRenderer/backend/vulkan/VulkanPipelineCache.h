@@ -11,6 +11,11 @@
 #include "VulkanHandles.h"
 
 template <>
+inline uint64_t hashStruct<ProgramHash>(const ProgramHash& hash) {
+    return hashBase(hash);
+}
+
+template <>
 inline uint64_t hashStruct<VulkanAttachment>(const VulkanAttachment& attachment) {
     uint64_t seed = hashBase(attachment.valid);
     seed ^= hashStruct(attachment.view);
@@ -228,7 +233,7 @@ class VulkanPipelineCache {
                                          VulkanSwapChain swapchain, 
                                          VulkanRenderTarget *renderTarget);
     VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
-    void bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const VulkanProgram &program, const VulkanBindings& bindings);
+    void bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const ProgramParameterLayout& layout, const VulkanBindings& bindings);
     void tick();
 
   private:
@@ -245,6 +250,9 @@ class VulkanPipelineCache {
     PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout);
    
     struct KeyHasher {
+        std::size_t operator()(const VulkanRTPipelineState& k) const {
+            return hashStruct<VulkanRTPipelineState>(k);
+        }
         std::size_t operator()(const VulkanAttachments& k) const {
             return hashStruct<VulkanAttachments>(k);
         }

@@ -18,9 +18,9 @@ void FrameGraph::addFramePass(FramePass pass) {
 }
 
 Handle<HwBufferObject> FrameGraph::createTempUniformBuffer(void* data, size_t size) {
-    auto buffer = createBufferObjectSC(size, BufferUsage::UNIFORM | BufferUsage::TRANSFER_DST, BufferType::HOST_COHERENT);
+    auto buffer = createBufferObjectSC(size, BufferUsage::UNIFORM | BufferUsage::TRANSFER_DST, BufferType::DEVICE);
     auto staging = createBufferObjectSC(size, BufferUsage::TRANSFER_SRC, BufferType::HOST_COHERENT);
-    driver.updateStagingBufferObject(staging, { .data = (uint32_t*)data, .size = size }, 0);
+    driver.updateCPUBufferObject(staging, { .data = (uint32_t*)data, .size = size }, 0);
     driver.copyBufferObject(buffer, staging);
     return buffer;
 }

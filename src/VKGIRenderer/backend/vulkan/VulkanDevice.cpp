@@ -11,6 +11,9 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
     physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray                     = VK_TRUE;
     physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount   = VK_TRUE;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+
    
     vkb::InstanceBuilder builder;
 
@@ -32,11 +35,17 @@ VulkanDevice::VulkanDevice(VKGIRenderer::Window* window) : semaphorePool(*this) 
     // Init vulkan device
     vkb::PhysicalDeviceSelector selector{ vkbInstance };
     auto physRet = selector.set_surface(wsi->surface)
+                    .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
+                    //.add_required_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME)
+        .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+                    .add_required_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
                     .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
                     .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
                     .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
+                    .add_required_extension_features(accelFeature)
+                    .add_required_extension_features(rtPipelineFeature)
 
                        .select ();
     if (!physRet) {
@@ -168,9 +177,10 @@ AllocatedImage VulkanDevice::allocateImage(vk::ImageCreateInfo info, VmaMemoryUs
 }
 
 uint64_t VulkanDevice::getBufferDeviceAddress(vk::Buffer buffer) {
-    vk::BufferDeviceAddressInfoKHR ai{};
+    VkBufferDeviceAddressInfoKHR ai = {};
+    ai.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR;
     ai.buffer = buffer;
-    return device.getBufferAddressKHR(ai);
+    return dld.vkGetBufferDeviceAddressKHR(device, &ai);
 }
 
 SemaphorePool::~SemaphorePool() {

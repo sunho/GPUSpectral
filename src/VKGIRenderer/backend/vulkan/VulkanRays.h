@@ -27,10 +27,11 @@ struct VulkanBLAS : public HwBLAS {
 };
 
 struct VulkanTLAS : public HwTLAS {
-    VulkanTLAS(VulkanDevice& device, const VulkanRTSceneDescriptor& scene, VulkanBufferObject** scratch);
+    VulkanTLAS(VulkanDevice& device, vk::CommandBuffer cmd, const VulkanRTSceneDescriptor& scene, VulkanBufferObject** scratch);
     ~VulkanTLAS();
     VkAccelerationStructureKHR handle{};
     std::unique_ptr<VulkanBufferObject> buffer{};
+    std::unique_ptr<VulkanBufferObject> instanceBuffer{};
 };
 
 

@@ -36,33 +36,23 @@ static std::vector<uint32_t> loadCompiledShader(const std::string& path) {
     throw std::runtime_error("Could not open shader file: " + path);
 }
 
-Handle<HwProgram> Renderer::loadComputeShader(const std::string& filename) {
+Handle<HwProgram> Renderer::loadShader(const std::string& filename) {
     auto code = loadCompiledShader(engine.assetPath(filename)+".spv");
     Program prog{ code };
     return driver.createProgram(prog);
 }
 
-Handle<HwProgram> Renderer::loadGraphicsShader(const std::string& vertFilename, const std::string& fragFilename) {
-    auto vertCode = loadCompiledShader(engine.assetPath(vertFilename) + ".spv");
-    auto fragCode = loadCompiledShader(engine.assetPath(fragFilename) + ".spv");
-    Program prog{ vertCode, fragCode };
-    return driver.createProgram(prog);
+void Renderer::registerShader(const std::string& shaderName, const std::string& filename)  {
+    programs.emplace(shaderName, loadShader(filename));
 }
 
-void Renderer::registerComputeShader(const std::string& shaderName, const std::string& filename)  {
-    programs.emplace(shaderName, loadComputeShader(filename));
-}
-
-void Renderer::registerGraphicsShader(const std::string& shaderName, const std::string& vertFilename, const std::string& fragFilename) {
-    programs.emplace(shaderName, loadGraphicsShader(vertFilename, fragFilename));
-}
 
 Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
     return programs.at(shaderName);
 }
 
 void Renderer::registerPrograms() {
-    registerComputeShader("DDGIProbeRayShade", "shaders/DDGIProbeRayShade.comp");
+    registerShader("DDGIProbeRayShade", "shaders/DDGIProbeRayShade.comp");
 }
 
 Renderer::~Renderer() {
