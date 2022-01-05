@@ -87,13 +87,13 @@ static void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
             .stride = 8,
             .type = ElementType::FLOAT2,
         };
-        auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA, BufferType::DEVICE);
+        auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE);
         driver.updateBufferObjectSync(buffer0, { .data = (uint32_t*)v.data() }, 0);
         mesh->positionBuffer = buffer0;
-        auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA, BufferType::DEVICE);
+        auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE);
         driver.updateBufferObjectSync(buffer1, { .data = (uint32_t*)vn.data() }, 0);
         mesh->normalBuffer = buffer1;
-        auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA, BufferType::DEVICE);
+        auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE);
         driver.updateBufferObjectSync(buffer2, { .data = (uint32_t*)vt.data() }, 0);
         mesh->uvBuffer = buffer2;
 

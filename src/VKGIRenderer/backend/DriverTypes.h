@@ -164,6 +164,7 @@ enum class BufferUsage : uint32_t {
     ACCELERATION_STRUCTURE = 0x40,
     SBT = 0x80,
     BDA = 0x100,
+    ACCELERATION_STRUCTURE_INPUT = 0x200,
 };
 
 enum class BufferType : uint8_t {

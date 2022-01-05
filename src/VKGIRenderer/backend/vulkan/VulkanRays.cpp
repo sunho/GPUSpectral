@@ -4,8 +4,8 @@
 #include <Tracy.hpp>
 
 VulkanBLAS::VulkanBLAS(VulkanDevice& device, vk::CommandBuffer cmd, VulkanPrimitive* primitive, VulkanBufferObject** scratch) {
-	VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress{};
-	VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress{};
+	VkDeviceOrHostAddressConstKHR vertexBufferDeviceAddress = {};
+	VkDeviceOrHostAddressConstKHR indexBufferDeviceAddress = {};
 
 	vertexBufferDeviceAddress.deviceAddress = device.getBufferDeviceAddress(primitive->vertex->buffers[0]->buffer);
 	indexBufferDeviceAddress.deviceAddress = device.getBufferDeviceAddress(primitive->index->buffer->buffer);
@@ -30,7 +30,7 @@ VulkanBLAS::VulkanBLAS(VulkanDevice& device, vk::CommandBuffer cmd, VulkanPrimit
 
 	// Get size info
 	VkAccelerationStructureBuildGeometryInfoKHR accelerationStructureBuildGeometryInfo = {};
-	accelerationStructureGeometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+	accelerationStructureBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
 	accelerationStructureBuildGeometryInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 	accelerationStructureBuildGeometryInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
 	accelerationStructureBuildGeometryInfo.geometryCount = 1;
@@ -45,7 +45,7 @@ VulkanBLAS::VulkanBLAS(VulkanDevice& device, vk::CommandBuffer cmd, VulkanPrimit
 		&numTriangles,
 		&accelerationStructureBuildSizesInfo);
 	
-	buffer = std::make_unique<VulkanBufferObject>(device, accelerationStructureBuildSizesInfo.accelerationStructureSize, BufferUsage::BDA, BufferType::DEVICE);
+	buffer = std::make_unique<VulkanBufferObject>(device, accelerationStructureBuildSizesInfo.accelerationStructureSize, BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE, BufferType::DEVICE);
 	// Acceleration structure
 	VkAccelerationStructureCreateInfoKHR accelerationStructureCreate_info{};
 	accelerationStructureCreate_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
@@ -60,7 +60,7 @@ VulkanBLAS::VulkanBLAS(VulkanDevice& device, vk::CommandBuffer cmd, VulkanPrimit
 	deviceAddress = device.dld.vkGetAccelerationStructureDeviceAddressKHR(device.device, &accelerationDeviceAddressInfo);
 
 	// Create a small scratch buffer used during build of the bottom level acceleration structure
-	*scratch = new VulkanBufferObject(device, accelerationStructureBuildSizesInfo.buildScratchSize, BufferUsage::BDA | BufferUsage::STORAGE, BufferType::DEVICE);
+	*scratch = new VulkanBufferObject(device, accelerationStructureBuildSizesInfo.buildScratchSize, BufferUsage::BDA | BufferUsage::STORAGE  | BufferUsage::ACCELERATION_STRUCTURE_INPUT , BufferType::DEVICE);
 
 	VkAccelerationStructureBuildGeometryInfoKHR accelerationBuildGeometryInfo = {};
 	accelerationBuildGeometryInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
@@ -105,7 +105,7 @@ VulkanTLAS::VulkanTLAS(VulkanDevice& device, vk::CommandBuffer cmd, const Vulkan
 		blasInstances.push_back(accInstance);
 	}
 
-	instanceBuffer = std::make_unique<VulkanBufferObject>(device, sizeof(VkAccelerationStructureInstanceKHR) * scene.instances.size(), BufferUsage::BDA, BufferType::CPU_TO_GPU);
+	instanceBuffer = std::make_unique<VulkanBufferObject>(device, sizeof(VkAccelerationStructureInstanceKHR) * scene.instances.size(), BufferUsage::BDA, BufferType::HOST_COHERENT);
 	memcpy(instanceBuffer->mapped, blasInstances.data(), blasInstances.size() * sizeof(VkAccelerationStructureInstanceKHR));
 
 	VkDeviceOrHostAddressConstKHR instance_data_device_address{};

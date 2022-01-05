@@ -185,9 +185,9 @@ AllocatedImage VulkanDevice::allocateImage(vk::ImageCreateInfo info, VmaMemoryUs
 
 uint64_t VulkanDevice::getBufferDeviceAddress(vk::Buffer buffer) {
     VkBufferDeviceAddressInfoKHR ai = {};
-    ai.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR;
+    ai.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
     ai.buffer = buffer;
-    return dld.vkGetBufferDeviceAddressKHR(device, &ai);
+    return dld.vkGetBufferDeviceAddress(device, &ai);
 }
 
 SemaphorePool::~SemaphorePool() {

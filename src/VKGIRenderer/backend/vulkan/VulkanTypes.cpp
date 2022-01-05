@@ -197,10 +197,13 @@ vk::BufferUsageFlags translateBufferUsage(BufferUsage usage) {
         out |= vk::BufferUsageFlagBits::eTransferDst;
     }
     if (usage & BufferUsage::BDA) {
-        out |= vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        out |= vk::BufferUsageFlagBits::eShaderDeviceAddressKHR;
     }
     if (usage & BufferUsage::ACCELERATION_STRUCTURE) {
         out |= vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR;
+    }
+    if (usage & BufferUsage::ACCELERATION_STRUCTURE_INPUT) {
+        out |= vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR;
     }
     return out;
 }

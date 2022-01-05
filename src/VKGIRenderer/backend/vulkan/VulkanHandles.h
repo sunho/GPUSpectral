@@ -24,7 +24,7 @@ struct VulkanVertexBuffer : public HwVertexBuffer {
 
 struct VulkanIndexBuffer : public HwIndexBuffer {
     explicit VulkanIndexBuffer(VulkanDevice &device, uint32_t count)
-        : HwIndexBuffer(count), buffer(std::make_unique<VulkanBufferObject>(device, count * 4, BufferUsage::INDEX | BufferUsage::STORAGE, BufferType::DEVICE)) {
+        : HwIndexBuffer(count), buffer(std::make_unique<VulkanBufferObject>(device, count * 4, BufferUsage::BDA | BufferUsage::INDEX | BufferUsage::STORAGE | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE)) {
     }
 
     std::unique_ptr<VulkanBufferObject> buffer;

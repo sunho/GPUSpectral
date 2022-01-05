@@ -103,6 +103,7 @@ void Renderer::render(InflightContext& ctx, const Scene& scene) {
         RTInstance instance;
         instance.blas = blas;
         instance.transfom = obj.transform;
+        instances.push_back(instance);
     }
     ctx.data->tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
 }
