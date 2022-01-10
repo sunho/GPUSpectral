@@ -65,7 +65,7 @@ target_include_directories(VKGIRenderer PUBLIC .. ${CMAKE_CURRENT_BINARY_DIR}/..
 
 add_executable(embedfile utils/EmbedFile.c)
 set(SHADER_BINARIES "")
-function(add_shader TARGET SHADER)
+function(add_shader SHADER)
     find_program(GLSLC glslc)
 
 	set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/assets/shaders/${SHADER})
@@ -77,7 +77,7 @@ function(add_shader TARGET SHADER)
 	add_custom_command(
 		OUTPUT ${current-output-path}
 		COMMAND ${GLSLC} --target-env=vulkan1.2 -o ${current-output-path} ${current-shader-path}
-        COMMAND ${CMAKE_COMMAND} -E echo "COMIPLE SHADRS"
+        COMMAND ${CMAKE_COMMAND} -E echo "COMIPLE SHADER"
 		DEPENDS ${current-shader-path}
 		IMPLICIT_DEPENDS CXX ${current-shader-path}
 		VERBATIM)
@@ -86,12 +86,14 @@ function(add_shader TARGET SHADER)
 	set_source_files_properties(${current-output-path} PROPERTIES GENERATED TRUE)
     set(SHADER_BINARIES ${SHADER_BINARIES} ${current-output-path} PARENT_SCOPE)
 endfunction(add_shader)
-
-add_shader(VKGIRenderer DDGIProbeRayShade.comp)
+add_shader(raygen.glsl)
+add_shader(rayhit.glsl)
+add_shader(miss.glsl)
+add_shader(DrawTexture.vert)
+add_shader(DrawTexture.frag)
 
 add_custom_target(shader_binary DEPENDS ${SHADER_BINARIES})
 message("shader: ${SHADER_BINARIES}")
-add_dependencies(VKGIRenderer shader_binary)
 
 add_custom_command(
     TARGET VKGIRenderer
@@ -99,9 +101,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets "$<TARGET_FILE_DIR:VKGIRenderer>/assets"
 )
 
-add_custom_command(
-    TARGET VKGIRenderer
-    POST_BUILD
+add_custom_target(
+    copy_shaders
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_BINARY_DIR}/shaders "$<TARGET_FILE_DIR:VKGIRenderer>/assets/shaders"
-    COMMAND ${CMAKE_COMMAND} -E echo "COPY SHADERS to lib"
+    COMMENT "Copying shaders"
+    DEPENDS shader_binary
 )
+
+add_dependencies(VKGIRenderer copy_shaders)

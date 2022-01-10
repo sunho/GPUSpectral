@@ -314,6 +314,36 @@ void VulkanDriver::dispatch(ComputePipeline pipeline, size_t groupCountX, size_t
     cmd.dispatch(groupCountX, groupCountY, groupCountZ);
 }
 
+void VulkanDriver::traceRays(RTPipeline pipeline, size_t width, size_t height) {
+    auto& cmd = context.inflight->cmd;
+    ProgramParameterLayout parameterLayout = handleCast<VulkanProgram>(pipeline.raygenGroup)->program.parameterLayout;
+    const auto unwrapVector = [&](const std::vector<Handle<HwProgram>>& programs) {
+        std::vector<VulkanProgram*> outPrograms;
+        for (auto program : programs) {
+            outPrograms.push_back(handleCast<VulkanProgram>(program));
+            parameterLayout = parameterLayout + outPrograms.back()->program.parameterLayout;
+        }
+        return outPrograms;
+    }; 
+    VulkanRTPipelineState state = {
+        .raygenGroup = handleCast<VulkanProgram>(pipeline.raygenGroup),
+        .missGroups = unwrapVector(pipeline.missGroups),
+        .hitGroups = unwrapVector(pipeline.hitGroups),
+        .callableGroups = unwrapVector(pipeline.callableGroups),
+        .parameterLayout = parameterLayout
+    };
+    auto vkpipe = device->cache->getOrCreateRTPipeline(state);
+    auto sbt = device->cache->getOrCreateSBT(state);
+    cmd.bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, vkpipe.pipeline);
+    device->cache->bindDescriptor(cmd, vk::PipelineBindPoint::eRayTracingKHR, parameterLayout, translateBindingMap(parameterLayout, pipeline.bindings));
+    device->dld.vkCmdTraceRaysKHR(cmd, 
+        &sbt.raygen.stridedDeviceAddressRegion, 
+        &sbt.miss.stridedDeviceAddressRegion, 
+        &sbt.hit.stridedDeviceAddressRegion, 
+        &sbt.callable.stridedDeviceAddressRegion, 
+        width, height, 1);
+}
+
 void VulkanDriver::setProfileSectionName(const char* name) {
     context.profileSectionName = name;
 }
@@ -471,16 +501,6 @@ ImageLayout VulkanDriver::getTextureImageLayout(Handle<HwTexture> handle) {
     return texture->imageLayout;
 }
 
-void VulkanDriver::intersectRays(Handle<HwTLAS> tlasHandle, uint32_t rayCount, Handle<HwBufferObject> raysHandle, Handle<HwBufferObject> hitsHandle) {
-    auto& cmd = context.inflight->cmd;
-    VulkanTLAS* tlas = handleCast<VulkanTLAS>(tlasHandle);
-    VulkanBufferObject* rays = handleCast<VulkanBufferObject>(raysHandle);
-    VulkanBufferObject* hits = handleCast<VulkanBufferObject>(hitsHandle);
-
-    ZoneScopedN("Intersect")
-    TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("intersect").c_str(), true)
-    //rayTracer->intersectRays(context.inflight->rayFrameContext, tlas, rayCount, rays, hits);
-}
 
 void VulkanDriver::destroyBLAS(Handle<HwBLAS> handle) {
     destructHandle<VulkanBLAS>(handle);
@@ -600,6 +620,17 @@ VulkanBindings VulkanDriver::translateBindingMap(const ProgramParameterLayout& l
                         vb.imageInfo.push_back(imageInfo);
                         ++vb.arraySize;
                     }
+                }
+                break;
+            }
+            case ProgramParameterType::TLAS: {
+                for (auto handle : binding.handles) {
+                    if (!handle.tlas) {
+                        break;
+                    }
+                    auto tlas = handleCast<VulkanTLAS>(handle.tlas);
+                    vb.tlasInfo.push_back(tlas->handle);
+                    ++vb.arraySize;
                 }
                 break;
             }

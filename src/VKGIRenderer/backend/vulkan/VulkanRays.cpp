@@ -91,21 +91,24 @@ VulkanBLAS::~VulkanBLAS() {
 VulkanTLAS::VulkanTLAS(VulkanDevice& device, vk::CommandBuffer cmd, const VulkanRTSceneDescriptor& scene, VulkanBufferObject** scratch) {
 	std::vector< VkAccelerationStructureInstanceKHR> blasInstances;
 	for (auto& instance : scene.instances) {
+		auto& t = instance.transfom;
 		VkTransformMatrixKHR transformMatrix = {
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f };
+			t[0][0], t[0][1], t[0][2], t[0][3],
+			t[1][0], t[1][1], t[1][2], t[1][3],
+			t[2][0], t[2][1], t[2][2], t[2][3],
+		};
 
 		VkAccelerationStructureInstanceKHR accInstance{};
 		accInstance.transform = transformMatrix;
 		accInstance.instanceCustomIndex = 0;
 		accInstance.mask = 0xFF;
 		accInstance.instanceShaderBindingTableRecordOffset = 0;
+		accInstance.accelerationStructureReference = instance.blas->deviceAddress;
 		accInstance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		blasInstances.push_back(accInstance);
 	}
 
-	instanceBuffer = std::make_unique<VulkanBufferObject>(device, sizeof(VkAccelerationStructureInstanceKHR) * scene.instances.size(), BufferUsage::BDA, BufferType::HOST_COHERENT);
+	instanceBuffer = std::make_unique<VulkanBufferObject>(device, sizeof(VkAccelerationStructureInstanceKHR) * scene.instances.size(), BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::HOST_COHERENT);
 	memcpy(instanceBuffer->mapped, blasInstances.data(), blasInstances.size() * sizeof(VkAccelerationStructureInstanceKHR));
 
 	VkDeviceOrHostAddressConstKHR instance_data_device_address{};
@@ -133,7 +136,7 @@ VulkanTLAS::VulkanTLAS(VulkanDevice& device, vk::CommandBuffer cmd, const Vulkan
 		&primitive_count,
 		&acceleration_structure_build_sizes_info);
 
-	buffer = std::make_unique<VulkanBufferObject>(device, acceleration_structure_build_sizes_info.accelerationStructureSize, BufferUsage::STORAGE, BufferType::DEVICE);
+	buffer = std::make_unique<VulkanBufferObject>(device, acceleration_structure_build_sizes_info.accelerationStructureSize, BufferUsage::STORAGE | BufferUsage::ACCELERATION_STRUCTURE, BufferType::DEVICE);
 
 	// Create the acceleration structure
 	VkAccelerationStructureCreateInfoKHR acceleration_structure_create_info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };

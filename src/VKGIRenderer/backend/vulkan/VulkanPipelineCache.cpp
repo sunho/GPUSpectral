@@ -133,7 +133,7 @@ VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayo
     vk::PushConstantRange pushConstants{};
     pushConstants.offset = 0;
     pushConstants.size = MAX_PUSH_CONSTANT_SIZE;
-    pushConstants.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment;
+    pushConstants.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eCompute | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eRaygenKHR;
     createInfo.pPushConstantRanges = &pushConstants;
     createInfo.pushConstantRangeCount = 1;
 
@@ -182,6 +182,12 @@ void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::Pipeli
         write.descriptorType = binding.type;
         write.pBufferInfo = binding.bufferInfo.data();
         write.pImageInfo = binding.imageInfo.data();
+        if (binding.type == vk::DescriptorType::eAccelerationStructureKHR) {
+            vk::WriteDescriptorSetAccelerationStructureKHR ac{};
+            ac.accelerationStructureCount = binding.arraySize;
+            ac.pAccelerationStructures = binding.tlasInfo.data();
+            write.pNext = &ac;
+        }
         writes.push_back(write);
     }
     device.device.updateDescriptorSets(writes.size(), writes.data(), 0, nullptr);
@@ -382,13 +388,20 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
         stages.push_back(wrapShaderModule(state.raygenGroup->shaderModule, vk::ShaderStageFlagBits::eRaygenKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
             .setGeneralShader(stages.size() - 1)
+            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+            .setClosestHitShader(VK_SHADER_UNUSED_KHR)
+
             .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
     for (auto& hitGroup : state.hitGroups) {
         stages.push_back(wrapShaderModule(hitGroup->shaderModule, vk::ShaderStageFlagBits::eClosestHitKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
-            .setGeneralShader(stages.size() - 1)
+            .setClosestHitShader(stages.size() - 1)
+            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+            .setGeneralShader(VK_SHADER_UNUSED_KHR)
             .setType(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup);
         groups.push_back(gi);
     }
@@ -396,6 +409,9 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
         stages.push_back(wrapShaderModule(missGroup->shaderModule, vk::ShaderStageFlagBits::eMissKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
             .setGeneralShader(stages.size() - 1)
+            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+            .setClosestHitShader(VK_SHADER_UNUSED_KHR)
             .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
@@ -403,6 +419,9 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
         stages.push_back(wrapShaderModule(callGroup->shaderModule, vk::ShaderStageFlagBits::eCallableKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
             .setGeneralShader(stages.size() - 1)
+            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+            .setClosestHitShader(VK_SHADER_UNUSED_KHR)
             .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
@@ -413,6 +432,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
     createInfo.groupCount = groups.size();
     createInfo.pGroups = groups.data();
     createInfo.maxPipelineRayRecursionDepth = MAX_RECURSION_DEPTH;
+    createInfo.layout = pipelineLayout.pipelineLayout;
     VkPipeline pipeline;
     auto res = device.dld.vkCreateRayTracingPipelinesKHR(device.device, nullptr, nullptr, 1, &createInfo, nullptr, &pipeline);
     if (res != VK_SUCCESS) {

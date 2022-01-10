@@ -96,6 +96,16 @@ struct ProgramParameterLayout {
         return *this;
     }
 
+    ProgramParameterLayout& addTLAS(uint32_t set, uint32_t binding) {
+        fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::TLAS, 1 };
+        return *this;
+    }
+
+    ProgramParameterLayout& addTLASArray(uint32_t set, uint32_t binding, size_t size) {
+        fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::TLAS, (uint32_t)size };
+        return *this;
+    }
+
     bool operator==(const ProgramParameterLayout& other) const {
         return fields == other.fields;
     }

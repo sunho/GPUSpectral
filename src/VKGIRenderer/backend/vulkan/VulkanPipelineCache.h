@@ -150,6 +150,7 @@ struct VulkanBinding {
     uint32_t arraySize;
     std::vector<vk::DescriptorBufferInfo> bufferInfo;
     std::vector<vk::DescriptorImageInfo> imageInfo;
+    std::vector<vk::AccelerationStructureKHR> tlasInfo;
 };
 
 using VulkanBindings = std::vector<VulkanBinding>;
@@ -195,7 +196,7 @@ struct VulkanPipeline {
     vk::PipelineLayout layout;
 };
 
-static inline vk::StridedDeviceAddressRegionKHR getSbtEntryStridedDeviceAddressRegion(VulkanDevice& device, vk::Buffer buffer, uint32_t handleCount) {
+static inline VkStridedDeviceAddressRegionKHR getSbtEntryStridedDeviceAddressRegion(VulkanDevice& device, vk::Buffer buffer, uint32_t handleCount) {
     VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
     stridedDeviceAddressRegion.deviceAddress = device.getBufferDeviceAddress(buffer);
     stridedDeviceAddressRegion.stride = device.shaderGroupHandleSizeAligned;
@@ -210,7 +211,7 @@ struct VulkanShaderBindingTable {
         buffer = new VulkanBufferObject(device, device.shaderGroupHandleSize * handlesCount, BufferUsage::SBT | BufferUsage::BDA, BufferType::HOST_COHERENT);
         stridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(device,buffer->buffer, handlesCount);
     }
-    vk::StridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
+    VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
     VulkanBufferObject* buffer{ nullptr };
 };
 

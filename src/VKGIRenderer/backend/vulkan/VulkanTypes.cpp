@@ -220,6 +220,8 @@ vk::DescriptorType translateDescriptorType(ProgramParameterType type) {
             return vk::DescriptorType::eCombinedImageSampler;
         case ProgramParameterType::ATTACHMENT:
             return vk::DescriptorType::eInputAttachment;
+        case ProgramParameterType::TLAS:
+            return vk::DescriptorType::eAccelerationStructureKHR;
     }
     return vk::DescriptorType();
 }

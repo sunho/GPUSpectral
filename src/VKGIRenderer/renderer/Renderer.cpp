@@ -23,6 +23,26 @@ Renderer::Renderer(Engine& engine, Window* window)
         inflights[i].rg = std::make_unique<FrameGraph>(driver);
     }
     registerPrograms();
+    surfaceRenderTarget = driver.createDefaultRenderTarget();
+    std::vector<float> v = { -1, -1, 1, 1, -1, 1, 1, -1, 1, 1, -1, -1 };
+    std::vector<uint32_t> indices = { 0, 1, 2, 3, 4, 5 };
+    AttributeArray attributes = {};
+    attributes[0] = {
+        .name = "position",
+        .index = 0,
+        .offset = 0,
+        .stride = 8,
+        .type = ElementType::FLOAT2
+    };
+    auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX, BufferType::DEVICE);
+    driver.updateBufferObjectSync(buffer0, { .data = (uint32_t*)v.data() }, 0);
+    auto vbo = driver.createVertexBuffer(1, 6, 1, attributes);
+    driver.setVertexBuffer(vbo, 0, buffer0);
+
+    auto ibo = driver.createIndexBuffer(indices.size());
+    driver.updateIndexBuffer(ibo, { .data = (uint32_t*)indices.data() }, 0);
+    quadPrimitive = driver.createPrimitive(PrimitiveMode::TRIANGLES);
+    driver.setPrimitiveBuffer(quadPrimitive, vbo, ibo);
 }
 
 static std::vector<uint32_t> loadCompiledShader(const std::string& path) {
@@ -52,7 +72,11 @@ Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
 }
 
 void Renderer::registerPrograms() {
-    registerShader("DDGIProbeRayShade", "shaders/DDGIProbeRayShade.comp");
+    registerShader("RayMiss", "shaders/miss.glsl");
+    registerShader("RayGen", "shaders/raygen.glsl");
+    registerShader("RayHit", "shaders/rayhit.glsl");
+    registerShader("DrawTextureVert", "shaders/DrawTexture.vert");
+    registerShader("DrawTextureFrag", "shaders/DrawTexture.frag");
 }
 
 Renderer::~Renderer() {
@@ -106,6 +130,23 @@ void Renderer::render(InflightContext& ctx, const Scene& scene) {
         instances.push_back(instance);
     }
     ctx.data->tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
+    auto tex = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, 1, 2048, 2048, 1);
+    RTPipeline pipeline = {};
+    pipeline.raygenGroup = getShaderProgram("RayGen");
+    pipeline.missGroups.push_back(getShaderProgram("RayMiss"));
+    pipeline.hitGroups.push_back(getShaderProgram("RayHit"));
+    pipeline.bindTLAS(0, 0, ctx.data->tlas);
+    pipeline.bindStorageImage(0, 1, tex);
+    driver.traceRays(pipeline, 2048, 2048);
+    GraphicsPipeline pipe = {};
+    pipe.vertex = getShaderProgram("DrawTextureVert");
+    pipe.fragment= getShaderProgram("DrawTextureFrag");
+    RenderPassParams params;
+    driver.beginRenderPass(this->surfaceRenderTarget, params);
+    pipe.bindTexture(0, 0, tex);
+    driver.draw(pipe, this->quadPrimitive);
+    driver.endRenderPass();
+
 }
 
 void Renderer::prepareSceneData(InflightContext& ctx) {

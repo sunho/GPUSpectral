@@ -57,6 +57,14 @@ void VulkanProgram::parseParameterLayout(const CompiledCode& code) {
         size_t arraySize = type.array.size() > 0 ? type.array[0] : 1;
         program.parameterLayout.addTextureArray(set, binding, arraySize);
     }
+
+    for (auto& ai : resources.acceleration_structures) {
+        auto type = refl.get_type(ai.type_id);
+        auto binding = refl.get_decoration(ai.id, spv::DecorationBinding);
+        auto set = refl.get_decoration(ai.id, spv::DecorationDescriptorSet);
+        size_t arraySize = type.array.size() > 0 ? type.array[0] : 1;
+        program.parameterLayout.addTLASArray(set, binding, arraySize);
+    }
 }
 
 VulkanRenderTarget::VulkanRenderTarget()
