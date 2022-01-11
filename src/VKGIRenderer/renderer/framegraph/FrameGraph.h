@@ -20,7 +20,9 @@ enum class ResourceAccessType {
     DepthWrite,
     ColorWrite,
     ComputeRead,
-    FragmentRead
+    FragmentRead,
+    RTWrite,
+    RTRead
 };
 
 static inline bool isWriteAccessType(const ResourceAccessType& access) {
@@ -29,6 +31,7 @@ static inline bool isWriteAccessType(const ResourceAccessType& access) {
         case ResourceAccessType::ColorWrite:
         case ResourceAccessType::DepthWrite:
         case ResourceAccessType::TransferWrite:
+        case ResourceAccessType::RTWrite:
             return true;
         default:
             return false;
@@ -41,6 +44,7 @@ static inline bool isReadAccessType(const ResourceAccessType& access) {
         case ResourceAccessType::FragmentRead:
         case ResourceAccessType::ComputeRead:
         case ResourceAccessType::TransferRead:
+        case ResourceAccessType::RTRead:
             return true;
         default:
             return false;

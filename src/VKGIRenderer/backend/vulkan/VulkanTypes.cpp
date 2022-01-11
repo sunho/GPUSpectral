@@ -255,6 +255,9 @@ vk::PipelineStageFlags translateStageMask(BarrierStageMask mask) {
     if (mask & BarrierStageMask::VERTEX_SHADER) {
         out |= vk::PipelineStageFlagBits::eVertexShader;
     }
+    if (mask & BarrierStageMask::RAYTRACING_SHADER) {
+        out |= vk::PipelineStageFlagBits::eRayTracingShaderKHR;
+    }
     return out;
 }
 

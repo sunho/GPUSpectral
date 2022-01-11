@@ -21,8 +21,8 @@ void main()
 	const vec2 inUV = pixelCenter/vec2(gl_LaunchSizeEXT.xy);
 	vec2 d = inUV * 2.0 - 1.0;
 
-	vec4 origin = vec4(0,0,3,1);
-	vec4 direction = vec4(rayDir(vec2(gl_LaunchSizeEXT.xy), vec2(gl_LaunchIDEXT.xy), radians(60.0)), 0.0);
+	vec4 origin = vec4(0,1,4,1);
+	vec4 direction = vec4(rayDir(vec2(gl_LaunchSizeEXT.xy), vec2(gl_LaunchIDEXT.xy), radians(45.0)), 0.0);
 	direction.z *= -1;
 	//vec4 direction = vec4(normalize(target.xyz / target.w), 0) ;
 

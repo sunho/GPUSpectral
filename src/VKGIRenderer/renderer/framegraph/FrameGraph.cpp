@@ -59,6 +59,10 @@ static std::pair<BarrierStageMask, BarrierAccessFlag> convertAccessTypeToBarrier
             return std::make_pair(BarrierStageMask::TRANSFER, BarrierAccessFlag::TRANSFER_READ);
         case ResourceAccessType::TransferWrite:
             return std::make_pair(BarrierStageMask::TRANSFER, BarrierAccessFlag::TRANSFER_WRITE);
+        case ResourceAccessType::RTRead:
+            return std::make_pair(BarrierStageMask::RAYTRACING_SHADER, BarrierAccessFlag::SHADER_READ);
+        case ResourceAccessType::RTWrite:
+            return std::make_pair(BarrierStageMask::RAYTRACING_SHADER, BarrierAccessFlag::SHADER_WRITE);
     }
 }
 
@@ -89,6 +93,10 @@ static ImageLayout decideImageLayout(const ResourceAccessType& type) {
             return ImageLayout::TRANSFER_SRC_OPTIMAL;
         case ResourceAccessType::TransferWrite:
             return ImageLayout::TRANSFER_DST_OPTIMAL;
+        case ResourceAccessType::RTRead:
+            return ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        case ResourceAccessType::RTWrite:
+            return ImageLayout::GENERAL;
     }
 }
 

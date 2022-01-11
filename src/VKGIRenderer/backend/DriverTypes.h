@@ -252,7 +252,7 @@ struct RenderAttachments {
 
 struct RTInstance {
     Handle<HwBLAS> blas;
-    glm::mat4x3 transfom;
+    glm::mat4 transfom;
 };
 
 struct RTSceneDescriptor {
@@ -293,6 +293,7 @@ enum class BarrierStageMask : uint32_t {
     EARLY_FRAGMENT_TESTS = 0x100,
     LATE_FRAGMENT_TESTS = 0x200,
     COLOR_ATTACHMENT_OUTPUT = 0x400,
+    RAYTRACING_SHADER = 0x800,
 };
 
 enum class BarrierAccessFlag : uint32_t {

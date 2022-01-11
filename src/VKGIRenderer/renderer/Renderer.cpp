@@ -129,23 +129,39 @@ void Renderer::render(InflightContext& ctx, const Scene& scene) {
         instance.transfom = obj.transform;
         instances.push_back(instance);
     }
-    ctx.data->tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
-    auto tex = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, 1, 2048, 2048, 1);
-    RTPipeline pipeline = {};
-    pipeline.raygenGroup = getShaderProgram("RayGen");
-    pipeline.missGroups.push_back(getShaderProgram("RayMiss"));
-    pipeline.hitGroups.push_back(getShaderProgram("RayHit"));
-    pipeline.bindTLAS(0, 0, ctx.data->tlas);
-    pipeline.bindStorageImage(0, 1, tex);
-    driver.traceRays(pipeline, 2048, 2048);
-    GraphicsPipeline pipe = {};
-    pipe.vertex = getShaderProgram("DrawTextureVert");
-    pipe.fragment= getShaderProgram("DrawTextureFrag");
-    RenderPassParams params;
-    driver.beginRenderPass(this->surfaceRenderTarget, params);
-    pipe.bindTexture(0, 0, tex);
-    driver.draw(pipe, this->quadPrimitive);
-    driver.endRenderPass();
+    auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
+    ctx.data->tlas = tlas;
+    auto tex = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, 1, 2048, 2048, 1);
+    ctx.rg->addFramePass({
+        .textures = {
+            {{tex}, ResourceAccessType::RTWrite},
+        },
+        .func = [this, tex, tlas](FrameGraph& rg) {
+            RTPipeline pipeline = {};
+            pipeline.raygenGroup = getShaderProgram("RayGen");
+            pipeline.missGroups.push_back(getShaderProgram("RayMiss"));
+            pipeline.hitGroups.push_back(getShaderProgram("RayHit"));
+            pipeline.bindTLAS(0, 0, tlas);
+            pipeline.bindStorageImage(0, 1, tex);
+            driver.traceRays(pipeline, 2048, 2048);
+        },
+    });
+
+    ctx.rg->addFramePass({
+        .textures = {
+            {{tex}, ResourceAccessType::FragmentRead},
+        },
+        .func = [this, tex, tlas](FrameGraph& rg) {
+            GraphicsPipeline pipe = {};
+            pipe.vertex = getShaderProgram("DrawTextureVert");
+            pipe.fragment= getShaderProgram("DrawTextureFrag");
+            RenderPassParams params;
+            driver.beginRenderPass(this->surfaceRenderTarget, params);
+            pipe.bindTexture(0, 0, tex);
+            driver.draw(pipe, this->quadPrimitive);
+            driver.endRenderPass();
+        },
+    });
 
 }
 
