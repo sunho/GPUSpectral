@@ -57,27 +57,6 @@ struct Ray {
     float maxTime;
 };
 
-uint rngState;
-uint randPcg()
-{
-    uint state = rngState;
-    rngState = rngState * 747796405u + 2891336453u;
-    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-    return (word >> 22u) ^ word;
-}
-
-uint pcgHash(uint v)
-{
-	uint state = v * 747796405u + 2891336453u;
-	uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-	return (word >> 22u) ^ word;
-}
-
-
-float randUniform() {
-    return randPcg()*(1.0/float(0xffffffffu));
-}
-
 // http://corysimon.github.io/articles/uniformdistn-on-sphere/
 // tldr; find pdf function by f(v)*dA = 1 = f(phi,theta) * dphi * dtheta
 // dA = sin(phi) * dphi * dtheta

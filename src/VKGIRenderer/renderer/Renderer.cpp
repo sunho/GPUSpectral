@@ -103,7 +103,7 @@ void Renderer::run(const Scene& scene) {
     ctx.data = &inflights[currentFrame % MAX_INFLIGHTS];
     ctx.rg = inflight.rg.get();
 
-    prepareSceneData(ctx);
+    prepareSceneData(ctx, scene);
     render(ctx, scene);
 
     ctx.rg->submit();
@@ -113,36 +113,28 @@ void Renderer::run(const Scene& scene) {
     FrameMarkEnd("Frame")
 }
 
+struct BufferInstance {
+    glm::mat4 transformInvT;
+    uint64_t positionBuffer;
+    uint64_t normalBuffer;
+};
+
 void Renderer::render(InflightContext& ctx, const Scene& scene) {
-    std::vector<RTInstance> instances;
-    for (auto& obj: scene.renderObjects) {
-        Handle<HwBLAS> blas;
-        auto it = blasCache.find(obj.mesh->id());
-        if (it == blasCache.end()) {
-            blas = driver.createBLAS(obj.mesh->hwInstance);
-            blasCache.emplace(obj.mesh->id(), blas);
-        } else {
-            blas = it->second;
-        }
-        RTInstance instance;
-        instance.blas = blas;
-        instance.transfom = obj.transform;
-        instances.push_back(instance);
-    }
-    auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
-    ctx.data->tlas = tlas;
     auto tex = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, 1, 2048, 2048, 1);
+    auto tlas = ctx.data->tlas;
+    auto instanceBuffer = ctx.data->instanceBuffer;
     ctx.rg->addFramePass({
         .textures = {
             {{tex}, ResourceAccessType::RTWrite},
         },
-        .func = [this, tex, tlas](FrameGraph& rg) {
+        .func = [this, tex, tlas, instanceBuffer](FrameGraph& rg) {
             RTPipeline pipeline = {};
             pipeline.raygenGroup = getShaderProgram("RayGen");
             pipeline.missGroups.push_back(getShaderProgram("RayMiss"));
             pipeline.hitGroups.push_back(getShaderProgram("RayHit"));
             pipeline.bindTLAS(0, 0, tlas);
             pipeline.bindStorageImage(0, 1, tex);
+            pipeline.bindStorageBuffer(0, 2, instanceBuffer);
             driver.traceRays(pipeline, 2048, 2048);
         },
     });
@@ -165,7 +157,30 @@ void Renderer::render(InflightContext& ctx, const Scene& scene) {
 
 }
 
-void Renderer::prepareSceneData(InflightContext& ctx) {
-    ctx.data->reset(driver);
+void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
     std::unordered_map<uint32_t, uint32_t> primitiveIdToVB;
+    std::vector<RTInstance> instances;
+    std::vector<BufferInstance> binstances;
+    for (auto& obj: scene.renderObjects) {
+        Handle<HwBLAS> blas;
+        auto it = blasCache.find(obj.mesh->id());
+        if (it == blasCache.end()) {
+            blas = driver.createBLAS(obj.mesh->hwInstance);
+            blasCache.emplace(obj.mesh->id(), blas);
+        } else {
+            blas = it->second;
+        }
+        RTInstance instance;
+        instance.blas = blas;
+        instance.transfom = obj.transform;
+        instances.push_back(instance);
+        BufferInstance bi;
+        bi.transformInvT = glm::inverse(glm::transpose(obj.transform));
+        bi.positionBuffer = driver.getDeviceAddress(obj.mesh->positionBuffer);
+        bi.normalBuffer = driver.getDeviceAddress(obj.mesh->normalBuffer);
+        binstances.push_back(bi);
+    }
+    auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
+    ctx.data->tlas = tlas;
+    ctx.data->instanceBuffer = ctx.rg->createTempStorageBuffer(binstances.data(), binstances.size()*sizeof(BufferInstance));
 }

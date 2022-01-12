@@ -25,6 +25,14 @@ Handle<HwBufferObject> FrameGraph::createTempUniformBuffer(void* data, size_t si
     return buffer;
 }
 
+Handle<HwBufferObject> FrameGraph::createTempStorageBuffer(void* data, size_t size) {
+    auto buffer = createBufferObjectSC(size, BufferUsage::STORAGE | BufferUsage::TRANSFER_DST, BufferType::DEVICE);
+    auto staging = createBufferObjectSC(size, BufferUsage::TRANSFER_SRC, BufferType::HOST_COHERENT);
+    driver.updateCPUBufferObject(staging, { .data = (uint32_t*)data, .size = size }, 0);
+    driver.copyBufferObject(buffer, staging);
+    return buffer;
+}
+
 
 FrameGraph::~FrameGraph() {
     for (auto d : destroyers) {

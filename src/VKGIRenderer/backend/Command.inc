@@ -75,6 +75,7 @@ VOIDCOMMAND(beginRenderPass, RenderTargetHandle, renderTarget, RenderPassParams,
 VOIDCOMMAND(setBarrier, Barrier, barrier)
 VOIDCOMMAND(setProfileSectionName, const char *, name)
 COMMAND(ImageLayout, getTextureImageLayout, TextureHandle, handle)
+COMMAND(uint64_t, getDeviceAddress, BufferObjectHandle, handle)
 VOIDCOMMAND0(endRenderPass)
 VOIDCOMMAND(draw, GraphicsPipeline, pipeline, PrimitiveHandle, primitive)
 VOIDCOMMAND(dispatch, ComputePipeline, pipeline, size_t, groupCountX, size_t, groupCountY, size_t, groupCountZ)

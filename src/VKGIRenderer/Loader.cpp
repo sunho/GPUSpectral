@@ -347,7 +347,7 @@ Scene VKGIRenderer::loadScene(Engine& engine, Renderer& renderer, const std::str
             auto mesh = loadOrGetMesh(filename);
             auto transform = obj->property("to_world").getTransform();
             bool faceNormals = obj->property("face_normals").getBool(false);
-            auto matrix = glm::make_mat4(transform.matrix.data());
+            auto matrix = glm::transpose(glm::make_mat4(transform.matrix.data()));
             if (obj->property("center").isValid()) {
                 auto point = obj->property("center").getVector();
                 matrix[3][0] = point.x;

@@ -344,6 +344,11 @@ void VulkanDriver::traceRays(RTPipeline pipeline, size_t width, size_t height) {
         width, height, 1);
 }
 
+uint64_t VulkanDriver::getDeviceAddress(Handle<HwBufferObject> handle) {
+    VulkanBufferObject* buffer = handleCast<VulkanBufferObject, HwBufferObject>(handle);
+    return device->getBufferDeviceAddress(buffer->buffer);
+}
+
 void VulkanDriver::setProfileSectionName(const char* name) {
     context.profileSectionName = name;
 }

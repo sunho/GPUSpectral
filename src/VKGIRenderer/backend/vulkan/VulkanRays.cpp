@@ -93,9 +93,9 @@ VulkanTLAS::VulkanTLAS(VulkanDevice& device, vk::CommandBuffer cmd, const Vulkan
 	for (auto& instance : scene.instances) {
 		auto& t = instance.transfom;
 		VkTransformMatrixKHR transformMatrix = {
-			t[0][0], t[0][1], t[0][2], t[0][3],
-			t[1][0], t[1][1], t[1][2], t[1][3],
-			t[2][0], t[2][1], t[2][2], t[2][3],
+			t[0][0], t[1][0], t[2][0], t[3][0],
+			t[0][1], t[1][1], t[2][1], t[3][1],
+			t[0][2], t[1][2], t[2][2], t[3][2],
 		};
 
 		VkAccelerationStructureInstanceKHR accInstance{};
