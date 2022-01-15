@@ -72,9 +72,9 @@ Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
 }
 
 void Renderer::registerPrograms() {
-    registerShader("RayMiss", "shaders/miss.glsl");
-    registerShader("RayGen", "shaders/raygen.glsl");
-    registerShader("RayHit", "shaders/rayhit.glsl");
+    registerShader("RayMiss", "shaders/miss.rmiss");
+    registerShader("RayGen", "shaders/raygen.rgen");
+    registerShader("RayHit", "shaders/rayhit.rchit");
     registerShader("DrawTextureVert", "shaders/DrawTexture.vert");
     registerShader("DrawTextureFrag", "shaders/DrawTexture.frag");
 }
@@ -104,7 +104,7 @@ void Renderer::run(const Scene& scene) {
     ctx.rg = inflight.rg.get();
 
     prepareSceneData(ctx, scene);
-    render(ctx, scene);
+    impl->render(ctx, scene);
 
     ctx.rg->submit();
     driver.endFrame();
@@ -120,41 +120,6 @@ struct BufferInstance {
 };
 
 void Renderer::render(InflightContext& ctx, const Scene& scene) {
-    auto tex = ctx.rg->createTextureSC(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA8, 1, 2048, 2048, 1);
-    auto tlas = ctx.data->tlas;
-    auto instanceBuffer = ctx.data->instanceBuffer;
-    ctx.rg->addFramePass({
-        .textures = {
-            {{tex}, ResourceAccessType::RTWrite},
-        },
-        .func = [this, tex, tlas, instanceBuffer](FrameGraph& rg) {
-            RTPipeline pipeline = {};
-            pipeline.raygenGroup = getShaderProgram("RayGen");
-            pipeline.missGroups.push_back(getShaderProgram("RayMiss"));
-            pipeline.hitGroups.push_back(getShaderProgram("RayHit"));
-            pipeline.bindTLAS(0, 0, tlas);
-            pipeline.bindStorageImage(0, 1, tex);
-            pipeline.bindStorageBuffer(0, 2, instanceBuffer);
-            driver.traceRays(pipeline, 2048, 2048);
-        },
-    });
-
-    ctx.rg->addFramePass({
-        .textures = {
-            {{tex}, ResourceAccessType::FragmentRead},
-        },
-        .func = [this, tex, tlas](FrameGraph& rg) {
-            GraphicsPipeline pipe = {};
-            pipe.vertex = getShaderProgram("DrawTextureVert");
-            pipe.fragment= getShaderProgram("DrawTextureFrag");
-            RenderPassParams params;
-            driver.beginRenderPass(this->surfaceRenderTarget, params);
-            pipe.bindTexture(0, 0, tex);
-            driver.draw(pipe, this->quadPrimitive);
-            driver.endRenderPass();
-        },
-    });
-
 }
 
 void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
@@ -174,13 +139,7 @@ void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
         instance.blas = blas;
         instance.transfom = obj.transform;
         instances.push_back(instance);
-        BufferInstance bi;
-        bi.transformInvT = glm::inverse(glm::transpose(obj.transform));
-        bi.positionBuffer = driver.getDeviceAddress(obj.mesh->positionBuffer);
-        bi.normalBuffer = driver.getDeviceAddress(obj.mesh->normalBuffer);
-        binstances.push_back(bi);
     }
     auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
     ctx.data->tlas = tlas;
-    ctx.data->instanceBuffer = ctx.rg->createTempStorageBuffer(binstances.data(), binstances.size()*sizeof(BufferInstance));
 }

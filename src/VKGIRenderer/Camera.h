@@ -3,19 +3,28 @@
 #include "Transform.h"
 
 struct Camera {
+    glm::mat4 toWorld;
     glm::mat4 view;
     glm::mat4 proj;
     float fov{};
 
+    
     void lookAt(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up) {
         view = glm::lookAt(eye, center, up);
     }
-    // view matrix is [u v w e]^-1
-    //                [0 0 0 0]
-    // (inverse of transforming world basis into camera basis)
-    // obviously this contains the affine section -x_e, -y_e, -z_e
+    
+    void setView(glm::mat4 view) {
+        this->view = view;
+        toWorld = glm::inverse(view);
+    }
+
+    void setToWorld(glm::mat4 toWorld) {
+        this->toWorld = toWorld;
+        view = glm::inverse(toWorld);
+    }
+
     glm::vec3 pos() const {
-        return -glm::vec3(view[3]);
+        return glm::vec3(toWorld[3]);
     }
 
     // tan theta / 2 = t / n

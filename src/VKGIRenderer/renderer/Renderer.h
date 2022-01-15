@@ -33,9 +33,10 @@ struct InflightContext {
 
 constexpr static size_t MAX_INFLIGHTS = 2; 
 
+
 class RendererImpl {
 public:
-    virtual ~RendererImpl() = 0;
+    virtual void render(InflightContext& ctx, const Scene& scene) = 0;
 };
 
 class Engine;
@@ -49,6 +50,7 @@ class Renderer : public IdResource {
     }
     void run(const Scene& scene);
 
+    void setRendererImpl(std::unique_ptr<RendererImpl> renderer) { this->impl = std::move(renderer);  }
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
     Handle<HwProgram> getShaderProgram(const std::string& shaderName);
@@ -63,6 +65,7 @@ class Renderer : public IdResource {
 
     std::unordered_map<uint32_t, Handle<HwBLAS>> blasCache;
     std::unordered_map<std::string, Handle<HwProgram> > programs;
+    std::unique_ptr<RendererImpl> impl;
 
     VulkanDriver driver;
     Engine& engine;

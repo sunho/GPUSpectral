@@ -1,5 +1,6 @@
 #include <VKGIRenderer/Engine.h>
 #include <VKGIRenderer/Loader.h>
+#include <VKGIRenderer/renderer/PathTracer.h>   
 
 #include <Windows.h>
 #include <filesystem>
@@ -17,7 +18,8 @@ int main() {
     VKGIRenderer::Engine engine(basePath(), basePath() / "assets");
     VKGIRenderer::Window* window = engine.createWindow(1200, 1200);
     VKGIRenderer::Renderer* renderer = engine.createRenderer(window);
-   
+    auto pathTracer = std::make_unique<VKGIRenderer::PathTracer>(*renderer);
+    renderer->setRendererImpl(std::move(pathTracer));
 
     //VKGIRenderer::Scene* scene = loader.loadGLTF("Unity2Skfb.gltf");
     /*
@@ -86,7 +88,7 @@ int main() {
         {
             cameraPos.x -= 0.05f;
         }
-        scene.camera.lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
+        //scene.camera.lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
         renderer->run(scene);
     });
     

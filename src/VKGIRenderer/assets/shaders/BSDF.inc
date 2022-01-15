@@ -1,0 +1,8 @@
+BSDFDefinition(DiffuseBSDF, diffuseBSDF, DIFFUSE)
+BSDFDefinition(SmoothDielectricBSDF, smoothDielectricBSDF, SMOOTH_DIELECTRIC)
+BSDFDefinition(SmoothConductorBSDF, smoothConductorBSDF, SMOOTH_CONDUCTOR)
+BSDFDefinition(SmoothPlasticBSDF, smoothPlasticBSDF, SMOOTH_PLASTIC)
+BSDFDefinition(RoughConductorBSDF, roughConductorBSDF, ROUGH_CONDUCTOR)
+BSDFDefinition(SmoothFloorBSDF, smoothFloorBSDF, SMOOTH_FLOOR)
+BSDFDefinition(RoughFloorBSDF, roughFloorBSDF, ROUGH_FLOOR)
+BSDFDefinition(RoughPlasticBSDF, roughPlasticBSDF, ROUGH_PLASTIC)

@@ -27,8 +27,8 @@ enum BSDFType : uint16_t {
 
 
 struct DiffuseBSDF {
-    glm::vec3 reflectance;
-    Handle<HwTexture> reflectanceTex;
+    alignas(16) glm::vec3 reflectance;
+    int hasTexture;
 };
 
 struct SmoothDielectricBSDF {
@@ -63,24 +63,22 @@ struct RoughConductorBSDF {
     glm::vec3 k;
     glm::vec3 reflectance;
     float alpha;
-    MicrofacetType distribution;
+    int hasTexture;
 };
 
 struct RoughPlasticBSDF {
     glm::vec3 diffuse;
-    Handle<HwTexture> diffuseTex;
     float iorIn;
     float iorOut; // usually 1.0
     float R0;
     float alpha;
-    MicrofacetType distribution;
+    int hasTexture;
 };
 
 struct RoughFloorBSDF {
     glm::vec3 diffuse;
     float R0;
     float alpha;
-    MicrofacetType distribution;
 };
 
 struct BSDFHandle {
@@ -104,8 +102,8 @@ struct Material {
 };
 
 struct TriangleLight {
-    glm::vec3 positions[3];
-    glm::vec3 radiance;
+    alignas(16) glm::vec4 positions[3];
+    alignas(16) glm::vec3 radiance;
 };
 
 struct BoundingBox {
@@ -171,8 +169,6 @@ struct Scene {
     }
 #include "BSDF.inc"
 #undef BSDFDefinition
-
-    void prepare(Engine& engine);
 
     Camera camera;
     std::vector<RenderObject> renderObjects;

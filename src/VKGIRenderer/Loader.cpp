@@ -112,7 +112,6 @@ static void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
     }
 }
 
-
 static Handle<HwTexture> loadTexture(Renderer& renderer, const std::string& path) {
     int width, height, comp;
     unsigned char* data =
@@ -230,7 +229,6 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             .iorOut = 1.0f,
             .R0 = R0,
             .alpha = (float)sqrt(2.0f) * alpha,
-            .distribution = GGX
         };
         for (auto [name, child] : obj.namedChildren()) {
             if (name == "diffuse_reflectance") {
@@ -281,7 +279,6 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             .k = k,
             .reflectance = reflectance,
             .alpha = (float)sqrt(2) * alpha,
-            .distribution = GGX
             });
     }
 
@@ -385,9 +382,9 @@ Scene VKGIRenderer::loadScene(Engine& engine, Renderer& renderer, const std::str
                     glm::vec3 pos0 = m->vertices[i].pos;
                     glm::vec3 pos1 = m->vertices[i + 1].pos;
                     glm::vec3 pos2 = m->vertices[i + 2].pos;
-                    light.positions[0] = glm::vec3(renderObject.transform * glm::vec4(pos0.x, pos0.y, pos0.z, 1.0f));
-                    light.positions[1] = glm::vec3(renderObject.transform * glm::vec4(pos1.x, pos1.y, pos1.z, 1.0f));
-                    light.positions[2] = glm::vec3(renderObject.transform * glm::vec4(pos2.x, pos2.y, pos2.z, 1.0f));
+                    light.positions[0] = (renderObject.transform * glm::vec4(pos0.x, pos0.y, pos0.z, 1.0f));
+                    light.positions[1] = (renderObject.transform * glm::vec4(pos1.x, pos1.y, pos1.z, 1.0f));
+                    light.positions[2] = (renderObject.transform * glm::vec4(pos2.x, pos2.y, pos2.z, 1.0f));
                     light.radiance = material.emission;
                     outScene.addTriangleLight(light);
                 }
@@ -398,7 +395,8 @@ Scene VKGIRenderer::loadScene(Engine& engine, Renderer& renderer, const std::str
             float fov = obj->property("fov").getNumber();
             outScene.camera.fov = fov * M_PI / 180.f;
             auto matrix = glm::make_mat4(transform.matrix.data());
-            outScene.camera.view = matrix;
+            matrix = glm::transpose(matrix);
+            outScene.camera.setToWorld(matrix);
         }
         else if (obj->type() == tinyparser_mitsuba::OT_EMITTER) {
             /*auto filename = obj->property("filename").getString();
