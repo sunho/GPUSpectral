@@ -45,8 +45,9 @@ struct Instance {
 	mat4 transformInvT;
 	uvec2 positionBuffer;
 	uvec2 normalBuffer;
-    vec3 emission;
+    vec4 emission;
     BSDFHandle bsdf;
+    uint twofaced;
 };
 
 struct Scene {
@@ -82,7 +83,8 @@ layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer In
    	Instance values[];
 };
 
-uint randPcg(inout uint rngState)
+uint rngState;
+uint randPcg()
 {
     uint state = rngState;
     rngState = rngState * 747796405u + 2891336453u;
@@ -97,8 +99,8 @@ uint pcgHash(uint v)
 	return (word >> 22u) ^ word;
 }
 
-float randUniform(inout uint rngState) {
-    return randPcg(rngState)*(1.0/float(0xffffffffu));
+float randUniform() {
+    return randPcg()*(1.0/float(0xffffffffu));
 }
 
 uint tea(uint val0, uint val1)

@@ -27,7 +27,7 @@ enum BSDFType : uint16_t {
 
 
 struct DiffuseBSDF {
-    alignas(16) glm::vec3 reflectance;
+    glm::vec3 reflectance;
     int hasTexture;
 };
 

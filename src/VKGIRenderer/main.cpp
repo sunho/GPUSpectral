@@ -16,7 +16,7 @@ std::filesystem::path basePath() {
 int main() {
 
     VKGIRenderer::Engine engine(basePath(), basePath() / "assets");
-    VKGIRenderer::Window* window = engine.createWindow(1200, 1200);
+    VKGIRenderer::Window* window = engine.createWindow(600, 600);
     VKGIRenderer::Renderer* renderer = engine.createRenderer(window);
     auto pathTracer = std::make_unique<VKGIRenderer::PathTracer>(*renderer);
     renderer->setRendererImpl(std::move(pathTracer));

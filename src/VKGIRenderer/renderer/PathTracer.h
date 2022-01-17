@@ -28,8 +28,9 @@ struct RenderState {
         alignas(16) glm::mat4 transformInvT;
         alignas(8) uint64_t positionBuffer;
         alignas(8) uint64_t normalBuffer;
-        alignas(16) glm::vec3 emission;
+        alignas(16) glm::vec4 emission;
         alignas(4) BSDFHandle bsdf;
+        alignas(4) int twofaced;
     };
 
     struct RenderParams {

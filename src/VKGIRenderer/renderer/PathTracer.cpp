@@ -3,7 +3,7 @@
 using namespace VKGIRenderer;
 
 void PathTracer::setup() {
-    accumulateBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA32F, 1, 2048, 2048, 1);
+    accumulateBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA32F, 1, 500, 500, 1);
 }
 
 void PathTracer::render(InflightContext& ctx, const Scene& scene) {
@@ -24,7 +24,7 @@ void PathTracer::render(InflightContext& ctx, const Scene& scene) {
             pipeline.bindTLAS(0, 0, tlas);
             pipeline.bindStorageImage(0, 1, accumulateBuffer);
             pipeline.bindUniformBuffer(0, 2, rsBuf);
-            driver.traceRays(pipeline, 2048, 2048);
+            driver.traceRays(pipeline, 500, 500);
         },
     });
 
@@ -54,11 +54,13 @@ void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
         ri.positionBuffer = driver.getDeviceAddress(obj.mesh->positionBuffer);
         ri.normalBuffer = driver.getDeviceAddress(obj.mesh->normalBuffer);
         const Material& material = scene.getMaterial(obj.material);
-        ri.emission = material.emission;
+        ri.emission = glm::vec4(material.emission,0.0);
         ri.bsdf = material.bsdf;
+        ri.twofaced = material.twofaced;
         rinstances.push_back(ri);
     }
     
+    int size = sizeof(RenderState::Instance);
     auto instanceBuffer = rg.createTempStorageBuffer(rinstances.data(), rinstances.size() * sizeof(RenderState::Instance));
     renderState.scene.instances = driver.getDeviceAddress(instanceBuffer);
 #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) {\

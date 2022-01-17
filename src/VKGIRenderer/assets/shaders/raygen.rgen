@@ -9,7 +9,6 @@
 
 #include "pt_common.glsl"
 
-
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 layout(binding = 2, std140, set = 0) uniform _RenderState {
@@ -25,6 +24,8 @@ vec3 rayDir(vec2 size, vec2 fragCoord, float fov) {
     return dir;
 }
 
+#define MAX_DEPTH 50
+
 void main() 
 {
 	vec4 origin = renderState.camera.eye;
@@ -32,7 +33,7 @@ void main()
 	direction = renderState.camera.view * direction;
 	direction.y *= -1;
 
-	uint seed = pcgHash(tea(gl_LaunchSizeEXT.x *gl_LaunchIDEXT.y + gl_LaunchIDEXT.x, renderState.params.timestamp));
+	rngState = pcgHash(tea(gl_LaunchSizeEXT.x *gl_LaunchIDEXT.y + gl_LaunchIDEXT.x, renderState.params.timestamp));
     //const float2 subpixel_jitter = make_float2(randUniform(sampler), randUniform(sampler));
 	vec3 result = vec3(0.0);
 	for (int i = 0; i < 1; i++) {
@@ -41,7 +42,7 @@ void main()
         prd.countEmitted = 1;
         prd.wasDelta = 0;
         prd.done = 0;
-        prd.seed = seed;
+        prd.seed = rngState;
 		prd.origin = origin.xyz;
         prd.direction = direction.xyz;
     
@@ -51,20 +52,25 @@ void main()
 			prd.emitted = vec3(0.0);
 			uint rayFlags = gl_RayFlagsOpaqueEXT;
 			uint cullMask = 0xff;
-			float tmin = 0.01;
-			float tmax = 10000.0;
-
+			float tmin = 0.0;
+			float tmax = 1e10;
 			traceRayEXT(topLevelAS, rayFlags, cullMask, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
-
-        
-            result += prd.emitted;
+            rngState = prd.seed;
+            float cutoff = 100000.0f;
+            if (prd.emitted.x < cutoff && prd.emitted.y < cutoff && prd.emitted.z < cutoff) {
+                result += prd.emitted;
+            }
             
             // russian rullete
             if (depth > 3) {
                 float q = clamp(max(max(prd.weight.x, prd.weight.y), prd.weight.z), 0.05, 1.0);
-                if (randUniform(prd.seed) > q || q != 0.0f)
+                if (randUniform() > q)
                     break;
                 prd.weight /= q;
+            }
+
+            if (depth > MAX_DEPTH) {
+                break;
             }
 
             if (prd.done == 1)
@@ -74,11 +80,11 @@ void main()
         }
     }
 
-	vec3 accumColor = result.xyz / float(1);
+	vec3 accumColor = result.xyz;
 
     if (renderState.params.timestamp > 0)
     {
-        const float                 a = 1.0f / float(renderState.params.timestamp  + 1);
+        const float a = 1.0f / float(renderState.params.timestamp  + 1);
 		vec3 prevColor = imageLoad(image, ivec2(gl_LaunchIDEXT.xy)).xyz;
         accumColor = mix(prevColor, accumColor, a);
     }
