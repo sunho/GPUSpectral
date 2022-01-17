@@ -20,6 +20,8 @@ struct RenderState {
 #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) alignas(8) DevicePtr BSDFFIELD##s;
 #include "../assets/shaders/BSDF.inc"
 #undef BSDFDefinition
+        int numLights;
+        int pad[3];
     };
 
     struct Instance {

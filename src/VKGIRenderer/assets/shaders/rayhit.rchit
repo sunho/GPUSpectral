@@ -14,6 +14,11 @@ layout(location = 0) rayPayloadInEXT HitPayload prd;
 layout(location = 2) rayPayloadEXT bool shadowed;
 hitAttributeEXT vec3 attribs;
 
+struct TriangleLight {
+    vec4 positions[3];
+    vec3 emission;
+};
+
 struct DiffuseBSDF {
     vec3 diffuse;
     uint hasTexture;
@@ -22,6 +27,11 @@ struct DiffuseBSDF {
 layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer DiffuseBSDFBuffer
 {
    	DiffuseBSDF values[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer TriangleLightBuffer
+{
+   	TriangleLight values[];
 };
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
@@ -57,6 +67,42 @@ float cosineHemispherePdf(vec3 wo) {
     return max(abs(wo.z) / M_PI, 0.000001f);
 }
 
+struct LightOutput {
+    vec3 position;
+    vec3 emission;
+    float pdf;
+};
+
+LightOutput sampleTrangleLight(inout uint seed, TriangleLight light, vec3 pos)  {
+    // barycentric coordinates
+    // u = 1 - sqrt(e_1)
+    // v = e_2 * sqrt(e_1)
+    float e1 = randUniform(seed);
+    float e2 = randUniform(seed);
+    float u = 1.0f - sqrt(e1);
+    float v = e2 * sqrt(e1);
+    float w = 1.0f - u - v;
+    vec3 v0 = light.positions[0].xyz;
+    vec3 v1 = light.positions[1].xyz;
+    vec3 v2 = light.positions[2].xyz;
+    float A = 0.5f * abs(length(cross(v2 - v0, v1 - v0)));
+    vec3 normal = normalize( cross( v1-v0, v2-v0 ) );
+    vec3 lightPos = u * v0 + v * v1 + w * v2;
+    float ldist = length(lightPos - pos);
+    vec3 l = normalize(lightPos - pos);
+    LightOutput res;
+    res.position = lightPos;
+    res.emission = light.emission * float(dot(-l, normal) > 0);
+    res.pdf = ldist * ldist / (abs(dot(-l, normal)) * A);
+    return res;
+}
+
+LightOutput sampleLight(inout uint seed, vec3 pos) {
+    uint lightIdx = randPcg(seed) % renderState.scene.numLights;
+    TriangleLight light = TriangleLightBuffer(renderState.scene.triangleLights).values[lightIdx];
+    return sampleTrangleLight(seed, light, pos);
+}
+
 void main()
 {
 	ivec3 index = ivec3(3 * gl_PrimitiveID, 3 * gl_PrimitiveID + 1, 3 * gl_PrimitiveID + 2);
@@ -89,10 +135,13 @@ void main()
 //   vec3 N = normal;
     if (dot(normal, -rayDir) < 0) {
         // if (rt_data->twofaced) {
-            normal *= -1.0f;
+            if (instance.emission == vec3(0.0)) {
+                normal *= -1.0f;
+            }
             // SN *= -1.0f;
         // }
     }
+
 
     // if (rt_data->facenormals) {
     //     SN = N;
@@ -105,20 +154,13 @@ void main()
     vec3 wi = randCosineHemisphere(prd.seed);
     float pdf = cosineHemispherePdf(wi);
     float NoW = abs(dot(wi, vec3(0.0f, 0.0f, 1.0f)));
-    prd.emitted = prd.weight * instance.emission;
-    wi = onbUntransform(onb, wi);
-    prd.origin = position;
-    prd.direction = wi;
-    prd.weight *= diffuse / M_PI * NoW / pdf;
-    //prd->wasDelta = bsdfRes.isDelta;
-    // LightOutput lightRes;
-    // sampleLight(params.scene.lightData, sampler, P, &lightRes);
+    float lightFlag = dot(normal, -rayDir) > 0 ? 1.0f : 0.0f;
+    if (prd.countEmitted == 1) {
+        prd.emitted = lightFlag * prd.weight * instance.emission;
+        prd.countEmitted = 0;
+    }
 
-    // float3 L = normalize(lightRes.position - P);
-    // float3 wL = onb.transform(L);
-    // float Ldist = length(lightRes.position - P);
-    // const float NoL = fabs(dot(SN, L));
-    // float lightPdf = lightRes.pdf;
+    wi = onbUntransform(onb, wi);
 
     // BSDFOutput bsdfRes;
     // float3 wi;
@@ -133,27 +175,39 @@ void main()
     // bool neeDone = false;
     // if (params.nee) {
     //     if (!bsdfRes.isDelta) {
-    //         if ((dot(N, -ray_dir) > 0 && dot(N, L) > 0) || isTransimissionBSDF(rt_data->bsdf.type())) {
-    //             bool occluded = traceOcclusion(
-    //                 params.scene.tlas,
-    //                 P,
-    //                 L,
-    //                 0.001f,
-    //                 Ldist - 0.01f
-    //             );
-    //             if (!occluded && isvalid(lightPdf) && isvalid(lightBsdfRes.bsdf) && lightPdf != 0.0f) {
-    //                 float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
-    //                 direct += w * NoL * lightBsdfRes.bsdf * prd->weight * lightRes.emission / lightPdf;
-    //                 neeDone = true;
-    //                 /*if (direct.x > 100.0) {
-    //                     printf("bsdf: %d pos: %f %f %f\n", rt_data->bsdf.type(), P.x, P.y, P.z);
-    //                     printf("light pdf: %f %f bsdf pdf: %f \n", lightPdf, lightRes.pdf, bsdfRes.pdf);
-    //                     printf("bsdf: %f %f %f\n", lightBsdfRes.bsdf.x, lightBsdfRes.bsdf.y, lightBsdfRes.bsdf.z);
-    //                     printf("NEE: %f %f %f\n", direct.x, direct.y, direct.z);
-    //                     printf("first hit: %d \n", prd->countEmitted);
-    //                 }*/
-    //             }
-    //         }
+    LightOutput lightRes = sampleLight(prd.seed, position);
+
+    vec3 L = normalize(lightRes.position - position);
+    vec3 wL = onbTransform(onb, L);
+    float Ldist = length(lightRes.position - position);
+    const float NoL = abs(dot(normal, L));
+    float lightPdf = lightRes.pdf;
+    if ((dot(normal, -rayDir) > 0 && dot(normal, L) > 0)) {
+        shadowed = true;  
+        traceRayEXT(topLevelAS, 
+            gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT, 
+            0xFF, 
+            0, 
+            0, 
+            1, 
+            position, 
+            0.001, 
+            L, 
+            Ldist - 0.01, 
+            2);
+
+        if (!shadowed && lightPdf != 0.0f) {
+            // float w = powerHeuristic(1, lightPdf, 1, bsdfRes.pdf);
+            prd.emitted += NoL * diffuse / M_PI * prd.weight * lightRes.emission / lightPdf;
+            //neeDone = true;
+        }
+    }
+    prd.origin = position;
+    prd.direction = wi;
+    prd.weight *= diffuse / M_PI * NoW / pdf;
+    //prd->wasDelta = bsdfRes.isDelta;
+    // LightOutput lightRes;
+
     //     }
     // }
 

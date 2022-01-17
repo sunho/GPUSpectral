@@ -102,8 +102,8 @@ struct Material {
 };
 
 struct TriangleLight {
-    alignas(16) glm::vec4 positions[3];
-    alignas(16) glm::vec3 radiance;
+    glm::vec4 positions[3];
+    glm::vec4 radiance;
 };
 
 struct BoundingBox {

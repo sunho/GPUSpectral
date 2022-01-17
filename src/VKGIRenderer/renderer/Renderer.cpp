@@ -73,6 +73,7 @@ Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
 
 void Renderer::registerPrograms() {
     registerShader("RayMiss", "shaders/miss.rmiss");
+    registerShader("ShadowMiss", "shaders/shadowmiss.rmiss");
     registerShader("RayGen", "shaders/raygen.rgen");
     registerShader("RayHit", "shaders/rayhit.rchit");
     registerShader("DrawTextureVert", "shaders/DrawTexture.vert");

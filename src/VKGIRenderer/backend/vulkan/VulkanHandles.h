@@ -75,7 +75,10 @@ struct VulkanPrimitive : public HwPrimitive {
 
 struct VulkanFence : public HwFence {
     VulkanFence() = default;
-    explicit VulkanFence(VulkanDevice &device) : fence(device.device.createFence(vk::FenceCreateInfo())) {
+    explicit VulkanFence(VulkanDevice &device) {
+        auto fi = vk::FenceCreateInfo();
+        fi.flags = vk::FenceCreateFlagBits::eSignaled;
+        fence = device.device.createFence(fi);
     }
     vk::Fence fence{};
 };

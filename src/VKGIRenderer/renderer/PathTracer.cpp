@@ -3,7 +3,7 @@
 using namespace VKGIRenderer;
 
 void PathTracer::setup() {
-    accumulateBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA16F, 1, 2048, 2048, 1);
+    accumulateBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA32F, 1, 2048, 2048, 1);
 }
 
 void PathTracer::render(InflightContext& ctx, const Scene& scene) {
@@ -19,6 +19,7 @@ void PathTracer::render(InflightContext& ctx, const Scene& scene) {
             RTPipeline pipeline = {};
             pipeline.raygenGroup = renderer.getShaderProgram("RayGen");
             pipeline.missGroups.push_back(renderer.getShaderProgram("RayMiss"));
+            pipeline.missGroups.push_back(renderer.getShaderProgram("ShadowMiss"));
             pipeline.hitGroups.push_back(renderer.getShaderProgram("RayHit"));
             pipeline.bindTLAS(0, 0, tlas);
             pipeline.bindStorageImage(0, 1, accumulateBuffer);
@@ -70,7 +71,8 @@ void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
 #undef BSDFDefinition
 
     auto lightBuffer = rg.createTempStorageBuffer(scene.triangleLights.data(), scene.triangleLights.size() * sizeof(TriangleLight));
-    renderState.scene.triangleLights = lightBuffer;
+    renderState.scene.triangleLights = driver.getDeviceAddress(lightBuffer);
+    renderState.scene.numLights = scene.triangleLights.size();
     renderState.camera.eye = scene.camera.pos();
     renderState.camera.view = scene.camera.toWorld;
     renderState.camera.fov = scene.camera.fov;

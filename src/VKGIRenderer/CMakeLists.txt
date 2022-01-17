@@ -90,6 +90,7 @@ endfunction(add_shader)
 add_shader(raygen.rgen)
 add_shader(rayhit.rchit)
 add_shader(miss.rmiss)
+add_shader(shadowmiss.rmiss)
 add_shader(DrawTexture.vert)
 add_shader(DrawTexture.frag)
 

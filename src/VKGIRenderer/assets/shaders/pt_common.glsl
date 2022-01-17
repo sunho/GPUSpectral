@@ -55,6 +55,10 @@ struct Scene {
     #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) DevicePtr BSDFFIELD##s;
     #include "BSDF.inc"
     #undef BSDFDefinition
+    int numLights;
+    int a;
+    int b;
+    int c;
 };
 
 struct RenderState {

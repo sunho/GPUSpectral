@@ -11,7 +11,7 @@
 
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
-layout(binding = 1, set = 0, rgba16f) uniform image2D image;
+layout(binding = 1, set = 0, rgba32f) uniform image2D image;
 layout(binding = 2, std140, set = 0) uniform _RenderState {
 	RenderState renderState;
 };
@@ -31,8 +31,9 @@ void main()
 	vec4 direction = vec4(rayDir(vec2(gl_LaunchSizeEXT.xy), vec2(gl_LaunchIDEXT.xy), renderState.camera.fov), 0.0);
 	direction = renderState.camera.view * direction;
 	direction.y *= -1;
-	uint seed = pcgHash(tea(gl_LaunchSizeEXT.x * gl_LaunchIDEXT.x + gl_LaunchIDEXT.y, renderState.params.timestamp));
-	  //const float2 subpixel_jitter = make_float2(randUniform(sampler), randUniform(sampler));
+
+	uint seed = pcgHash(tea(gl_LaunchSizeEXT.x *gl_LaunchIDEXT.y + gl_LaunchIDEXT.x, renderState.params.timestamp));
+    //const float2 subpixel_jitter = make_float2(randUniform(sampler), randUniform(sampler));
 	vec3 result = vec3(0.0);
 	for (int i = 0; i < 1; i++) {
         prd.weight = vec3(1.0);
@@ -43,7 +44,7 @@ void main()
         prd.seed = seed;
 		prd.origin = origin.xyz;
         prd.direction = direction.xyz;
-
+    
         int depth = 0;
         while (true)
         {

@@ -58,6 +58,7 @@ enum class TextureFormat : uint16_t {
     R32I,
     RG16F,
     RGBA16F,
+    RGBA32F,
     RG16UI,
     RG16I,
     R11F_G11F_B10F,

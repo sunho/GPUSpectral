@@ -385,7 +385,7 @@ Scene VKGIRenderer::loadScene(Engine& engine, Renderer& renderer, const std::str
                     light.positions[0] = (renderObject.transform * glm::vec4(pos0.x, pos0.y, pos0.z, 1.0f));
                     light.positions[1] = (renderObject.transform * glm::vec4(pos1.x, pos1.y, pos1.z, 1.0f));
                     light.positions[2] = (renderObject.transform * glm::vec4(pos2.x, pos2.y, pos2.z, 1.0f));
-                    light.radiance = material.emission;
+                    light.radiance = glm::vec4(material.emission,1.0);
                     outScene.addTriangleLight(light);
                 }
             }

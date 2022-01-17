@@ -281,7 +281,7 @@ class VulkanPipelineCache {
     GCPool<std::pair<VkRenderPass, VkImageView>, VkFramebuffer, KeyHasher> framebuffers;
     GCPool<VulkanAttachments, VkRenderPass, KeyHasher> renderpasses;
     GCPool<ProgramParameterLayout, PipelineLayout, KeyHasher> pipelineLayouts;
-    std::array<VulkanDescriptorAllocator, 2> descriptorAllocators;
+    std::array<VulkanDescriptorAllocator, 3> descriptorAllocators;
     size_t currentFrame{0};
 	VkDescriptorPool descriptorPool;
 

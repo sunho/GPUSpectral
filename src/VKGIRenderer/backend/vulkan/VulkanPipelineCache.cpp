@@ -99,8 +99,16 @@ VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) 
     graphicsPipelines.setDestroyer([=](VkPipeline pipeline) {
         vkDestroyPipeline(this->device.device, pipeline, nullptr);
     });
+    rtPipelines.setDestroyer([=](VkPipeline pipeline) {
+        vkDestroyPipeline(this->device.device, pipeline, nullptr);
+    });
+    rtSBTs.setDestroyer([=](VulkanShaderBindingTables sbt) {
+        delete sbt.raygen.buffer;
+        delete sbt.callable.buffer;
+        delete sbt.hit.buffer;
+        delete sbt.miss.buffer;
+    });
     framebuffers.setDestroyer([=](VkFramebuffer framebuffer) {
-        std::cout << "destroy " << framebuffer << std::endl;
         vkDestroyFramebuffer(this->device.device, framebuffer, nullptr);
     });
     renderpasses.setDestroyer([=](VkRenderPass renderPass) {
@@ -116,6 +124,8 @@ void VulkanPipelineCache::tick() {
     graphicsPipelines.tick();
     framebuffers.tick();
     renderpasses.tick();
+    rtPipelines.tick();
+    rtSBTs.tick();
     ++currentFrame;
     currentDescriptorAllocator().resetPools();
 }
@@ -375,7 +385,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
     if (it) {
         return { *it, pipelineLayout.pipelineLayout };
     }
-    const size_t MAX_RECURSION_DEPTH = 2;
+    const size_t MAX_RECURSION_DEPTH = 3;
     const auto wrapShaderModule = [](const vk::ShaderModule& shaderModule, const vk::ShaderStageFlagBits& flags) {
         return vk::PipelineShaderStageCreateInfo()
             .setStage(flags)
