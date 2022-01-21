@@ -61,7 +61,7 @@ private:
     RenderState renderState;
     int timestamp{ 0 };
     Renderer& renderer;
-    VulkanDriver& driver;
+    HwDriver& driver;
 };
 
 }

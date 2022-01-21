@@ -53,7 +53,7 @@
 COMMAND(VertexBufferHandle, createVertexBuffer, uint32_t, bufferCount, uint32_t, vertexCount, uint8_t, attributeCount, AttributeArray, attributes)
 COMMAND(IndexBufferHandle, createIndexBuffer, uint32_t, indexCount)
 COMMAND(ProgramHandle, createProgram, Program, program)
-COMMAND(CompiledCode, compileCode, const char *, path)
+//COMMAND(CompiledCode, compileCode, const char *, path)
 COMMAND0(FenceHandle, createFence)
 COMMAND0(RenderTargetHandle, createDefaultRenderTarget)
 COMMAND(RenderTargetHandle, createRenderTarget, uint32_t, width, uint32_t, height, RenderAttachments, attachments)

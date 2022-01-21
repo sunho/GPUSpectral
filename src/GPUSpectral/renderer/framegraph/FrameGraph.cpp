@@ -4,7 +4,7 @@
 #include <iostream>
 
 
-FrameGraph::FrameGraph(GPUSpectral::VulkanDriver& driver)
+FrameGraph::FrameGraph(HwDriver& driver)
     : driver(driver) {
 }
 

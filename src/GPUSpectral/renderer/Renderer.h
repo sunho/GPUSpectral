@@ -7,7 +7,6 @@
 #include "Mesh.h"
 #include "../engine/Window.h"
 #include "../backend/vulkan/VulkanDriver.h"
-#include "../utils/ResourceList.h"
 
 namespace GPUSpectral {
 
@@ -42,13 +41,13 @@ public:
 };
 
 class Engine;
-class Renderer : public IdResource {
+class Renderer {
   public:
     Renderer(Engine& engine, Window* window);
     ~Renderer();
 
-    VulkanDriver& getDriver() {
-        return driver;
+    HwDriver& getDriver() {
+        return *driver;
     }
     void run(const Scene& scene);
     void setRendererImpl(std::unique_ptr<RendererImpl> renderer) { this->impl = std::move(renderer);  }
@@ -71,7 +70,7 @@ class Renderer : public IdResource {
     std::unordered_map<std::string, Handle<HwProgram> > programs;
     std::unique_ptr<RendererImpl> impl;
 
-    VulkanDriver driver;
+    std::unique_ptr<HwDriver> driver;
     Engine& engine;
     Window* window;
 

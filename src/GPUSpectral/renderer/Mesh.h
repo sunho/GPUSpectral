@@ -17,7 +17,7 @@ public:
         glm::vec2 uv;
     };
 
-    Mesh(VulkanDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices);
+    Mesh(HwDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices);
     ~Mesh();
 
     Mesh(Mesh&&) noexcept = default;
@@ -48,7 +48,7 @@ public:
     
 private:
     uint32_t id;
-    VulkanDriver& driver;
+    HwDriver& driver;
     Handle<HwVertexBuffer> vertexBuffer{};
     Handle<HwPrimitive> primitive{};
     Handle<HwIndexBuffer> indexBuffer{};

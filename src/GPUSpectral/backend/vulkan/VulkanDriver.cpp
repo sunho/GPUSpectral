@@ -13,8 +13,6 @@
 #include <filesystem>
 #include <fstream>
 
-
-
 using namespace GPUSpectral;
 
 static void DestroyDebugUtilsMessengerEXT(VkInstance instance,
@@ -150,6 +148,10 @@ void VulkanDriver::waitFence(FenceHandle handle) {
     std::array<vk::Fence, 1> fences = {handleCast<VulkanFence>(handle)->fence};
     device->device.waitForFences(fences, true, UINT64_MAX); 
     device->device.resetFences(fences);
+}
+
+void VulkanDriver::destroyFence(FenceHandle handle) {
+    destructHandle<VulkanFence>(handle);
 }
 
 void VulkanDriver::setVertexBuffer(VertexBufferHandle handle, uint32_t index,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <GPUSpectral/engine/Window.h>
+#include "../Driver.h"
 #include <vulkan/vulkan.h>
 
 #include <map>
@@ -60,7 +61,7 @@ struct DriverContext {
     std::string profileSectionName;
 };
 
-class VulkanDriver {
+class VulkanDriver : public HwDriver {
   public:
     VulkanDriver(Window *window, const std::filesystem::path& basePath);
     ~VulkanDriver();
@@ -70,8 +71,8 @@ class VulkanDriver {
     VulkanDriver(VulkanDriver &&) = delete;
     VulkanDriver &operator=(VulkanDriver &&) = delete;
 
-#define DECL_COMMAND(R, N, ARGS, PARAMS) R N(ARGS);
-#define DECL_VOIDCOMMAND(N, ARGS, PARAMS) void N(ARGS);
+#define DECL_COMMAND(R, N, ARGS, PARAMS) R N(ARGS) override;
+#define DECL_VOIDCOMMAND(N, ARGS, PARAMS) void N(ARGS) override;
 
 #include "../Command.inc"
 

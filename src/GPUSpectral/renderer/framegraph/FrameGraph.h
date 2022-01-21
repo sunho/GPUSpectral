@@ -122,7 +122,7 @@ class FrameGraph {
   public:
     friend class FrameGraphContext;
     friend class BakedPass;
-    FrameGraph(GPUSpectral::VulkanDriver& driver);
+    FrameGraph(HwDriver& driver);
     ~FrameGraph();
 
     void submit();
@@ -215,10 +215,10 @@ class FrameGraph {
     uint32_t nextId{ 1 };
 
     template <typename T, typename... ARGS>
-    T callDriverMethod(T (GPUSpectral::VulkanDriver::*mf)(ARGS...), ARGS&&... args) noexcept {
+    T callDriverMethod(T (HwDriver::*mf)(ARGS...), ARGS&&... args) noexcept {
         return (driver.*mf)(std::forward<ARGS>(args)...);
     }
 
     std::vector<std::function<void()>> destroyers;
-    GPUSpectral::VulkanDriver& driver;
+    HwDriver& driver;
 };

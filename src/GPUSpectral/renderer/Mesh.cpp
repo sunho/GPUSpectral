@@ -2,7 +2,7 @@
 
 using namespace GPUSpectral;
 
-GPUSpectral::Mesh::Mesh(VulkanDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices) 
+GPUSpectral::Mesh::Mesh(HwDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices) 
     : driver(driver), vertices(vertices.begin(), vertices.end()), indices(indices.begin(), indices.end()), id(id) {
     std::vector<float> v;
     std::vector<float> vn;

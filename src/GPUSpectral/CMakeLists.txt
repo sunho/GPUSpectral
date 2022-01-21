@@ -3,6 +3,7 @@ set(SOURCE_LIST
     backend/Handles.cpp
     backend/Command.inc
     backend/Program.h
+    backend/Driver.h
     backend/PipelineState.h
     backend/DriverBase.h
     backend/DriverTypes.h
