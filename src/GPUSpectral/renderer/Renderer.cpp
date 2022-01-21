@@ -83,6 +83,10 @@ void Renderer::registerPrograms() {
 Renderer::~Renderer() {
 }
 
+void Renderer::addRenderPassCreator(std::unique_ptr<RenderPassCreator> creator) {
+    renderPassCreators.push_back(std::move(creator));
+}
+
 void Renderer::run(const Scene& scene) {
     FrameMarkStart("Frame")
     InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
@@ -91,53 +95,35 @@ void Renderer::run(const Scene& scene) {
         driver->releaseInflight(inflight.handle);
         inflight.handle.reset();
     }
-    if (inflight.tlas) {
-        driver->destroyTLAS(inflight.tlas);
-        inflight.tlas.reset();
-    }
     Handle<HwInflight> handle = driver->beginFrame(inflight.fence);
     inflight.handle = handle;
 
     inflight.rg.reset();
     inflight.rg = std::make_unique<FrameGraph>(*driver);
-    InflightContext ctx = {};
-    ctx.data = &inflights[currentFrame % MAX_INFLIGHTS];
-    ctx.rg = inflight.rg.get();
 
-    prepareSceneData(ctx, scene);
-    impl->render(ctx, scene);
+    for (auto& creator : renderPassCreators) {
+        creator->createRenderPass(*inflight.rg, scene);
+    }
 
-    ctx.rg->submit();
+    inflight.rg->submit();
     driver->endFrame();
 
     ++currentFrame;
     FrameMarkEnd("Frame")
 }
 
-void Renderer::render(InflightContext& ctx, const Scene& scene) {
-}
-
-void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
-    std::unordered_map<uint32_t, uint32_t> primitiveIdToVB;
-    std::vector<RTInstance> instances;
-    for (auto& obj: scene.renderObjects) {
-        Handle<HwBLAS> blas;
-        auto it = blasCache.find(obj.mesh->getID());
-        if (it == blasCache.end()) {
-            blas = driver->createBLAS(obj.mesh->getPrimitive());
-            blasCache.emplace(obj.mesh->getID(), blas);
-        } else {
-            blas = it->second;
-        }
-        RTInstance instance;
-        instance.blas = blas;
-        instance.transfom = obj.transform;
-        instances.push_back(instance);
-    }
-    auto tlas = driver->createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
-    ctx.data->tlas = tlas;
-}
-
 MeshPtr Renderer::createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices) {
     return std::make_shared<Mesh>(*driver, nextMeshId++, vertices, indices);
+}
+
+Handle<HwBLAS> GPUSpectral::Renderer::getOrCreateBLAS(const MeshPtr& meshPtr)
+{
+    auto it = blasCache.find(meshPtr->getID());
+    if (it == blasCache.end()) {
+        auto blas = driver->createBLAS(meshPtr->getPrimitive());
+        blasCache.emplace(meshPtr->getID(), blas);
+        return blas;
+    } else {
+        return it->second;
+    }
 }

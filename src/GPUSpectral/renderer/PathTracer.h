@@ -45,7 +45,7 @@ struct RenderState {
     alignas(16) RenderParams params;
 };
 
-class PathTracer : public RendererImpl {
+class PathTracer : public RenderPassCreator {
 public:
     PathTracer(Renderer& renderer) : renderer(renderer), driver(renderer.getDriver()) {
         setup();
@@ -53,7 +53,7 @@ public:
     ~PathTracer() { }
 
     void setup();
-    void render(InflightContext& ctx, const Scene& scene) override;
+    void createRenderPass(FrameGraph& fg, const Scene& scene) override;
 private:
     void prepareScene(FrameGraph& rg, const Scene& scene);
     Handle<HwTexture> accumulateBuffer;

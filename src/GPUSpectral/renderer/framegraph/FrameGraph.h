@@ -118,6 +118,8 @@ struct Resource {
     FixedVector<char> data;
 };
 
+using DisposeFunc = std::function<void()>;
+
 class FrameGraph {
   public:
     friend class FrameGraphContext;
@@ -131,6 +133,8 @@ class FrameGraph {
     Handle<HwBufferObject> createTempUniformBuffer(void* data, size_t size);
     Handle<HwBufferObject> createTempStorageBuffer(const void* data, size_t size);
     Handle<HwBufferObject> createPermenantUniformBuffer(void* data, size_t size);
+
+    void queueDispose(const DisposeFunc& func);
 
 #define SCRATCH_IMPL(RESOURCENAME, METHODNAME)                        \
     template <typename... ARGS>                                       \

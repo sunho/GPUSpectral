@@ -17,42 +17,34 @@ struct SceneData;
 struct LightData;
 class Renderer;
 
-struct InflightData {
-    Handle<HwFence> fence;
-    Handle<HwInflight> handle{};
-    Handle<HwTLAS> tlas{};
-    Handle<HwBufferObject> instanceBuffer{};
-    std::unique_ptr<FrameGraph> rg;
-};
-
-struct InflightContext {
-    FrameGraph* rg;
-    InflightData* data;
-    SceneData* sceneData;
-    Scene* scene;
-};
-
 constexpr static size_t MAX_INFLIGHTS = 2; 
 
-
-class RendererImpl {
+class RenderPassCreator {
 public:
-    virtual void render(InflightContext& ctx, const Scene& scene) = 0;
+    virtual void createRenderPass(FrameGraph& fg, const Scene& scene) = 0;
 };
 
 class Engine;
 class Renderer {
   public:
+    struct InflightData {
+        Handle<HwFence> fence;
+        Handle<HwInflight> handle{};
+        std::unique_ptr<FrameGraph> rg;
+    };
+
     Renderer(Engine& engine, Window* window);
     ~Renderer();
+
+    void addRenderPassCreator(std::unique_ptr<RenderPassCreator> creator);
 
     HwDriver& getDriver() {
         return *driver;
     }
     void run(const Scene& scene);
-    void setRendererImpl(std::unique_ptr<RendererImpl> renderer) { this->impl = std::move(renderer);  }
 
     MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
+    Handle<HwBLAS> getOrCreateBLAS(const MeshPtr& meshPtr);
 
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
@@ -60,15 +52,13 @@ class Renderer {
   private:
     Handle<HwProgram> loadShader(const std::string& filename);
     void registerShader(const std::string& shaderName, const std::string& filename);
-    void render(InflightContext& context, const Scene& scene);
     void registerPrograms();
-    void prepareSceneData(InflightContext& context, const Scene& scene);
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
 
     std::unordered_map<uint32_t, Handle<HwBLAS>> blasCache;
     std::unordered_map<std::string, Handle<HwProgram> > programs;
-    std::unique_ptr<RendererImpl> impl;
+    std::list<std::unique_ptr<RenderPassCreator>> renderPassCreators;
 
     std::unique_ptr<HwDriver> driver;
     Engine& engine;

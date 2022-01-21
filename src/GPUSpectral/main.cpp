@@ -18,7 +18,7 @@ int main() {
     GPUSpectral::Engine engine(basePath(), basePath() / "assets");
     engine.init(500, 500);
     auto pathTracer = std::make_unique<GPUSpectral::PathTracer>(engine.getRenderer());
-    engine.getRenderer().setRendererImpl(std::move(pathTracer));
+    engine.getRenderer().addRenderPassCreator(std::move(pathTracer));
 
 
     auto scene = loadScene(engine, engine.getRenderer(), (basePath() / "assets" / "scenes" / "test3" / "scene.xml").string());

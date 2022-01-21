@@ -6,12 +6,22 @@ void PathTracer::setup() {
     accumulateBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA32F, 1, driver.getFrameSize().width, driver.getFrameSize().height, 1);
 }
 
-void PathTracer::render(InflightContext& ctx, const Scene& scene) {
-    auto tlas = ctx.data->tlas;
-    prepareScene(*ctx.rg, scene);
-    auto rsBuf = ctx.rg->createTempUniformBuffer(&renderState, sizeof(RenderState));
+void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
+    std::unordered_map<uint32_t, uint32_t> primitiveIdToVB;
+    std::vector<RTInstance> instances;
+    for (auto& obj: scene.renderObjects) {
+        RTInstance instance;
+        instance.blas = renderer.getOrCreateBLAS(obj.mesh);
+        instance.transfom = obj.transform;
+        instances.push_back(instance);
+    }
+    auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
+    fg.queueDispose([tlas, this]() { driver.destroyTLAS(tlas); });
 
-    ctx.rg->addFramePass({
+    prepareScene(fg, scene);
+    auto rsBuf = fg.createTempUniformBuffer(&renderState, sizeof(RenderState));
+
+    fg.addFramePass({
         .textures = {
             {{accumulateBuffer}, ResourceAccessType::RTWrite},
         },
@@ -28,7 +38,7 @@ void PathTracer::render(InflightContext& ctx, const Scene& scene) {
         },
     });
 
-    ctx.rg->addFramePass({
+    fg.addFramePass({
         .textures = {
             {{accumulateBuffer}, ResourceAccessType::FragmentRead},
         },
@@ -80,4 +90,5 @@ void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
     renderState.camera.fov = scene.camera.getFov();
     renderState.params.timestamp = timestamp;
     timestamp++;
+
 }

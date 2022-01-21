@@ -33,6 +33,11 @@ Handle<HwBufferObject> FrameGraph::createTempStorageBuffer(const void* data, siz
     return buffer;
 }
 
+void FrameGraph::queueDispose(const DisposeFunc& func)
+{
+    destroyers.push_back(func);
+}
+
 
 FrameGraph::~FrameGraph() {
     for (auto d : destroyers) {
