@@ -2,14 +2,16 @@
 
 #include "framegraph/FrameGraph.h"
 
-#include "../Camera.h"
-#include "../Transform.h"
-#include "../Window.h"
+#include "Camera.h"
+#include "Transform.h"
+#include "Mesh.h"
+#include "../engine/Window.h"
 #include "../backend/vulkan/VulkanDriver.h"
 #include "../utils/ResourceList.h"
-#include "../Loader.h"
 
 namespace GPUSpectral {
+
+using MeshPtr = std::shared_ptr<Mesh>;
 
 class Scene;
 struct SceneData;
@@ -49,8 +51,10 @@ class Renderer : public IdResource {
         return driver;
     }
     void run(const Scene& scene);
-
     void setRendererImpl(std::unique_ptr<RendererImpl> renderer) { this->impl = std::move(renderer);  }
+
+    MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
+
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;
     Handle<HwProgram> getShaderProgram(const std::string& shaderName);
@@ -70,6 +74,8 @@ class Renderer : public IdResource {
     VulkanDriver driver;
     Engine& engine;
     Window* window;
+
+    uint32_t nextMeshId{ 1 };
 
     size_t currentFrame{0};
 };

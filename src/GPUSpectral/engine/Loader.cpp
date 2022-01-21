@@ -1,8 +1,8 @@
 #include "Loader.h"
 #include "Engine.h"
-#include "Scene.h"
-#include "renderer/Renderer.h"
-#include "utils/Util.h"
+#include "../renderer/Scene.h"
+#include "../renderer/Renderer.h"
+#include "../utils/Util.h"
 #include <tinyparser-mitsuba.h>
 #include <stb_image.h>
 #include <tiny_obj_loader.h>
@@ -60,7 +60,7 @@ static MeshPtr loadMesh(Renderer& renderer, Engine& engine, const std::string& p
             vertices.push_back({ .pos = pos, .normal = normal, .uv = uv });
         }
     }
-    return engine.createMesh({ vertices.data(), vertices.size() }, { indices.data(), indices.size() });
+    return renderer.createMesh({ vertices.data(), vertices.size() }, { indices.data(), indices.size() });
 }
 
 static Handle<HwTexture> loadTexture(Renderer& renderer, const std::string& path) {
@@ -344,7 +344,7 @@ Scene GPUSpectral::loadScene(Engine& engine, Renderer& renderer, const std::stri
         else if (obj->type() == tinyparser_mitsuba::OT_SENSOR) {
             auto transform = obj->property("to_world").getTransform();
             float fov = obj->property("fov").getNumber();
-            outScene.camera.fov = fov * M_PI / 180.f;
+            outScene.camera.setFov(fov * M_PI / 180.f, 1.0f, 0.001f, 1000.0f);
             auto matrix = glm::make_mat4(transform.matrix.data());
             matrix = glm::transpose(matrix);
             outScene.camera.setToWorld(matrix);

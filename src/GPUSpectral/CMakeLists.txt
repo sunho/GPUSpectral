@@ -31,6 +31,13 @@ set(SOURCE_LIST
     renderer/Renderer.cpp
     renderer/PathTracer.h
     renderer/PathTracer.cpp
+    renderer/Transform.h
+    renderer/Camera.h
+    renderer/Camera.cpp
+    renderer/Scene.h
+    renderer/Scene.cpp
+    renderer/Mesh.h
+    renderer/Mesh.cpp
     utils/Log.h
     utils/ResourceList.h
     utils/Util.h
@@ -40,19 +47,12 @@ set(SOURCE_LIST
     utils/HalfFloat/umHalf.h
     utils/HalfFloat/umHalf.inl
     utils/HalfFloat/stdint.h
-    Engine.h
-    Engine.cpp
-    Window.h
-    Window.cpp
-    Transform.h
-    Camera.h
-    Camera.cpp
-    Scene.h
-    Scene.cpp
-    Loader.h
-    Loader.cpp
-    Mesh.h
-    Mesh.cpp
+    engine/Engine.h
+    engine/Engine.cpp
+    engine/Window.h
+    engine/Window.cpp    
+    engine/Loader.h
+    engine/Loader.cpp
     BSDF.inc
     main.cpp
 )

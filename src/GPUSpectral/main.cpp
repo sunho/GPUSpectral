@@ -1,5 +1,5 @@
-#include <GPUSpectral/Engine.h>
-#include <GPUSpectral/Loader.h>
+#include <GPUSpectral/engine/Engine.h>
+#include <GPUSpectral/engine/Loader.h>
 #include <GPUSpectral/renderer/PathTracer.h>   
 
 #include <Windows.h>
@@ -26,14 +26,8 @@ int main() {
     glm::vec3 origin = glm::vec3(0.0, 1.0, 0.0);
 
     engine.getWindow().run([&]() {
-        //t.x += 0.1;
-        //neptune->setTransform(t);
-        //scene.camera.lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
         engine.getRenderer().run(scene);
     });
     
-    
-
-
     return 0;
 }

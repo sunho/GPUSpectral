@@ -6,15 +6,12 @@
 #include <memory>
 #include <filesystem>
 
-#include "Mesh.h"
-#include "renderer/Renderer.h"
-#include "Scene.h"
+#include "../renderer/Mesh.h"
+#include "../renderer/Renderer.h"
 #include "Window.h"
-#include "utils/ResourceList.h"
 
 namespace GPUSpectral {
 
-using MeshPtr = std::shared_ptr<Mesh>;
 class Engine {
   public:
     Engine(const std::filesystem::path& basePath, const std::filesystem::path& assetBasePath);
@@ -27,8 +24,6 @@ class Engine {
     Engine& operator=(Engine&&) = delete;
 
     void init(size_t width, size_t height);
-
-    MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
 
     [[nodiscard]] std::string assetPath(const std::string& assetName) const noexcept;
 
@@ -48,8 +43,6 @@ class Engine {
     
     std::filesystem::path basePath;
     std::filesystem::path assetBasePath;
-
-    uint32_t nextMeshId{ 1 };
 };
 
 }  // namespace GPUSpectral

@@ -5,8 +5,8 @@
 #include <iostream>
 #include <fstream>
 
-#include "../Engine.h"
-#include "../Scene.h"
+#include "../engine/Engine.h"
+#include "Scene.h"
 
 #include <iostream>
 using namespace GPUSpectral;
@@ -114,19 +114,12 @@ void Renderer::run(const Scene& scene) {
     FrameMarkEnd("Frame")
 }
 
-struct BufferInstance {
-    glm::mat4 transformInvT;
-    uint64_t positionBuffer;
-    uint64_t normalBuffer;
-};
-
 void Renderer::render(InflightContext& ctx, const Scene& scene) {
 }
 
 void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
     std::unordered_map<uint32_t, uint32_t> primitiveIdToVB;
     std::vector<RTInstance> instances;
-    std::vector<BufferInstance> binstances;
     for (auto& obj: scene.renderObjects) {
         Handle<HwBLAS> blas;
         auto it = blasCache.find(obj.mesh->getID());
@@ -143,4 +136,8 @@ void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
     }
     auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
     ctx.data->tlas = tlas;
+}
+
+MeshPtr Renderer::createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices) {
+    return std::make_shared<Mesh>(driver, nextMeshId++, vertices, indices);
 }

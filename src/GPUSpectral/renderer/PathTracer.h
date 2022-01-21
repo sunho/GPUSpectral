@@ -1,6 +1,6 @@
 #pragma once
 #include "Renderer.h"
-#include "../Scene.h"
+#include "Scene.h"
 
 namespace GPUSpectral {
 

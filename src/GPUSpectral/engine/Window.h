@@ -6,12 +6,10 @@
 
 #include <functional>
 
-#include "utils/ResourceList.h"
-
 namespace GPUSpectral {
 class Engine;
 
-class Window : public IdResource {
+class Window {
   public:
     Window() = delete;
     explicit Window(size_t width, size_t height);

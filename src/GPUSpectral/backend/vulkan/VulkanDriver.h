@@ -1,6 +1,6 @@
 #pragma once
 
-#include <GPUSpectral/Window.h>
+#include <GPUSpectral/engine/Window.h>
 #include <vulkan/vulkan.h>
 
 #include <map>

@@ -45,7 +45,3 @@ void GPUSpectral::Engine::init(size_t width, size_t height) {
     renderer = std::make_unique<Renderer>(*this, window.get());
 }
 
-MeshPtr GPUSpectral::Engine::createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices)
-{
-    return std::make_shared<Mesh>(renderer->getDriver(), nextMeshId++, vertices, indices);
-}

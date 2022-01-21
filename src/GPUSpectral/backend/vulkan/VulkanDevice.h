@@ -1,6 +1,6 @@
 #pragma once
 #include <VkBootstrap.h>
-#include <GPUSpectral/Window.h>
+#include <GPUSpectral/engine/Window.h>
 #include "VulkanWSI.h"
 #include <vulkan/vulkan.hpp>
 #include <vk_mem_alloc.h>

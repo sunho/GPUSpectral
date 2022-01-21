@@ -75,9 +75,9 @@ void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
     auto lightBuffer = rg.createTempStorageBuffer(scene.triangleLights.data(), scene.triangleLights.size() * sizeof(TriangleLight));
     renderState.scene.triangleLights = driver.getDeviceAddress(lightBuffer);
     renderState.scene.numLights = scene.triangleLights.size();
-    renderState.camera.eye = scene.camera.pos();
-    renderState.camera.view = scene.camera.toWorld;
-    renderState.camera.fov = scene.camera.fov;
+    renderState.camera.eye = scene.camera.getPosition();
+    renderState.camera.view = scene.camera.getToWorld();
+    renderState.camera.fov = scene.camera.getFov();
     renderState.params.timestamp = timestamp;
     timestamp++;
 }

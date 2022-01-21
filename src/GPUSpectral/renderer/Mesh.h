@@ -1,12 +1,11 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include "backend/DriverTypes.h"
 #include <vector>
 #include <span>
-#include "backend/vulkan/VulkanDriver.h"
-#include "backend/Handles.h"
-#include "utils/ResourceList.h"
+#include "../backend/DriverTypes.h"
+#include "../backend/vulkan/VulkanDriver.h"
+#include "../backend/Handles.h"
 
 namespace GPUSpectral {
 

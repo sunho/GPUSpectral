@@ -2,7 +2,7 @@
 
 #include "Camera.h"
 #include "Mesh.h"
-#include "backend/Handles.h"
+#include "../backend/Handles.h"
 #include <vector>
 #include <optional>
 #include <unordered_map>
@@ -22,7 +22,7 @@ struct RenderObject {
 
 enum BSDFType : uint16_t {
 #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) BSDF_##BSDFTYPE,
-#include "BSDF.inc"
+#include "../assets/shaders/BSDF.inc"
 #undef BSDFDefinition
 };
 
@@ -168,7 +168,7 @@ struct Scene {
         BSDFFIELD##s.push_back(bsdf); \
         return outHandle; \
     }
-#include "BSDF.inc"
+#include "../assets/shaders/BSDF.inc"
 #undef BSDFDefinition
 
     Camera camera;
@@ -176,7 +176,7 @@ struct Scene {
     std::vector<Material> materials;
     std::vector<TriangleLight> triangleLights;
 #define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) std::vector<BSDFNAME> BSDFFIELD##s;
-#include "BSDF.inc"
+#include "../assets/shaders/BSDF.inc"
 #undef BSDFDefinition
     std::optional<Envmap> envMap;
 
