@@ -29,6 +29,7 @@ vec3 rayDir(vec2 size, vec2 fragCoord, float fov) {
 void main() 
 {
 	vec4 origin = renderState.camera.eye;
+    //origin.y -= 0.05f;
 	vec4 direction = vec4(rayDir(vec2(gl_LaunchSizeEXT.xy), vec2(gl_LaunchIDEXT.xy), renderState.camera.fov), 0.0);
 	direction = renderState.camera.view * direction;
 	direction.y *= -1;
@@ -56,13 +57,13 @@ void main()
 			float tmax = 1e10;
 			traceRayEXT(topLevelAS, rayFlags, cullMask, 0, 0, 0, prd.origin, tmin, prd.direction, tmax, 0);
             rngState = prd.seed;
-            float cutoff = 1000.0f;
+            float cutoff = 20.0f;
             if (prd.emitted.x < cutoff && prd.emitted.y < cutoff && prd.emitted.z < cutoff) {
                 result += prd.emitted;
             }
             
             // russian rullete
-            if (depth > 3) {
+            if (depth > 10) {
                 float q = clamp(max(max(prd.weight.x, prd.weight.y), prd.weight.z), 0.05, 1.0);
                 if (randUniform() > q)
                     break;

@@ -10,12 +10,13 @@
 namespace GPUSpectral {
 class Engine;
 
+using MeshPtr = std::shared_ptr<Mesh>;
 using TextureId = size_t;
 using MaterialHandle = int;
 
 struct RenderObject {
     glm::mat4 transform;
-    Mesh* mesh;
+    MeshPtr mesh;
     MaterialHandle material;
 };
 

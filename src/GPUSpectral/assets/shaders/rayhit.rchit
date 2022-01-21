@@ -653,7 +653,7 @@ void evalBSDF(BSDFHandle handle, vec2 uv, vec3 wo, vec3 wi, out BSDFOutput res) 
     }
 }
 
-#define NEE false
+#define NEE true
 
 bool isvalid(float x) {
     return isnan(x) == false && isinf(x) == false;
@@ -790,7 +790,7 @@ void main()
     }
 
     prd.countEmitted = 0;
-    prd.origin = position + 0.001f*faceforward(N, -wi, N);;
+    prd.origin = position + 0.0001f*faceforward(N, -wi, N);;
     prd.direction = wi;
     prd.weight *= bsdfRes.bsdf * NoW / bsdfRes.pdf;
     prd.wasDelta = bsdfRes.isDelta ? 1 : 0;

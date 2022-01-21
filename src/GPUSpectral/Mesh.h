@@ -3,29 +3,64 @@
 #include <glm/glm.hpp>
 #include "backend/DriverTypes.h"
 #include <vector>
+#include <span>
+#include "backend/vulkan/VulkanDriver.h"
 #include "backend/Handles.h"
 #include "utils/ResourceList.h"
 
 namespace GPUSpectral {
-struct Vertex {
-    glm::vec3 pos;
-    float _pad0;
-    glm::vec3 normal;
-    float _pad1;
-    glm::vec2 uv;
-    glm::vec2 _pad2;
-};
 
-struct Mesh : public IdResource {
-    Handle<HwVertexBuffer> vertexBuffer;
-    Handle<HwPrimitive> hwInstance;
-    Handle<HwIndexBuffer> indexBuffer;
-    Handle<HwBufferObject> positionBuffer;
-    Handle<HwBufferObject> normalBuffer;
-    Handle<HwBufferObject> uvBuffer;
-    AttributeArray attributes;
+class Mesh {
+public:
+    struct Vertex {
+        alignas(16) glm::vec3 pos;
+        alignas(16) glm::vec3 normal;
+        glm::vec2 uv;
+    };
+
+    Mesh(VulkanDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices);
+    ~Mesh();
+
+    Mesh(Mesh&&) noexcept = default;
+    Mesh& operator=(Mesh&&) noexcept = default;
+
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
+    
+    [[nodiscard]] Handle<HwVertexBuffer> getVertexBuffer() const noexcept;
+
+    [[nodiscard]] Handle<HwPrimitive> getPrimitive() const noexcept;
+
+    [[nodiscard]] Handle<HwIndexBuffer> getIndexBuffer() const noexcept;
+
+    [[nodiscard]] Handle<HwBufferObject> getPositionBuffer() const noexcept;
+
+    [[nodiscard]] Handle<HwBufferObject> getNormalBuffer() const noexcept;
+
+    [[nodiscard]] Handle<HwBufferObject> getUVBuffer() const noexcept;
+
+    [[nodiscard]] const AttributeArray& getAttributes() const noexcept;
+
+    [[nodiscard]] uint32_t getAttributeCount() const noexcept;
+
+    [[nodiscard]] uint32_t getID() const noexcept;
+
+    [[nodiscard]] std::span<const Vertex> getVertices() const noexcept;
+    
+private:
+    uint32_t id;
+    VulkanDriver& driver;
+    Handle<HwVertexBuffer> vertexBuffer{};
+    Handle<HwPrimitive> primitive{};
+    Handle<HwIndexBuffer> indexBuffer{};
+    Handle<HwBufferObject> positionBuffer{};
+    Handle<HwBufferObject> normalBuffer{};
+    Handle<HwBufferObject> uvBuffer{};
+
     std::vector<Vertex> vertices;
-    uint32_t elementCount;
-    uint32_t attributeCount;
+    std::vector<uint32_t> indices;
+
+    // only single attributes format is supported
+    AttributeArray attributes;
 };
 }

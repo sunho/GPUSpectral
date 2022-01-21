@@ -16,7 +16,7 @@
 #include <filesystem>
 using namespace GPUSpectral;
 
-static void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
+static MeshPtr loadMesh(Renderer& renderer, Engine& engine, const std::string& path) {
     std::string warn;
     std::string err;
     std::vector<tinyobj::shape_t> shapes;
@@ -37,79 +37,30 @@ static void loadMesh(Renderer& renderer, Mesh* mesh, const std::string& path) {
     for (size_t m = 0; m < materials.size(); m++) {
         tinyobj::material_t* mp = &materials[m];
     }
+    std::vector<uint32_t> indices;
+    std::vector<Mesh::Vertex> vertices;
     for (size_t s = 0; s < shapes.size(); s++) {
         auto& driver = renderer.getDriver();
         Material* material = nullptr;
         const int matId = shapes[s].mesh.material_ids[0];
-        std::vector<float> v;
-        std::vector<float> vt;
-        std::vector<float> vn;
-        std::vector<uint32_t> indices;
-        std::vector<Vertex> vertices;
         for (size_t f = 0; f < shapes[s].mesh.indices.size(); ++f) {
-            indices.push_back(f);
+            indices.push_back(indices.size());
             auto i0 = shapes[s].mesh.indices[f];
             glm::vec3 pos;
             pos.x = attrib.vertices[3 * i0.vertex_index];
             pos.y = attrib.vertices[3 * i0.vertex_index + 1];
             pos.z = attrib.vertices[3 * i0.vertex_index + 2];
-            v.push_back(pos.x);
-            v.push_back(pos.y);
-            v.push_back(pos.z);
             glm::vec2 uv;
             uv.x = attrib.texcoords[2 * i0.texcoord_index];
             uv.y = attrib.texcoords[2 * i0.texcoord_index + 1];
-            vt.push_back(uv.x);
-            vt.push_back(uv.y);
             glm::vec3 normal;
             normal.x = attrib.normals[3 * i0.normal_index];
             normal.y = attrib.normals[3 * i0.normal_index + 1];
             normal.z = attrib.normals[3 * i0.normal_index + 2];
-            vn.push_back(normal.x);
-            vn.push_back(normal.y);
-            vn.push_back(normal.z);
             vertices.push_back({ .pos = pos, .normal = normal, .uv = uv });
         }
-        mesh->attributes[0] = {
-            .name = "position",
-            .index = 0,
-            .offset = 0,
-            .stride = 12,
-            .type = ElementType::FLOAT3
-        };
-        mesh->attributes[1] = {
-            .name = "normal", .index = 1, .offset = 0, .stride = 12, .type = ElementType::FLOAT3
-        };
-        mesh->attributes[2] = {
-            .name = "texcoord",
-            .index = 2,
-            .offset = 0,
-            .stride = 8,
-            .type = ElementType::FLOAT2,
-        };
-        auto buffer0 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE);
-        driver.updateBufferObjectSync(buffer0, { .data = (uint32_t*)v.data() }, 0);
-        mesh->positionBuffer = buffer0;
-        auto buffer1 = driver.createBufferObject(4 * v.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE);
-        driver.updateBufferObjectSync(buffer1, { .data = (uint32_t*)vn.data() }, 0);
-        mesh->normalBuffer = buffer1;
-        auto buffer2 = driver.createBufferObject(4 * vt.size(), BufferUsage::VERTEX | BufferUsage::STORAGE | BufferUsage::BDA | BufferUsage::ACCELERATION_STRUCTURE_INPUT, BufferType::DEVICE);
-        driver.updateBufferObjectSync(buffer2, { .data = (uint32_t*)vt.data() }, 0);
-        mesh->uvBuffer = buffer2;
-
-        auto vbo = driver.createVertexBuffer(3, v.size() / 3, 3, mesh->attributes);
-        driver.setVertexBuffer(vbo, 0, buffer0);
-        driver.setVertexBuffer(vbo, 1, buffer1);
-        driver.setVertexBuffer(vbo, 2, buffer2);
-
-        auto ibo = driver.createIndexBuffer(indices.size());
-        driver.updateIndexBuffer(ibo, { .data = (uint32_t*)indices.data() }, 0);
-        mesh->indexBuffer = ibo;
-        mesh->vertexBuffer = vbo;
-        mesh->hwInstance = driver.createPrimitive(PrimitiveMode::TRIANGLES);
-        mesh->vertices = vertices;
-        driver.setPrimitiveBuffer(mesh->hwInstance, vbo, ibo);
     }
+    return engine.createMesh({ vertices.data(), vertices.size() }, { indices.data(), indices.size() });
 }
 
 static Handle<HwTexture> loadTexture(Renderer& renderer, const std::string& path) {
@@ -307,13 +258,12 @@ void loadPfm(const std::string& path, std::vector<float>& data, int& width, int&
 }
 
 Scene GPUSpectral::loadScene(Engine& engine, Renderer& renderer, const std::string& path) {
-    std::unordered_map<std::string, Mesh*> meshCache;
+    std::unordered_map<std::string, MeshPtr> meshCache;
     auto loadOrGetMesh = [&](const std::string& objPath) {
         if (meshCache.find(objPath) != meshCache.end()) {
             return meshCache.at(objPath);
         }
-        auto mesh = engine.createMesh();
-        loadMesh(renderer, mesh, objPath);
+        auto mesh = loadMesh(renderer, engine, objPath);
         meshCache.emplace(objPath, mesh);
         return mesh;
     };
@@ -377,11 +327,12 @@ Scene GPUSpectral::loadScene(Engine& engine, Renderer& renderer, const std::stri
 
             if (emitting) {
                 auto m = renderObject.mesh;
-                for (size_t i = 0; i < m->vertices.size(); i += 3) {
+                auto vertices = m->getVertices();
+                for (size_t i = 0; i < vertices.size(); i += 3) {
                     TriangleLight light = {};
-                    glm::vec3 pos0 = m->vertices[i].pos;
-                    glm::vec3 pos1 = m->vertices[i + 1].pos;
-                    glm::vec3 pos2 = m->vertices[i + 2].pos;
+                    glm::vec3 pos0 = vertices[i].pos;
+                    glm::vec3 pos1 = vertices[i + 1].pos;
+                    glm::vec3 pos2 = vertices[i + 2].pos;
                     light.positions[0] = (renderObject.transform * glm::vec4(pos0.x, pos0.y, pos0.z, 1.0f));
                     light.positions[1] = (renderObject.transform * glm::vec4(pos1.x, pos1.y, pos1.z, 1.0f));
                     light.positions[2] = (renderObject.transform * glm::vec4(pos2.x, pos2.y, pos2.z, 1.0f));

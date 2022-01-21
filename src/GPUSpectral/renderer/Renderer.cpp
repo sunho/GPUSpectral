@@ -129,10 +129,10 @@ void Renderer::prepareSceneData(InflightContext& ctx, const Scene& scene) {
     std::vector<BufferInstance> binstances;
     for (auto& obj: scene.renderObjects) {
         Handle<HwBLAS> blas;
-        auto it = blasCache.find(obj.mesh->id());
+        auto it = blasCache.find(obj.mesh->getID());
         if (it == blasCache.end()) {
-            blas = driver.createBLAS(obj.mesh->hwInstance);
-            blasCache.emplace(obj.mesh->id(), blas);
+            blas = driver.createBLAS(obj.mesh->getPrimitive());
+            blasCache.emplace(obj.mesh->getID(), blas);
         } else {
             blas = it->second;
         }

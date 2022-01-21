@@ -13,26 +13,43 @@
 #include "utils/ResourceList.h"
 
 namespace GPUSpectral {
+
+using MeshPtr = std::shared_ptr<Mesh>;
 class Engine {
   public:
     Engine(const std::filesystem::path& basePath, const std::filesystem::path& assetBasePath);
     ~Engine();
 
-    Window *createWindow(size_t width, size_t height);
-    Mesh *createMesh();
-    Renderer *createRenderer(Window *window);
-    std::string assetPath(const std::string& assetName);
-    std::filesystem::path getBasePath() { return basePath;  }
+    Engine(const Engine&) = delete;
+    Engine& operator=(const Engine&) = delete;
 
+    Engine(Engine&&) = delete;
+    Engine& operator=(Engine&&) = delete;
 
+    void init(size_t width, size_t height);
 
-  private:
-    ResourceList<Window> windows;
-    ResourceList<Renderer> renderers;
-    ResourceList<Mesh> meshes;
+    MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
+
+    [[nodiscard]] std::string assetPath(const std::string& assetName) const noexcept;
+
+    [[nodiscard]] std::filesystem::path getBasePath() const noexcept;
+
+    [[nodiscard]] const Renderer& getRenderer() const noexcept;
+
+    [[nodiscard]] const Window& getWindow() const noexcept;
+
+    [[nodiscard]] Renderer& getRenderer() noexcept;
+
+    [[nodiscard]] Window& getWindow() noexcept;
+
+   private:
+    std::unique_ptr<Window> window;
+    std::unique_ptr<Renderer> renderer;
     
     std::filesystem::path basePath;
     std::filesystem::path assetBasePath;
+
+    uint32_t nextMeshId{ 1 };
 };
 
 }  // namespace GPUSpectral

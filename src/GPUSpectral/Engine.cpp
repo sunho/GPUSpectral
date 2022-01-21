@@ -2,25 +2,50 @@
 
 using namespace GPUSpectral;
 
-Engine::Engine(const std::filesystem::path& basePath, const std::filesystem::path& assetBasePath) : assetBasePath(assetBasePath), basePath(basePath) {
+Engine::Engine(const std::filesystem::path& basePath, const std::filesystem::path& assetBasePath) 
+    : assetBasePath(assetBasePath), basePath(basePath) {
 }
 
 Engine::~Engine() {
 }
 
-Window *Engine::createWindow(size_t width, size_t height) {
-    return windows.construct(width, height);
-}
-
-Renderer *Engine::createRenderer(Window *window) {
-    return renderers.construct(*this, window);
-}
-
-std::string GPUSpectral::Engine::assetPath(const std::string& assetName) {
+std::string GPUSpectral::Engine::assetPath(const std::string& assetName) const noexcept
+{
     auto path = assetBasePath / assetName;
     return path.string();
 }
 
-Mesh *Engine::createMesh() {
-    return meshes.construct();
+std::filesystem::path GPUSpectral::Engine::getBasePath() const noexcept
+{
+    return assetBasePath;
+}
+
+const Renderer& GPUSpectral::Engine::getRenderer() const noexcept
+{
+    return *renderer;
+}
+
+const Window& GPUSpectral::Engine::getWindow() const noexcept
+{
+    return *window;
+}
+
+Renderer& GPUSpectral::Engine::getRenderer() noexcept
+{
+    return *renderer;
+}
+
+Window& GPUSpectral::Engine::getWindow() noexcept
+{
+    return *window;
+}
+
+void GPUSpectral::Engine::init(size_t width, size_t height) {
+    window = std::make_unique<Window>(width, height);
+    renderer = std::make_unique<Renderer>(*this, window.get());
+}
+
+MeshPtr GPUSpectral::Engine::createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices)
+{
+    return std::make_shared<Mesh>(renderer->getDriver(), nextMeshId++, vertices, indices);
 }

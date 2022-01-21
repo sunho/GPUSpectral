@@ -16,40 +16,20 @@ std::filesystem::path basePath() {
 int main() {
 
     GPUSpectral::Engine engine(basePath(), basePath() / "assets");
-    GPUSpectral::Window* window = engine.createWindow(600, 600);
-    GPUSpectral::Renderer* renderer = engine.createRenderer(window);
-    auto pathTracer = std::make_unique<GPUSpectral::PathTracer>(*renderer);
-    renderer->setRendererImpl(std::move(pathTracer));
+    engine.init(500, 500);
+    auto pathTracer = std::make_unique<GPUSpectral::PathTracer>(engine.getRenderer());
+    engine.getRenderer().setRendererImpl(std::move(pathTracer));
 
-    auto scene = loadScene(engine, *renderer, (basePath() / "assets" / "scenes" / "test2" / "scene.xml").string());
+
+    auto scene = loadScene(engine, engine.getRenderer(), (basePath() / "assets" / "scenes" / "test3" / "scene.xml").string());
     glm::vec3 cameraPos = glm::vec3(0.0, 1.0, 13.0f);
     glm::vec3 origin = glm::vec3(0.0, 1.0, 0.0);
 
-    window->run([&]() {
+    engine.getWindow().run([&]() {
         //t.x += 0.1;
         //neptune->setTransform(t);
-        int a = glfwGetKey(window->window, GLFW_KEY_A);
-        if (a == GLFW_PRESS)
-        {
-            cameraPos.z -= 0.05f;
-        }
-        int d = glfwGetKey(window->window, GLFW_KEY_D);
-        if (d == GLFW_PRESS)
-        {
-            cameraPos.x += 0.05f;
-        }
-        int w = glfwGetKey(window->window, GLFW_KEY_W);
-        if (w == GLFW_PRESS)
-        {
-            cameraPos.z += 0.05f;
-        }
-        int s = glfwGetKey(window->window, GLFW_KEY_S);
-        if (s == GLFW_PRESS)
-        {
-            cameraPos.x -= 0.05f;
-        }
         //scene.camera.lookAt(cameraPos, origin, glm::vec3(0.0, 1.0, 0.0));
-        renderer->run(scene);
+        engine.getRenderer().run(scene);
     });
     
     
