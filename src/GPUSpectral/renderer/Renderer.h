@@ -51,8 +51,6 @@ class Renderer {
     Handle<HwProgram> getShaderProgram(const std::string& shaderName);
   private:
     Handle<HwProgram> loadShader(const std::string& filename);
-    void registerShader(const std::string& shaderName, const std::string& filename);
-    void registerPrograms();
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
 

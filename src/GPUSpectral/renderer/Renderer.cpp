@@ -22,7 +22,6 @@ Renderer::Renderer(Engine& engine, Window* window)
         inflights[i].fence = driver->createFence();
         inflights[i].rg = std::make_unique<FrameGraph>(*driver);
     }
-    registerPrograms();
     surfaceRenderTarget = driver->createDefaultRenderTarget();
     std::vector<float> v = { -1, -1, 1, 1, -1, 1, 1, -1, 1, 1, -1, -1 };
     std::vector<uint32_t> indices = { 0, 1, 2, 3, 4, 5 };
@@ -62,22 +61,14 @@ Handle<HwProgram> Renderer::loadShader(const std::string& filename) {
     return driver->createProgram(prog);
 }
 
-void Renderer::registerShader(const std::string& shaderName, const std::string& filename)  {
-    programs.emplace(shaderName, loadShader(filename));
-}
-
-
 Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
-    return programs.at(shaderName);
-}
-
-void Renderer::registerPrograms() {
-    registerShader("RayMiss", "shaders/miss.rmiss");
-    registerShader("ShadowMiss", "shaders/shadowmiss.rmiss");
-    registerShader("RayGen", "shaders/raygen.rgen");
-    registerShader("RayHit", "shaders/rayhit.rchit");
-    registerShader("DrawTextureVert", "shaders/DrawTexture.vert");
-    registerShader("DrawTextureFrag", "shaders/DrawTexture.frag");
+    auto it = programs.find(shaderName);
+    if (it != programs.end()) {
+        return it->second;
+    }
+    auto program = loadShader("shaders/" + shaderName);
+    programs.emplace(shaderName, program);
+    return program;
 }
 
 Renderer::~Renderer() {

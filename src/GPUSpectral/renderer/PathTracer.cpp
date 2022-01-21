@@ -27,10 +27,10 @@ void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
         },
         .func = [this, tlas, rsBuf](FrameGraph& rg) {
             RTPipeline pipeline = {};
-            pipeline.raygenGroup = renderer.getShaderProgram("RayGen");
-            pipeline.missGroups.push_back(renderer.getShaderProgram("RayMiss"));
-            pipeline.missGroups.push_back(renderer.getShaderProgram("ShadowMiss"));
-            pipeline.hitGroups.push_back(renderer.getShaderProgram("RayHit"));
+            pipeline.raygenGroup = renderer.getShaderProgram("raygen.rgen");
+            pipeline.missGroups.push_back(renderer.getShaderProgram("miss.rmiss"));
+            pipeline.missGroups.push_back(renderer.getShaderProgram("shadowmiss.rmiss"));
+            pipeline.hitGroups.push_back(renderer.getShaderProgram("rayhit.rchit"));
             pipeline.bindTLAS(0, 0, tlas);
             pipeline.bindStorageImage(0, 1, accumulateBuffer);
             pipeline.bindUniformBuffer(0, 2, rsBuf);
@@ -44,8 +44,8 @@ void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
         },
         .func = [this, tlas](FrameGraph& rg) {
             GraphicsPipeline pipe = {};
-            pipe.vertex = renderer.getShaderProgram("DrawTextureVert");
-            pipe.fragment= renderer.getShaderProgram("DrawTextureFrag");
+            pipe.vertex = renderer.getShaderProgram("DrawTexture.vert");
+            pipe.fragment= renderer.getShaderProgram("DrawTexture.frag");
             RenderPassParams params;
             driver.beginRenderPass(renderer.surfaceRenderTarget, params);
             pipe.bindTexture(0, 0, accumulateBuffer);
