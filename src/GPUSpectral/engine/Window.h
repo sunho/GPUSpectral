@@ -22,9 +22,8 @@ class Window {
 
     void run(std::function<void()> drawFrame);
     GLFWwindow* window;
+
   private:
-
-
     size_t width;
     size_t height;
 };

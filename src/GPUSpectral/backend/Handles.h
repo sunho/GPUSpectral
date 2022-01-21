@@ -38,10 +38,11 @@ class HandleBase {
     HandleId getId() const {
         return id;
     }
-    
+
     void reset() {
         id = nullId;
     }
+
   protected:
     HandleId id{ nullId };
 };

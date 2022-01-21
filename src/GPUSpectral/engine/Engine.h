@@ -2,9 +2,9 @@
 
 #include <stdlib.h>
 
+#include <filesystem>
 #include <list>
 #include <memory>
-#include <filesystem>
 
 #include "../renderer/Mesh.h"
 #include "../renderer/Renderer.h"
@@ -37,10 +37,10 @@ class Engine {
 
     [[nodiscard]] Window& getWindow() noexcept;
 
-   private:
+  private:
     std::unique_ptr<Window> window;
     std::unique_ptr<Renderer> renderer;
-    
+
     std::filesystem::path basePath;
     std::filesystem::path assetBasePath;
 };

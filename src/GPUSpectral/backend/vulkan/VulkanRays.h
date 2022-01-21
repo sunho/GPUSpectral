@@ -1,8 +1,8 @@
 #pragma once
 #include <GPUSpectral/backend/DriverBase.h>
 
-#include "VulkanDevice.h"
 #include "VulkanBuffer.h"
+#include "VulkanDevice.h"
 #include "VulkanHandles.h"
 
 class VulkanRayFrameContext;
@@ -33,5 +33,3 @@ struct VulkanTLAS : public HwTLAS {
     std::unique_ptr<VulkanBufferObject> buffer{};
     std::unique_ptr<VulkanBufferObject> instanceBuffer{};
 };
-
-

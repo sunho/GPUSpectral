@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vulkan/vulkan.hpp>
 #include <stdexcept>
+#include <vulkan/vulkan.hpp>
 
 #include "../DriverBase.h"
 #include "../Handles.h"
@@ -13,7 +13,7 @@ struct VulkanBufferObject : public HwBufferObject {
     void uploadSync(const BufferDescriptor &descriptor);
     void copy(vk::CommandBuffer cmd, const VulkanBufferObject &obj);
     std::vector<char> download();
-    void* mapped{ nullptr };
+    void *mapped{ nullptr };
     vk::Buffer buffer;
     BufferType type;
 

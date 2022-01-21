@@ -1,17 +1,17 @@
 #pragma once
 
 #include <GPUSpectral/engine/Window.h>
-#include "../Driver.h"
 #include <vulkan/vulkan.h>
+#include "../Driver.h"
 
+#include <Tracy.hpp>
+#include <TracyVulkan.hpp>
+#include <cassert>
+#include <filesystem>
+#include <iostream>
 #include <map>
 #include <optional>
 #include <vector>
-#include <cassert>
-#include <Tracy.hpp>
-#include <TracyVulkan.hpp>
-#include <filesystem>
-#include <iostream>
 
 #include "../DriverBase.h"
 #include "../PipelineState.h"
@@ -19,24 +19,22 @@
 #include "VulkanDevice.h"
 #include "VulkanHandles.h"
 #include "VulkanPipelineCache.h"
-#include "VulkanTexture.h"
 #include "VulkanRays.h"
+#include "VulkanTexture.h"
 
 namespace GPUSpectral {
 using HandleData = std::vector<char>;
 
 struct VulkanInflight : public HwInflight {
     VulkanInflight() = delete;
-    static vk::CommandBuffer createCommandBuffer(VulkanDevice& device) {
+    static vk::CommandBuffer createCommandBuffer(VulkanDevice &device) {
         auto cmdInfo = vk::CommandBufferAllocateInfo()
-            .setCommandBufferCount(1)
-            .setCommandPool(device.commandPool);
+                           .setCommandBufferCount(1)
+                           .setCommandPool(device.commandPool);
         return device.device.allocateCommandBuffers(cmdInfo).front();
     }
-    VulkanInflight(VulkanDevice& device) : 
-            device(device), 
-            cmd(createCommandBuffer(device))
-    {
+    VulkanInflight(VulkanDevice &device)
+        : device(device), cmd(createCommandBuffer(device)) {
         imageSemaphore = device.semaphorePool.acquire();
         renderSemaphore = device.semaphorePool.acquire();
     }
@@ -48,22 +46,22 @@ struct VulkanInflight : public HwInflight {
     vk::Fence inflightFence{};
     vk::Semaphore imageSemaphore{};
     vk::Semaphore renderSemaphore{};
-    VulkanDevice& device;
+    VulkanDevice &device;
     vk::CommandBuffer cmd{};
 };
 
-struct DriverContext { 
+struct DriverContext {
     VulkanRenderTarget *currentRenderTarget{};
     vk::RenderPass currentRenderPass{};
     Viewport viewport{};
-    VulkanInflight* inflight{};
+    VulkanInflight *inflight{};
     TracyVkCtx tracyContext{ nullptr };
     std::string profileSectionName;
 };
 
 class VulkanDriver : public HwDriver {
   public:
-    VulkanDriver(Window *window, const std::filesystem::path& basePath);
+    VulkanDriver(Window *window, const std::filesystem::path &basePath);
     ~VulkanDriver();
 
     VulkanDriver(const VulkanDriver &) = delete;
@@ -81,9 +79,8 @@ class VulkanDriver : public HwDriver {
 
   private:
     void setupDebugMessenger();
-    VulkanBindings translateBindingMap(const ProgramParameterLayout& layout, const BindingMap& binds);
+    VulkanBindings translateBindingMap(const ProgramParameterLayout &layout, const BindingMap &binds);
     std::string profileZoneName(std::string zoneName);
-    
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL
     debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

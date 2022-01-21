@@ -1,8 +1,8 @@
 #pragma once
 
 #include <array>
-#include <string>
 #include <glm/matrix.hpp>
+#include <string>
 
 #include "Handles.h"
 
@@ -219,7 +219,6 @@ struct ImageDescriptor {
     ImageSubresource subresource{};
 };
 
-
 struct Viewport {
     int32_t left;
     int32_t top;
@@ -332,6 +331,6 @@ struct Barrier {
     BarrierStageMask dstStage;
     BarrierAccessFlag dstAccess;
     Handle<HwTexture> image{};
-    ImageLayout initialLayout {ImageLayout::NONE};
-    ImageLayout finalLayout{ImageLayout::NONE};
+    ImageLayout initialLayout{ ImageLayout::NONE };
+    ImageLayout finalLayout{ ImageLayout::NONE };
 };

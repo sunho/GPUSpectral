@@ -1,19 +1,19 @@
 #include "Loader.h"
-#include "Engine.h"
-#include "../renderer/Scene.h"
-#include "../renderer/Renderer.h"
-#include "../utils/Util.h"
-#include <tinyparser-mitsuba.h>
+#include <assert.h>
 #include <stb_image.h>
 #include <tiny_obj_loader.h>
+#include <tinyparser-mitsuba.h>
 #include <glm/glm.hpp>
-#include <glm/matrix.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/matrix.hpp>
 #include <iostream>
-#include <assert.h>
+#include "../renderer/Renderer.h"
+#include "../renderer/Scene.h"
+#include "../utils/Util.h"
+#include "Engine.h"
 
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 using namespace GPUSpectral;
 
 static MeshPtr loadMesh(Renderer& renderer, Engine& engine, const std::string& path) {
@@ -115,7 +115,6 @@ static Handle<HwTexture> loadTexture(Renderer& renderer, const std::string& path
     return texId;
 }*/
 
-
 static glm::vec3 convertRgb(tinyparser_mitsuba::Color color) {
     return glm::vec3(color.r, color.g, color.b);
 }
@@ -126,8 +125,7 @@ static Handle<HwTexture> loadTexture(Renderer& renderer, Scene& scene, tinyparse
         /*auto filename = obj.property("filename").getString();
         auto path = (basepath / filename).string();
         return loadTexture(renderer, path);*/
-    }
-    else if (type == "checkerboard") {
+    } else if (type == "checkerboard") {
         /*const uint32_t uSize = obj.property("uscale").getNumber(1);
         const uint32_t vSize = obj.property("vscale").getNumber(1);
         const glm::vec3 colorOn = convertRgb(obj.property("color0").getColor());
@@ -161,8 +159,7 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             }
         }
         material->bsdf = scene.addDiffuseBSDF(bsdf);
-    }
-    else if (type == "roughplastic") {
+    } else if (type == "roughplastic") {
         auto rgb = obj.property("diffuse_reflectance").getColor();
         float alpha = obj.property("alpha").getNumber();
         glm::vec3 diffuse = glm::vec3(rgb.r, rgb.g, rgb.b);
@@ -189,17 +186,14 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             }
         }
         material->bsdf = scene.addRoughPlasticBSDF(bsdf);
-    }
-    else if (type == "dielectric") {
+    } else if (type == "dielectric") {
         float intIOR = obj.property("int_ior").getNumber();
         float extIOR = obj.property("ext_ior").getNumber();
         material->bsdf = scene.addSmoothDielectricBSDF(SmoothDielectricBSDF{ intIOR, extIOR });
-    }
-    else if (type == "conductor") {
+    } else if (type == "conductor") {
         float ior = obj.property("eta").isValid() ? obj.property("eta").getNumber() : 0.0f;
         material->bsdf = scene.addSmoothConductorBSDF(SmoothConductorBSDF{ ior, 1.0f });
-    }
-    else if (type == "plastic") {
+    } else if (type == "plastic") {
         auto rgb = obj.property("diffuse_reflectance").getColor();
         glm::vec3 diffuse = glm::vec3(rgb.r, rgb.g, rgb.b);
         if (obj.property("ext_ior").isValid()) {
@@ -215,9 +209,8 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             .iorIn = ior,
             .iorOut = 1.0f,
             .R0 = R0,
-            });
-    }
-    else if (type == "roughconductor") {
+        });
+    } else if (type == "roughconductor") {
         auto eta_ = obj.property("eta").getColor();
         auto k_ = obj.property("k").getColor();
         auto reflectance_ = obj.property("specular_reflectance").getColor();
@@ -230,7 +223,7 @@ static void loadMaterial(Renderer& renderer, Scene& scene, Material* material, t
             .k = k,
             .reflectance = reflectance,
             .alpha = (float)sqrt(2) * alpha,
-            });
+        });
     }
 
     for (auto child : obj.anonymousChildren()) {
@@ -278,17 +271,13 @@ Scene GPUSpectral::loadScene(Engine& engine, Renderer& renderer, const std::stri
             std::string filename;
             if (obj->pluginType() == "obj") {
                 filename = (parentPath / obj->property("filename").getString()).string();
-            }
-            else if (obj->pluginType() == "rectangle") {
+            } else if (obj->pluginType() == "rectangle") {
                 filename = engine.assetPath("rect.obj");
-            }
-            else if (obj->pluginType() == "cube") {
+            } else if (obj->pluginType() == "cube") {
                 filename = engine.assetPath("box.obj");
-            }
-            else if (obj->pluginType() == "disk") {
+            } else if (obj->pluginType() == "disk") {
                 filename = engine.assetPath("disk.obj");
-            }
-            else {
+            } else {
                 filename = (parentPath / filename).string();
             }
             auto mesh = loadOrGetMesh(filename);
@@ -309,8 +298,7 @@ Scene GPUSpectral::loadScene(Engine& engine, Renderer& renderer, const std::stri
             for (auto child : obj->anonymousChildren()) {
                 if (child->type() == tinyparser_mitsuba::OT_BSDF) {
                     loadMaterial(renderer, outScene, &material, *child, parentPath);
-                }
-                else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
+                } else if (child->type() == tinyparser_mitsuba::OT_EMITTER) {
                     if (child->pluginType() == "area") {
                         auto col = child->property("radiance").getColor();
                         material.emission = glm::vec3(col.r, col.g, col.b);
@@ -336,20 +324,18 @@ Scene GPUSpectral::loadScene(Engine& engine, Renderer& renderer, const std::stri
                     light.positions[0] = (renderObject.transform * glm::vec4(pos0.x, pos0.y, pos0.z, 1.0f));
                     light.positions[1] = (renderObject.transform * glm::vec4(pos1.x, pos1.y, pos1.z, 1.0f));
                     light.positions[2] = (renderObject.transform * glm::vec4(pos2.x, pos2.y, pos2.z, 1.0f));
-                    light.radiance = glm::vec4(material.emission,1.0);
+                    light.radiance = glm::vec4(material.emission, 1.0);
                     outScene.addTriangleLight(light);
                 }
             }
-        }
-        else if (obj->type() == tinyparser_mitsuba::OT_SENSOR) {
+        } else if (obj->type() == tinyparser_mitsuba::OT_SENSOR) {
             auto transform = obj->property("to_world").getTransform();
             float fov = obj->property("fov").getNumber();
             outScene.camera.setFov(fov * M_PI / 180.f, 1.0f, 0.001f, 1000.0f);
             auto matrix = glm::make_mat4(transform.matrix.data());
             matrix = glm::transpose(matrix);
             outScene.camera.setToWorld(matrix);
-        }
-        else if (obj->type() == tinyparser_mitsuba::OT_EMITTER) {
+        } else if (obj->type() == tinyparser_mitsuba::OT_EMITTER) {
             /*auto filename = obj->property("filename").getString();
             auto path = (parentPath / filename).string();
             auto tex = loadHdrTexture(renderer, path);

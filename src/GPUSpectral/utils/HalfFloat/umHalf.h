@@ -41,9 +41,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef UM_HALF_H_INCLUDED
 #define UM_HALF_H_INCLUDED
 
-#include <limits>
-#include <algorithm>
 #include <stdint.h>
+#include <algorithm>
+#include <limits>
 
 #undef min
 #undef max
@@ -60,195 +60,176 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *  - no well-defined rounding mode
  */
 ///////////////////////////////////////////////////////////////////////////////////
-class HalfFloat
-{
-	friend HalfFloat operator+ (HalfFloat, HalfFloat);
-	friend HalfFloat operator- (HalfFloat, HalfFloat);
-	friend HalfFloat operator* (HalfFloat, HalfFloat);
-	friend HalfFloat operator/ (HalfFloat, HalfFloat);
+class HalfFloat {
+    friend HalfFloat operator+(HalfFloat, HalfFloat);
+    friend HalfFloat operator-(HalfFloat, HalfFloat);
+    friend HalfFloat operator*(HalfFloat, HalfFloat);
+    friend HalfFloat operator/(HalfFloat, HalfFloat);
 
-public:
+  public:
+    enum { BITS_MANTISSA = 10 };
+    enum { BITS_EXPONENT = 5 };
 
-	enum { BITS_MANTISSA = 10 };
-	enum { BITS_EXPONENT = 5 };
+    enum { MAX_EXPONENT_VALUE = 31 };
+    enum { BIAS = MAX_EXPONENT_VALUE / 2 };
 
-	enum { MAX_EXPONENT_VALUE = 31 };
-	enum { BIAS = MAX_EXPONENT_VALUE/2 };
+    enum { MAX_EXPONENT = BIAS };
+    enum { MIN_EXPONENT = -BIAS };
 
-	enum { MAX_EXPONENT = BIAS };
-	enum { MIN_EXPONENT = -BIAS };
+    enum { MAX_EXPONENT10 = 9 };
+    enum { MIN_EXPONENT10 = -9 };
 
-	enum { MAX_EXPONENT10 = 9 };
-	enum { MIN_EXPONENT10 = -9 };
-
-public:
-
-	/** Default constructor. Unitialized by default.
+  public:
+    /** Default constructor. Unitialized by default.
 	 */
-	inline HalfFloat() {}
+    inline HalfFloat() {
+    }
 
-	/** Construction from an existing half
+    /** Construction from an existing half
 	 */
-	inline HalfFloat(const HalfFloat& other)
-		: bits(other.GetBits())
-	{}
+    inline HalfFloat(const HalfFloat& other)
+        : bits(other.GetBits()) {
+    }
 
-	/** Construction from existing values for mantissa, sign
+    /** Construction from existing values for mantissa, sign
 	 *  and exponent. No validation is performed.
 	 *  @note The exponent is unsigned and biased by #BIAS 
 	 */
-	inline HalfFloat(uint16_t _m,uint16_t _e,uint16_t _s);
+    inline HalfFloat(uint16_t _m, uint16_t _e, uint16_t _s);
 
-
-	/** Construction from a single-precision float
+    /** Construction from a single-precision float
 	 */
-	inline HalfFloat(float other);
+    inline HalfFloat(float other);
 
-	/** Construction from a double-precision float
+    /** Construction from a double-precision float
 	 */
-	inline HalfFloat(const double);
+    inline HalfFloat(const double);
 
-
-
-	/** Conversion operator to convert from half to float
+    /** Conversion operator to convert from half to float
 	 */
-	inline operator float() const;
+    inline operator float() const;
 
-	/** Conversion operator to convert from half to double
+    /** Conversion operator to convert from half to double
 	 */
-	inline operator double() const;
+    inline operator double() const;
 
-
-
-	/** Assignment operator to assign another half to
+    /** Assignment operator to assign another half to
 	 *  *this* object.
 	 */
-	inline HalfFloat& operator= (HalfFloat other);
-	inline HalfFloat& operator= (float other);
-	inline HalfFloat& operator= (const double other);
+    inline HalfFloat& operator=(HalfFloat other);
+    inline HalfFloat& operator=(float other);
+    inline HalfFloat& operator=(const double other);
 
-
-	/** Comparison operators
+    /** Comparison operators
 	 */
-	inline bool operator== (HalfFloat other) const;
-	inline bool operator!= (HalfFloat other) const;
+    inline bool operator==(HalfFloat other) const;
+    inline bool operator!=(HalfFloat other) const;
 
-
-	/** Relational comparison operators
+    /** Relational comparison operators
 	 */
-	inline bool operator<  (HalfFloat other) const;
-	inline bool operator>  (HalfFloat other) const;
-	inline bool operator<= (HalfFloat other) const;
-	inline bool operator>= (HalfFloat other) const;
+    inline bool operator<(HalfFloat other) const;
+    inline bool operator>(HalfFloat other) const;
+    inline bool operator<=(HalfFloat other) const;
+    inline bool operator>=(HalfFloat other) const;
 
-	inline bool operator<  (float other) const;
-	inline bool operator>  (float other) const;
-	inline bool operator<= (float other) const;
-	inline bool operator>= (float other) const;
+    inline bool operator<(float other) const;
+    inline bool operator>(float other) const;
+    inline bool operator<=(float other) const;
+    inline bool operator>=(float other) const;
 
-
-	/** Combined assignment operators
+    /** Combined assignment operators
 	 */
-	inline HalfFloat& operator += (HalfFloat other);
-	inline HalfFloat& operator -= (HalfFloat other);
-	inline HalfFloat& operator *= (HalfFloat other);
-	inline HalfFloat& operator /= (HalfFloat other);
+    inline HalfFloat& operator+=(HalfFloat other);
+    inline HalfFloat& operator-=(HalfFloat other);
+    inline HalfFloat& operator*=(HalfFloat other);
+    inline HalfFloat& operator/=(HalfFloat other);
 
-	inline HalfFloat& operator += (float other);
-	inline HalfFloat& operator -= (float other);
-	inline HalfFloat& operator *= (float other);
-	inline HalfFloat& operator /= (float other);
+    inline HalfFloat& operator+=(float other);
+    inline HalfFloat& operator-=(float other);
+    inline HalfFloat& operator*=(float other);
+    inline HalfFloat& operator/=(float other);
 
-	/** Post and prefix increment operators
+    /** Post and prefix increment operators
 	 */
-	inline HalfFloat& operator++();
-	inline HalfFloat operator++(int);
+    inline HalfFloat& operator++();
+    inline HalfFloat operator++(int);
 
-	/** Post and prefix decrement operators
+    /** Post and prefix decrement operators
 	 */
-	inline HalfFloat& operator--();
-	inline HalfFloat operator--(int);
+    inline HalfFloat& operator--();
+    inline HalfFloat operator--(int);
 
-	/** Unary minus operator
+    /** Unary minus operator
 	 */
-	inline HalfFloat operator-() const;
+    inline HalfFloat operator-() const;
 
-
-	/** Provides direct access to the bits of a half float
+    /** Provides direct access to the bits of a half float
 	 */
-	inline uint16_t GetBits() const;
-	inline uint16_t& GetBits();
+    inline uint16_t GetBits() const;
+    inline uint16_t& GetBits();
 
-
-	/** Classification of floating-point types
+    /** Classification of floating-point types
 	 */
-	inline bool IsNaN() const;
-	inline bool IsInfinity() const;
-	inline bool IsDenorm() const;
+    inline bool IsNaN() const;
+    inline bool IsInfinity() const;
+    inline bool IsDenorm() const;
 
-	/** Returns the sign of the floating-point value -
+    /** Returns the sign of the floating-point value -
 	 *  true stands for positive. 
 	 */
-	inline bool GetSign() const;
+    inline bool GetSign() const;
 
-public:
+  public:
+    union {
+        uint16_t bits;  // All bits
+        struct
+        {
+            uint16_t Frac : 10;  // mantissa
+            uint16_t Exp : 5;    // exponent
+            uint16_t Sign : 1;   // sign
+        } IEEE;
+    };
 
-	union 
-	{
-		uint16_t bits;			// All bits
-		struct 
-		{
-			uint16_t Frac : 10;	// mantissa
-			uint16_t Exp  : 5;		// exponent
-			uint16_t Sign : 1;		// sign
-		} IEEE;
-	};
+    union IEEESingle {
+        float Float;
+        struct
+        {
+            uint32_t Frac : 23;
+            uint32_t Exp : 8;
+            uint32_t Sign : 1;
+        } IEEE;
+    };
 
+    union IEEEDouble {
+        double Double;
+        struct {
+            uint64_t Frac : 52;
+            uint64_t Exp : 11;
+            uint64_t Sign : 1;
+        } IEEE;
+    };
 
-	union IEEESingle
-	{
-		float Float;
-		struct
-		{
-			uint32_t Frac : 23;
-			uint32_t Exp  : 8;
-			uint32_t Sign : 1;
-		} IEEE;
-	};
-
-	union IEEEDouble
-	{
-		double Double;
-		struct {
-			uint64_t Frac : 52;
-			uint64_t Exp  : 11;
-			uint64_t Sign : 1;
-		} IEEE;
-	};
-
-	// Enums can not store 64 bit values, so we have to use static constants.
-	static const uint64_t IEEEDouble_MaxExpontent = 0x7FF;
-	static const uint64_t IEEEDouble_ExponentBias = IEEEDouble_MaxExpontent / 2;
+    // Enums can not store 64 bit values, so we have to use static constants.
+    static const uint64_t IEEEDouble_MaxExpontent = 0x7FF;
+    static const uint64_t IEEEDouble_ExponentBias = IEEEDouble_MaxExpontent / 2;
 };
 
 /** 2. Binary operations
  */
-inline HalfFloat operator+ (HalfFloat one, HalfFloat two);
-inline HalfFloat operator- (HalfFloat one, HalfFloat two);
-inline HalfFloat operator* (HalfFloat one, HalfFloat two);
-inline HalfFloat operator/ (HalfFloat one, HalfFloat two);
+inline HalfFloat operator+(HalfFloat one, HalfFloat two);
+inline HalfFloat operator-(HalfFloat one, HalfFloat two);
+inline HalfFloat operator*(HalfFloat one, HalfFloat two);
+inline HalfFloat operator/(HalfFloat one, HalfFloat two);
 
-inline float operator+ (HalfFloat one, float two);
-inline float operator- (HalfFloat one, float two);
-inline float operator* (HalfFloat one, float two);
-inline float operator/ (HalfFloat one, float two);
+inline float operator+(HalfFloat one, float two);
+inline float operator-(HalfFloat one, float two);
+inline float operator*(HalfFloat one, float two);
+inline float operator/(HalfFloat one, float two);
 
-inline float operator+ (float one, HalfFloat two);
-inline float operator- (float one, HalfFloat two);
-inline float operator* (float one, HalfFloat two);
-inline float operator/ (float one, HalfFloat two);
-
-
+inline float operator+(float one, HalfFloat two);
+inline float operator-(float one, HalfFloat two);
+inline float operator*(float one, HalfFloat two);
+inline float operator/(float one, HalfFloat two);
 
 ///////////////////////////////////////////////////////////////////////////////////
 /** 3. Specialization of std::numeric_limits for type half.
@@ -257,62 +238,67 @@ inline float operator/ (float one, HalfFloat two);
 namespace std {
 template <>
 class numeric_limits<HalfFloat> {
-
- public:
-
-	// General -- meaningful for all specializations.
+  public:
+    // General -- meaningful for all specializations.
 
     static const bool is_specialized = true;
-    static HalfFloat min ()
-		{return HalfFloat(0,1,0);}
-    static HalfFloat max ()
-		{return HalfFloat(~0,HalfFloat::MAX_EXPONENT_VALUE-1,0);}
+    static HalfFloat min() {
+        return HalfFloat(0, 1, 0);
+    }
+    static HalfFloat max() {
+        return HalfFloat(~0, HalfFloat::MAX_EXPONENT_VALUE - 1, 0);
+    }
     static const int radix = 2;
     static const int digits = 10;   // conservative assumption
     static const int digits10 = 2;  // conservative assumption
-	static const bool is_signed		= true;
-    static const bool is_integer	= true;
-    static const bool is_exact		= false;
-    static const bool traps			= false;
-    static const bool is_modulo		= false;
-    static const bool is_bounded	= true;
+    static const bool is_signed = true;
+    static const bool is_integer = true;
+    static const bool is_exact = false;
+    static const bool traps = false;
+    static const bool is_modulo = false;
+    static const bool is_bounded = true;
 
-	// Floating point specific.
+    // Floating point specific.
 
-    static HalfFloat epsilon ()
-		{return HalfFloat(0.00097656f);} // from OpenEXR, needs to be confirmed
-    static HalfFloat round_error ()
-		{return HalfFloat(0.00097656f/2);}
+    static HalfFloat epsilon() {
+        return HalfFloat(0.00097656f);
+    }  // from OpenEXR, needs to be confirmed
+    static HalfFloat round_error() {
+        return HalfFloat(0.00097656f / 2);
+    }
     static const int min_exponent10 = HalfFloat::MIN_EXPONENT10;
     static const int max_exponent10 = HalfFloat::MAX_EXPONENT10;
-    static const int min_exponent   = HalfFloat::MIN_EXPONENT;
-    static const int max_exponent   = HalfFloat::MAX_EXPONENT;
+    static const int min_exponent = HalfFloat::MIN_EXPONENT;
+    static const int max_exponent = HalfFloat::MAX_EXPONENT;
 
-    static const bool has_infinity			= true;
-    static const bool has_quiet_NaN			= true;
-    static const bool has_signaling_NaN		= true;
-    static const bool is_iec559				= false;
-    static const bool has_denorm			= denorm_present;
-    static const bool tinyness_before		= false;
+    static const bool has_infinity = true;
+    static const bool has_quiet_NaN = true;
+    static const bool has_signaling_NaN = true;
+    static const bool is_iec559 = false;
+    static const bool has_denorm = denorm_present;
+    static const bool tinyness_before = false;
     static const float_round_style round_style = round_to_nearest;
 
-    static HalfFloat denorm_min ()
-		{return HalfFloat(1,0,1);}
-    static HalfFloat infinity ()
-		{return HalfFloat(0,HalfFloat::MAX_EXPONENT_VALUE,0);}
-    static HalfFloat quiet_NaN ()
-		{return HalfFloat(1,HalfFloat::MAX_EXPONENT_VALUE,0);}
-    static HalfFloat signaling_NaN ()
-		{return HalfFloat(1,HalfFloat::MAX_EXPONENT_VALUE,0);}
- };
-} // end namespace std
-
+    static HalfFloat denorm_min() {
+        return HalfFloat(1, 0, 1);
+    }
+    static HalfFloat infinity() {
+        return HalfFloat(0, HalfFloat::MAX_EXPONENT_VALUE, 0);
+    }
+    static HalfFloat quiet_NaN() {
+        return HalfFloat(1, HalfFloat::MAX_EXPONENT_VALUE, 0);
+    }
+    static HalfFloat signaling_NaN() {
+        return HalfFloat(1, HalfFloat::MAX_EXPONENT_VALUE, 0);
+    }
+};
+}  // end namespace std
 
 #include "./umHalf.inl"
 
 #ifndef UM_HALF_NO_TYPEDEFS
-	typedef HalfFloat float16;
-	typedef HalfFloat half;
+typedef HalfFloat float16;
+typedef HalfFloat half;
 #endif
 
-#endif // !! UM_HALF_H_INCLUDED
+#endif  // !! UM_HALF_H_INCLUDED

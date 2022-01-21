@@ -67,7 +67,8 @@ vk::Format translateElementFormat(ElementType type, bool normalized, bool intege
             case ElementType::BYTE:
                 return vk::Format::eR8Snorm;
             case ElementType::UBYTE:
-                return vk::Format::eR8Unorm;;
+                return vk::Format::eR8Unorm;
+                ;
             case ElementType::SHORT:
                 return vk::Format::eR16Snorm;
             case ElementType::USHORT:

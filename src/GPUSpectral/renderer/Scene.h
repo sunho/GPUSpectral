@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Camera.h"
-#include "Mesh.h"
-#include "../backend/Handles.h"
-#include <vector>
 #include <optional>
 #include <unordered_map>
+#include <vector>
+#include "../backend/Handles.h"
+#include "Camera.h"
+#include "Mesh.h"
 
 namespace GPUSpectral {
 class Engine;
@@ -26,7 +26,6 @@ enum BSDFType : uint16_t {
 #undef BSDFDefinition
 };
 
-
 struct DiffuseBSDF {
     glm::vec3 reflectance;
     int hasTexture;
@@ -34,12 +33,12 @@ struct DiffuseBSDF {
 
 struct SmoothDielectricBSDF {
     float iorIn;
-    float iorOut; // usually 1.0
+    float iorOut;  // usually 1.0
 };
 
 struct SmoothConductorBSDF {
     float iorIn;
-    float iorOut; // usually 1.0
+    float iorOut;  // usually 1.0
 };
 
 struct SmoothFloorBSDF {
@@ -50,7 +49,7 @@ struct SmoothFloorBSDF {
 struct SmoothPlasticBSDF {
     glm::vec3 diffuse;
     float iorIn;
-    float iorOut; // usually 1.0
+    float iorOut;  // usually 1.0
     float R0;
 };
 
@@ -70,7 +69,7 @@ struct RoughConductorBSDF {
 struct RoughPlasticBSDF {
     glm::vec3 diffuse;
     float iorIn;
-    float iorOut; // usually 1.0
+    float iorOut;  // usually 1.0
     float R0;
     float alpha;
     int hasTexture;
@@ -83,8 +82,10 @@ struct RoughFloorBSDF {
 };
 
 struct BSDFHandle {
-    BSDFHandle() { }
-    BSDFHandle(BSDFType type, uint32_t index) : handle((static_cast<uint32_t>(type) << 16) | (index & 0xFFFF)) {
+    BSDFHandle() {
+    }
+    BSDFHandle(BSDFType type, uint32_t index)
+        : handle((static_cast<uint32_t>(type) << 16) | (index & 0xFFFF)) {
     }
     BSDFType type() const {
         return static_cast<BSDFType>((handle >> 16) & 0xffff);
@@ -96,7 +97,7 @@ struct BSDFHandle {
 };
 
 struct Material {
-    glm::vec3 emission{ 0.0f,0.0f,0.0f };
+    glm::vec3 emission{ 0.0f, 0.0f, 0.0f };
     bool twofaced = false;
     bool facenormals = false;
     BSDFHandle bsdf;
@@ -162,11 +163,11 @@ struct Scene {
         triangleLights.push_back(light);
     }
 
-#define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) \
-    BSDFHandle add##BSDFNAME(const BSDFNAME& bsdf) { \
-        BSDFHandle outHandle { BSDF_##BSDFTYPE, (uint32_t)BSDFFIELD##s.size() }; \
-        BSDFFIELD##s.push_back(bsdf); \
-        return outHandle; \
+#define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE)                           \
+    BSDFHandle add##BSDFNAME(const BSDFNAME& bsdf) {                            \
+        BSDFHandle outHandle{ BSDF_##BSDFTYPE, (uint32_t)BSDFFIELD##s.size() }; \
+        BSDFFIELD##s.push_back(bsdf);                                           \
+        return outHandle;                                                       \
     }
 #include "../assets/shaders/BSDF.inc"
 #undef BSDFDefinition
@@ -183,4 +184,4 @@ struct Scene {
     // baked data
     SceneData sceneData;
 };
-}
+}  // namespace GPUSpectral

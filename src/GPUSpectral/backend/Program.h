@@ -1,11 +1,11 @@
 #pragma once
 
+#include <GPUSpectral/utils/FixedVector.h>
+#include <GPUSpectral/utils/Hash.h>
 #include <array>
 #include <string>
-#include <vector>
 #include <variant>
-#include <GPUSpectral/utils/Hash.h>
-#include <GPUSpectral/utils/FixedVector.h>
+#include <vector>
 
 enum class ProgramType {
     VERTEX,
@@ -43,7 +43,7 @@ struct ProgramParameterLayout {
         bool operator==(const LayoutField& other) const {
             return value == other.value;
         }
-        uint32_t value{0};
+        uint32_t value{ 0 };
     };
 
     ProgramParameterLayout() {
@@ -85,7 +85,6 @@ struct ProgramParameterLayout {
         return *this;
     }
 
-
     ProgramParameterLayout& addStorageImage(uint32_t set, uint32_t binding) {
         fields[set * MAX_BINDINGS + binding] = { ProgramParameterType::IMAGE, 1 };
         return *this;
@@ -116,7 +115,7 @@ struct ProgramParameterLayout {
             for (size_t j = 0; j < ProgramParameterLayout::MAX_BINDINGS; ++j) {
                 auto& field = other.fields[i * ProgramParameterLayout::MAX_BINDINGS + j];
                 if (field) {
-                    outLayout.fields[i * ProgramParameterLayout::MAX_BINDINGS + j]= field;
+                    outLayout.fields[i * ProgramParameterLayout::MAX_BINDINGS + j] = field;
                 }
             }
         }
@@ -133,7 +132,7 @@ struct ProgramParameter {
     uint32_t set{};
     uint32_t binding{};
     ProgramParameterType type{};
-    uint32_t arraySize{1};
+    uint32_t arraySize{ 1 };
 };
 
 struct Program {
@@ -149,7 +148,7 @@ struct Program {
     ProgramParameterLayout parameterLayout;
     ProgramType type;
     ProgramHash hash;
+
   private:
     CompiledCode _code;
 };
-

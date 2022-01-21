@@ -2,11 +2,11 @@
 
 #include "DriverBase.h"
 #include "DriverTypes.h"
-#include "Program.h"
 #include "PipelineState.h"
+#include "Program.h"
 
 class HwDriver {
-public:
+  public:
 #define DECL_COMMAND(R, N, ARGS, PARAMS) virtual R N(ARGS) = 0;
 #define DECL_VOIDCOMMAND(N, ARGS, PARAMS) virtual void N(ARGS) = 0;
 

@@ -1,23 +1,23 @@
 #include "VulkanDriver.h"
 
-#include <fmt/format.h>
 #include <GLFW/glfw3.h>
 #include <GPUSpectral/utils/Log.h>
 #include <GPUSpectral/utils/Util.h>
+#include <fmt/format.h>
 
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <set>
 #include <stdexcept>
 #include <vector>
-#include <filesystem>
-#include <fstream>
 
 using namespace GPUSpectral;
 
 static void DestroyDebugUtilsMessengerEXT(VkInstance instance,
                                           VkDebugUtilsMessengerEXT debugMessenger,
-                                          const VkAllocationCallbacks *pAllocator) {
+                                          const VkAllocationCallbacks* pAllocator) {
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
         func(instance, debugMessenger, pAllocator);
@@ -25,9 +25,9 @@ static void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 }
 
 static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
-                                             const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-                                             const VkAllocationCallbacks *pAllocator,
-                                             VkDebugUtilsMessengerEXT *pDebugMessenger) {
+                                             const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+                                             const VkAllocationCallbacks* pAllocator,
+                                             VkDebugUtilsMessengerEXT* pDebugMessenger) {
     auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
     if (func != nullptr) {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -36,7 +36,8 @@ static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance,
     }
 }
 
-VulkanDriver::VulkanDriver(Window *window, const std::filesystem::path& basePath) : basePath(basePath) {
+VulkanDriver::VulkanDriver(Window* window, const std::filesystem::path& basePath)
+    : basePath(basePath) {
     device = std::make_unique<VulkanDevice>(window);
     dummyTex = std::make_unique<VulkanTexture>(*device, SamplerType::SAMPLER2D, TextureUsage::UPLOADABLE | TextureUsage::STORAGE | TextureUsage::COLOR_ATTACHMENT, 1, TextureFormat::RGBA8, 1, 1, 1);
     uint32_t zero = 0;
@@ -60,9 +61,9 @@ InflightHandle VulkanDriver::beginFrame(FenceHandle handle) {
     if (!context.tracyContext) {
         context.tracyContext = TracyVkContext(device->physicalDevice, device->device, device->graphicsQueue, inflight->cmd);
     }
-    
+
     inflight->cmd.begin(vk::CommandBufferBeginInfo());
-    
+
     device->wsi->beginFrame(inflight->imageSemaphore);
     return inflightHandle;
 }
@@ -70,15 +71,16 @@ InflightHandle VulkanDriver::beginFrame(FenceHandle handle) {
 void VulkanDriver::endFrame(int) {
     context.inflight->cmd.end();
     TracyVkCollect(context.tracyContext, context.inflight->cmd)
-    std::array<vk::PipelineStageFlags, 1> waitStages = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+        std::array<vk::PipelineStageFlags, 1>
+            waitStages = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
     std::array<vk::Semaphore, 1> waitSemaphores = { context.inflight->imageSemaphore };
     std::array<vk::Semaphore, 1> signalSemaphores = { context.inflight->renderSemaphore };
     auto info = vk::SubmitInfo()
-        .setWaitSemaphores(waitSemaphores)
-        .setSignalSemaphores(signalSemaphores)
-        .setWaitDstStageMask(waitStages)
-        .setPCommandBuffers(&context.inflight->cmd)
-        .setCommandBufferCount(1);
+                    .setWaitSemaphores(waitSemaphores)
+                    .setSignalSemaphores(signalSemaphores)
+                    .setWaitDstStageMask(waitStages)
+                    .setPCommandBuffers(&context.inflight->cmd)
+                    .setCommandBufferCount(1);
     device->graphicsQueue.submit(1, &info, context.inflight->inflightFence);
     device->wsi->endFrame(context.inflight->renderSemaphore);
     device->cache->tick();
@@ -145,8 +147,8 @@ FenceHandle VulkanDriver::createFence(int) {
 }
 
 void VulkanDriver::waitFence(FenceHandle handle) {
-    std::array<vk::Fence, 1> fences = {handleCast<VulkanFence>(handle)->fence};
-    device->device.waitForFences(fences, true, UINT64_MAX); 
+    std::array<vk::Fence, 1> fences = { handleCast<VulkanFence>(handle)->fence };
+    device->device.waitForFences(fences, true, UINT64_MAX);
     device->device.resetFences(fences);
 }
 
@@ -163,11 +165,10 @@ void VulkanDriver::setVertexBuffer(VertexBufferHandle handle, uint32_t index,
 void VulkanDriver::updateIndexBuffer(IndexBufferHandle handle, BufferDescriptor data,
                                      uint32_t offset) {
     handleCast<VulkanIndexBuffer>(handle)->buffer->uploadSync(data);
-
 }
 
 void VulkanDriver::updateCPUBufferObject(BufferObjectHandle handle, BufferDescriptor data,
-                                      uint32_t offset) {
+                                         uint32_t offset) {
     auto buffer = handleCast<VulkanBufferObject>(handle);
     if (data.size == 0) {
         data.size = buffer->size;
@@ -176,34 +177,34 @@ void VulkanDriver::updateCPUBufferObject(BufferObjectHandle handle, BufferDescri
 }
 
 void VulkanDriver::updateBufferObjectSync(BufferObjectHandle handle, BufferDescriptor data,
-                                             uint32_t offset) {
+                                          uint32_t offset) {
     handleCast<VulkanBufferObject>(handle)->uploadSync(data);
 }
 
 Extent2D VulkanDriver::getFrameSize(int dummy) {
     auto e = device->wsi->getExtent();
-    return {e.width, e.height};
+    return { e.width, e.height };
 }
 
 void VulkanDriver::beginRenderPass(RenderTargetHandle renderTarget, RenderPassParams params) {
     auto& cmd = context.inflight->cmd;
-    VulkanRenderTarget *rt = handleCast<VulkanRenderTarget>(renderTarget);
+    VulkanRenderTarget* rt = handleCast<VulkanRenderTarget>(renderTarget);
     vk::RenderPass renderPass = device->cache->getOrCreateRenderPass(device->wsi->currentSwapChain(), rt);
     vk::Framebuffer frameBuffer = device->cache->getOrCreateFrameBuffer(renderPass, device->wsi->currentSwapChain(), rt);
 
     vk::RenderPassBeginInfo renderPassInfo{};
     renderPassInfo.renderPass = renderPass;
     renderPassInfo.framebuffer = frameBuffer;
-    renderPassInfo.renderArea.offset = { .x = 0, .y= 0 };
+    renderPassInfo.renderArea.offset = { .x = 0, .y = 0 };
     renderPassInfo.renderArea.extent = rt->getExtent(*device);
     std::vector<vk::ClearValue> clearValues{};
     for (size_t i = 0; i < rt->attachmentCount; ++i) {
-        clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f })); 
+        clearValues.push_back(vk::ClearColorValue(std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f }));
     }
     if (rt->attachments.depth.valid) {
         clearValues.push_back(vk::ClearDepthStencilValue().setDepth(1.0f));
     }
-    
+
     renderPassInfo.clearValueCount = clearValues.size();
     renderPassInfo.pClearValues = clearValues.data();
     cmd.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
@@ -250,8 +251,8 @@ void VulkanDriver::blitTexture(TextureHandle destHandle, ImageSubresource destSu
 
 void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle vertexBuffer,
                                       IndexBufferHandle indexBuffer) {
-    VulkanVertexBuffer *vertex = handleCast<VulkanVertexBuffer>(vertexBuffer);
-    VulkanIndexBuffer *index = handleCast<VulkanIndexBuffer>(indexBuffer);
+    VulkanVertexBuffer* vertex = handleCast<VulkanVertexBuffer>(vertexBuffer);
+    VulkanIndexBuffer* index = handleCast<VulkanIndexBuffer>(indexBuffer);
     handleCast<VulkanPrimitive>(handle)->index = index;
     handleCast<VulkanPrimitive>(handle)->vertex = vertex;
 }
@@ -259,9 +260,9 @@ void VulkanDriver::setPrimitiveBuffer(PrimitiveHandle handle, VertexBufferHandle
 void VulkanDriver::draw(GraphicsPipeline pipeline, PrimitiveHandle handle) {
     auto& cmd = context.inflight->cmd;
     ZoneScopedN("Draw")
-    TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("draw").c_str(), true)
+        TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("draw").c_str(), true)
 
-    VulkanPrimitive *prim = handleCast<VulkanPrimitive>(handle);
+            VulkanPrimitive* prim = handleCast<VulkanPrimitive>(handle);
     const uint32_t bufferCount = prim->vertex->attributeCount;
     vk::Buffer buffers[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
     vk::DeviceSize offsets[MAX_VERTEX_ATTRIBUTE_COUNT] = {};
@@ -272,8 +273,8 @@ void VulkanDriver::draw(GraphicsPipeline pipeline, PrimitiveHandle handle) {
         offsets[i] = attrib.offset;
     }
 
-    VulkanProgram *vertex = handleCast<VulkanProgram>(pipeline.vertex);
-    VulkanProgram *fragment = handleCast<VulkanProgram>(pipeline.fragment);
+    VulkanProgram* vertex = handleCast<VulkanProgram>(pipeline.vertex);
+    VulkanProgram* fragment = handleCast<VulkanProgram>(pipeline.fragment);
     ProgramParameterLayout parameterLayout = vertex->program.parameterLayout + fragment->program.parameterLayout;
 
     VulkanPipelineState state = {
@@ -292,8 +293,8 @@ void VulkanDriver::draw(GraphicsPipeline pipeline, PrimitiveHandle handle) {
     device->cache->bindDescriptor(cmd, vk::PipelineBindPoint::eGraphics, parameterLayout, translateBindingMap(parameterLayout, pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, vkpipe.pipeline);
     if (!pipeline.pushConstants.empty()) {
-        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data()); 
-    } 
+        cmd.pushConstants(vkpipe.layout, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute, 0, pipeline.pushConstants.size(), pipeline.pushConstants.data());
+    }
     cmd.bindVertexBuffers(0, bufferCount, buffers, offsets);
     cmd.bindIndexBuffer(prim->index->buffer->buffer, 0, vk::IndexType::eUint32);
     cmd.drawIndexed(prim->index->count, 1, 0, 0, 0);
@@ -302,9 +303,9 @@ void VulkanDriver::draw(GraphicsPipeline pipeline, PrimitiveHandle handle) {
 void VulkanDriver::dispatch(ComputePipeline pipeline, size_t groupCountX, size_t groupCountY, size_t groupCountZ) {
     auto& cmd = context.inflight->cmd;
     ZoneScopedN("Dispatch")
-    TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("dispatch").c_str(), true)
+        TracyVkZoneTransient(context.tracyContext, vkzone, cmd, profileZoneName("dispatch").c_str(), true)
 
-    VulkanProgram* program = handleCast<VulkanProgram>(pipeline.program);
+            VulkanProgram* program = handleCast<VulkanProgram>(pipeline.program);
     VulkanPipeline vkpipe = device->cache->getOrCreateComputePipeline(*program);
     device->cache->bindDescriptor(cmd, vk::PipelineBindPoint::eCompute, program->program.parameterLayout, translateBindingMap(program->program.parameterLayout, pipeline.bindings));
     cmd.bindPipeline(vk::PipelineBindPoint::eCompute, vkpipe.pipeline);
@@ -325,7 +326,7 @@ void VulkanDriver::traceRays(RTPipeline pipeline, size_t width, size_t height) {
             parameterLayout = parameterLayout + outPrograms.back()->program.parameterLayout;
         }
         return outPrograms;
-    }; 
+    };
     VulkanRTPipelineState state = {
         .raygenGroup = handleCast<VulkanProgram>(pipeline.raygenGroup),
         .missGroups = unwrapVector(pipeline.missGroups),
@@ -337,12 +338,12 @@ void VulkanDriver::traceRays(RTPipeline pipeline, size_t width, size_t height) {
     auto sbt = device->cache->getOrCreateSBT(state);
     cmd.bindPipeline(vk::PipelineBindPoint::eRayTracingKHR, vkpipe.pipeline);
     device->cache->bindDescriptor(cmd, vk::PipelineBindPoint::eRayTracingKHR, parameterLayout, translateBindingMap(parameterLayout, pipeline.bindings));
-    device->dld.vkCmdTraceRaysKHR(cmd, 
-        &sbt.raygen.stridedDeviceAddressRegion, 
-        &sbt.miss.stridedDeviceAddressRegion, 
-        &sbt.hit.stridedDeviceAddressRegion, 
-        &sbt.callable.stridedDeviceAddressRegion, 
-        width, height, 1);
+    device->dld.vkCmdTraceRaysKHR(cmd,
+                                  &sbt.raygen.stridedDeviceAddressRegion,
+                                  &sbt.miss.stridedDeviceAddressRegion,
+                                  &sbt.hit.stridedDeviceAddressRegion,
+                                  &sbt.callable.stridedDeviceAddressRegion,
+                                  width, height, 1);
 }
 
 uint64_t VulkanDriver::getDeviceAddress(Handle<HwBufferObject> handle) {
@@ -429,7 +430,7 @@ static inline void preprocessShader(std::string& preprocessedSource, const std::
     core.SetMessageConsumer([](spv_message_level_t, const char*, const spv_position_t&, const char* message) {
         Log("Shader validation error: {}", message);
     });*/
-    /*
+/*
     spvtools::ValidatorOptions opts;
     opts.SetScalarBlockLayout(true);
     if (!core.Validate(compiledCode.data(), compiledCode.size(), opts))
@@ -507,7 +508,6 @@ ImageLayout VulkanDriver::getTextureImageLayout(Handle<HwTexture> handle) {
     return texture->imageLayout;
 }
 
-
 void VulkanDriver::destroyBLAS(Handle<HwBLAS> handle) {
     destructHandle<VulkanBLAS>(handle);
 }
@@ -518,8 +518,8 @@ void VulkanDriver::destroyTLAS(Handle<HwTLAS> handle) {
 
 VkBool32 VulkanDriver::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                                      VkDebugUtilsMessageTypeFlagsEXT messageType,
-                                     const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
-                                     void *pUserData) {
+                                     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                     void* pUserData) {
     if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
         std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
     }
@@ -543,9 +543,9 @@ void VulkanDriver::setupDebugMessenger() {
     }
 }
 
-VulkanBindings VulkanDriver::translateBindingMap(const ProgramParameterLayout& layout, const BindingMap & binds) {
+VulkanBindings VulkanDriver::translateBindingMap(const ProgramParameterLayout& layout, const BindingMap& binds) {
     ZoneScopedN("Translate binding map")
-    VulkanBindings bindings;
+        VulkanBindings bindings;
     for (auto [key, binding] : binds) {
         VulkanBinding vb = {};
         vb.binding = key.binding;
@@ -662,14 +662,14 @@ void VulkanDriver::setBarrier(Barrier barrier) {
         imageBarrier.subresourceRange.baseArrayLayer = 0;
         imageBarrier.subresourceRange.layerCount = texture->layers;
         imageBarrier.subresourceRange.baseMipLevel = 0;
-        imageBarrier.subresourceRange.levelCount= texture->levels;
+        imageBarrier.subresourceRange.levelCount = texture->levels;
         imageBarrier.image = texture->image;
         texture->vkImageLayout = translateImageLayout(barrier.finalLayout);
         texture->imageLayout = barrier.finalLayout;
 
         cmd.pipelineBarrier(translateStageMask(barrier.srcStage),
                             translateStageMask(barrier.dstStage), vk::DependencyFlags(), 0, nullptr, 0, nullptr, 1, &imageBarrier);
-    } else if (barrier.srcAccess != BarrierAccessFlag::NONE || barrier.dstAccess != BarrierAccessFlag::NONE){
+    } else if (barrier.srcAccess != BarrierAccessFlag::NONE || barrier.dstAccess != BarrierAccessFlag::NONE) {
         vk::MemoryBarrier memBarrier{};
         memBarrier.srcAccessMask = translateAccessMask(barrier.srcAccess);
         memBarrier.dstAccessMask = translateAccessMask(barrier.dstAccess);
@@ -679,6 +679,5 @@ void VulkanDriver::setBarrier(Barrier barrier) {
     } else {
         cmd.pipelineBarrier(translateStageMask(barrier.srcStage),
                             translateStageMask(barrier.dstStage), vk::DependencyFlags(), 0, nullptr, 0, nullptr, 0, nullptr);
-    
     }
 }

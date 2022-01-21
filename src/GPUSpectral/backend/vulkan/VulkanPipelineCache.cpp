@@ -1,6 +1,6 @@
 #include "VulkanPipelineCache.h"
-#include <iostream>
 #include <Tracy.hpp>
+#include <iostream>
 
 #include <GPUSpectral/utils/Log.h>
 
@@ -17,7 +17,7 @@ void VulkanDescriptorAllocator::cleanup() {
     }
 }
 
-vk::DescriptorPool createPool(vk::Device device, const VulkanDescriptorAllocator::PoolSizes &poolSizes, int count, vk::DescriptorPoolCreateFlags flags) {
+vk::DescriptorPool createPool(vk::Device device, const VulkanDescriptorAllocator::PoolSizes& poolSizes, int count, vk::DescriptorPoolCreateFlags flags) {
     std::vector<vk::DescriptorPoolSize> sizes;
     sizes.reserve(poolSizes.sizes.size());
     for (auto sz : poolSizes.sizes) {
@@ -91,8 +91,8 @@ void VulkanDescriptorAllocator::resetPools() {
     currentPool = nullptr;
 }
 
-
-VulkanPipelineCache::VulkanPipelineCache(VulkanDevice &device) : device(device) {
+VulkanPipelineCache::VulkanPipelineCache(VulkanDevice& device)
+    : device(device) {
     computePipelines.setDestroyer([=](VkPipeline pipeline) {
         vkDestroyPipeline(this->device.device, pipeline, nullptr);
     });
@@ -130,14 +130,13 @@ void VulkanPipelineCache::tick() {
     currentDescriptorAllocator().resetPools();
 }
 
-VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout &layout) {
-    ZoneScopedN("PipelineCache create layout")
-    auto it = pipelineLayouts.get(layout);
-    
+VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayout(const ProgramParameterLayout& layout) {
+    ZoneScopedN("PipelineCache create layout") auto it = pipelineLayouts.get(layout);
+
     if (it) {
         return *it;
     }
-    
+
     VulkanPipelineCache::PipelineLayout pipelineLayout{};
     vk::PipelineLayoutCreateInfo createInfo{};
     vk::PushConstantRange pushConstants{};
@@ -147,11 +146,10 @@ VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayo
     createInfo.pPushConstantRanges = &pushConstants;
     createInfo.pushConstantRangeCount = 1;
 
-
     for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
         std::vector<vk::DescriptorSetLayoutBinding> bindings;
         for (size_t j = 0; j < ProgramParameterLayout::MAX_BINDINGS; ++j) {
-            auto &field = layout.fields[i * ProgramParameterLayout::MAX_BINDINGS + j];
+            auto& field = layout.fields[i * ProgramParameterLayout::MAX_BINDINGS + j];
             if (field) {
                 vk::DescriptorSetLayoutBinding binding{};
                 binding.descriptorType = translateDescriptorType(field.type());
@@ -174,8 +172,7 @@ VulkanPipelineCache::PipelineLayout VulkanPipelineCache::getOrCreatePipelineLayo
 }
 
 void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const ProgramParameterLayout& layout, const VulkanBindings& bindings) {
-    ZoneScopedN("PipelineCache bind descriptor")
-    auto pipelineLayout = getOrCreatePipelineLayout(layout);
+    ZoneScopedN("PipelineCache bind descriptor") auto pipelineLayout = getOrCreatePipelineLayout(layout);
     DescriptorSets descriptorSets{};
     for (size_t i = 0; i < ProgramParameterLayout::MAX_SET; ++i) {
         descriptorSets[i] = currentDescriptorAllocator().allocate(pipelineLayout.descriptorSetLayout[i]);
@@ -185,7 +182,7 @@ void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::Pipeli
     std::vector<vk::WriteDescriptorSetAccelerationStructureKHR> writeAccs;
     writes.reserve(bindings.size());
     writeAccs.reserve(bindings.size());
-    for (auto &binding : bindings) {
+    for (auto& binding : bindings) {
         vk::WriteDescriptorSet write = {};
         write.dstBinding = binding.binding;
         write.dstSet = descriptorSets[binding.set];
@@ -199,7 +196,7 @@ void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::Pipeli
             ac.accelerationStructureCount = binding.arraySize;
             ac.pAccelerationStructures = binding.tlasInfo.data();
             writeAccs.push_back(ac);
-            write.pNext = &writeAccs[writeAccs.size()-1];
+            write.pNext = &writeAccs[writeAccs.size() - 1];
         }
         writes.push_back(write);
     }
@@ -207,9 +204,8 @@ void VulkanPipelineCache::bindDescriptor(vk::CommandBuffer cmd, const vk::Pipeli
     cmd.bindDescriptorSets(bindPoint, pipelineLayout.pipelineLayout, 0, ProgramParameterLayout::MAX_SET, descriptorSets.data(), 0, nullptr);
 }
 
-VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipelineState &state) {
-    ZoneScopedN("PipelineCache create graphics pipeline")
-    auto pipelineLayout = getOrCreatePipelineLayout(state.parameterLayout);
+VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipelineState& state) {
+    ZoneScopedN("PipelineCache create graphics pipeline") auto pipelineLayout = getOrCreatePipelineLayout(state.parameterLayout);
     auto it = graphicsPipelines.get(state);
     if (it) {
         return { *it, pipelineLayout.pipelineLayout };
@@ -235,7 +231,7 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
         attributes[i] = { .location = i,
                           .binding = i,
                           .format = (VkFormat)translateElementFormat(attrib.type,
-                                                                   attrib.flags & Attribute::FLAG_NORMALIZED, false) };
+                                                                     attrib.flags & Attribute::FLAG_NORMALIZED, false) };
         bindings[i] = {
             .binding = i,
             .stride = attrib.stride,
@@ -293,14 +289,14 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
     vk::PipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sampleShadingEnable = false;
     multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
-    multisampling.minSampleShading = 1.0f;           // Optional
-    multisampling.pSampleMask = nullptr;             // Optional
+    multisampling.minSampleShading = 1.0f;        // Optional
+    multisampling.pSampleMask = nullptr;          // Optional
     multisampling.alphaToCoverageEnable = false;  // Optional
-    multisampling.alphaToOneEnable = false;          // Optional
+    multisampling.alphaToOneEnable = false;       // Optional
 
     std::vector<vk::PipelineColorBlendAttachmentState> attachments{};
     vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
-    
+
     colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
     colorBlendAttachment.blendEnable = false;
     colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
@@ -337,7 +333,6 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
     dynamicState.dynamicStateCount = 2;
     dynamicState.pDynamicStates = dynamicStates;
 
-
     vk::GraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
@@ -353,16 +348,15 @@ VulkanPipeline VulkanPipelineCache::getOrCreateGraphicsPipeline(const VulkanPipe
     pipelineInfo.renderPass = state.renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = nullptr;  // Optional
-    pipelineInfo.basePipelineIndex = -1;               // Optional
+    pipelineInfo.basePipelineIndex = -1;        // Optional
 
     vk::Pipeline out = device.device.createGraphicsPipeline(nullptr, pipelineInfo);
     graphicsPipelines.add(state, out);
     return { out, pipelineLayout.pipelineLayout };
 }
 
-VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgram &program) {
-    ZoneScopedN("PipelineCache create compute pipeline")
-    auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout);
+VulkanPipeline VulkanPipelineCache::getOrCreateComputePipeline(const VulkanProgram& program) {
+    ZoneScopedN("PipelineCache create compute pipeline") auto pipelineLayout = getOrCreatePipelineLayout(program.program.parameterLayout);
     auto it = computePipelines.get(program.program.hash);
     if (it) {
         return { *it, pipelineLayout.pipelineLayout };
@@ -400,42 +394,42 @@ VulkanPipeline VulkanPipelineCache::getOrCreateRTPipeline(const VulkanRTPipeline
     {
         stages.push_back(wrapShaderModule(state.raygenGroup->shaderModule, vk::ShaderStageFlagBits::eRaygenKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
-            .setGeneralShader(stages.size() - 1)
-            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
-            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
-            .setClosestHitShader(VK_SHADER_UNUSED_KHR)
+                      .setGeneralShader(stages.size() - 1)
+                      .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+                      .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+                      .setClosestHitShader(VK_SHADER_UNUSED_KHR)
 
-            .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+                      .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
     for (auto& hitGroup : state.hitGroups) {
         stages.push_back(wrapShaderModule(hitGroup->shaderModule, vk::ShaderStageFlagBits::eClosestHitKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
-            .setClosestHitShader(stages.size() - 1)
-            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
-            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
-            .setGeneralShader(VK_SHADER_UNUSED_KHR)
-            .setType(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup);
+                      .setClosestHitShader(stages.size() - 1)
+                      .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+                      .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+                      .setGeneralShader(VK_SHADER_UNUSED_KHR)
+                      .setType(vk::RayTracingShaderGroupTypeKHR::eTrianglesHitGroup);
         groups.push_back(gi);
     }
-    for (auto& missGroup: state.missGroups) {
+    for (auto& missGroup : state.missGroups) {
         stages.push_back(wrapShaderModule(missGroup->shaderModule, vk::ShaderStageFlagBits::eMissKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
-            .setGeneralShader(stages.size() - 1)
-            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
-            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
-            .setClosestHitShader(VK_SHADER_UNUSED_KHR)
-            .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+                      .setGeneralShader(stages.size() - 1)
+                      .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+                      .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+                      .setClosestHitShader(VK_SHADER_UNUSED_KHR)
+                      .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
     for (auto& callGroup : state.callableGroups) {
         stages.push_back(wrapShaderModule(callGroup->shaderModule, vk::ShaderStageFlagBits::eCallableKHR));
         auto gi = vk::RayTracingShaderGroupCreateInfoKHR()
-            .setGeneralShader(stages.size() - 1)
-            .setIntersectionShader(VK_SHADER_UNUSED_KHR)
-            .setAnyHitShader(VK_SHADER_UNUSED_KHR)
-            .setClosestHitShader(VK_SHADER_UNUSED_KHR)
-            .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
+                      .setGeneralShader(stages.size() - 1)
+                      .setIntersectionShader(VK_SHADER_UNUSED_KHR)
+                      .setAnyHitShader(VK_SHADER_UNUSED_KHR)
+                      .setClosestHitShader(VK_SHADER_UNUSED_KHR)
+                      .setType(vk::RayTracingShaderGroupTypeKHR::eGeneral);
         groups.push_back(gi);
     }
     VkRayTracingPipelineCreateInfoKHR createInfo = {};
@@ -492,9 +486,8 @@ VulkanShaderBindingTables VulkanPipelineCache::getOrCreateSBT(const VulkanRTPipe
     return tables;
 }
 
-VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget) {
-    ZoneScopedN("PipelineCache create renderpass")
-    auto it = renderpasses.get(renderTarget->attachments);
+VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget* renderTarget) {
+    ZoneScopedN("PipelineCache create renderpass") auto it = renderpasses.get(renderTarget->attachments);
     if (it) {
         return *it;
     }
@@ -517,7 +510,7 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
                                        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
     } else {
         for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
-            auto &color = renderTarget->attachments.colors[i];
+            auto& color = renderTarget->attachments.colors[i];
             if (color.valid) {
                 attachments.push_back({ .format = color.format,
                                         .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -570,10 +563,9 @@ VkRenderPass VulkanPipelineCache::getOrCreateRenderPass(VulkanSwapChain swapchai
 }
 
 vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass renderPass,
-                                                        VulkanSwapChain swapchain, 
-                                                          VulkanRenderTarget *renderTarget) {
-    ZoneScopedN("PipelineCache create frame buffer")
-    auto it = framebuffers.get(
+                                                            VulkanSwapChain swapchain,
+                                                            VulkanRenderTarget* renderTarget) {
+    ZoneScopedN("PipelineCache create frame buffer") auto it = framebuffers.get(
         std::make_pair(renderPass, renderTarget->surface ? swapchain.view : nullptr));
     if (it) {
         return *it;
@@ -584,7 +576,7 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
         attachments.push_back(swapchain.view);
     } else {
         for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
-            auto &color = renderTarget->attachments.colors[i];
+            auto& color = renderTarget->attachments.colors[i];
             if (color.valid) {
                 attachments.push_back(color.view);
             }
@@ -612,5 +604,3 @@ vk::Framebuffer VulkanPipelineCache::getOrCreateFrameBuffer(vk::RenderPass rende
                      framebuffer);
     return framebuffer;
 }
-
-

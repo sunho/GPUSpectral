@@ -2,7 +2,7 @@
 
 using namespace GPUSpectral;
 
-GPUSpectral::Mesh::Mesh(HwDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices) 
+GPUSpectral::Mesh::Mesh(HwDriver& driver, uint32_t id, const std::span<Vertex>& vertices, const std::span<uint32_t>& indices)
     : driver(driver), vertices(vertices.begin(), vertices.end()), indices(indices.begin(), indices.end()), id(id) {
     std::vector<float> v;
     std::vector<float> vn;
@@ -82,37 +82,30 @@ Handle<HwIndexBuffer> GPUSpectral::Mesh::getIndexBuffer() const noexcept {
     return indexBuffer;
 }
 
-Handle<HwBufferObject> GPUSpectral::Mesh::getPositionBuffer() const noexcept
-{
+Handle<HwBufferObject> GPUSpectral::Mesh::getPositionBuffer() const noexcept {
     return positionBuffer;
 }
 
-Handle<HwBufferObject> GPUSpectral::Mesh::getNormalBuffer() const noexcept
-{
+Handle<HwBufferObject> GPUSpectral::Mesh::getNormalBuffer() const noexcept {
     return normalBuffer;
 }
 
-Handle<HwBufferObject> GPUSpectral::Mesh::getUVBuffer() const noexcept
-{
+Handle<HwBufferObject> GPUSpectral::Mesh::getUVBuffer() const noexcept {
     return uvBuffer;
 }
 
-const AttributeArray& GPUSpectral::Mesh::getAttributes() const noexcept
-{
+const AttributeArray& GPUSpectral::Mesh::getAttributes() const noexcept {
     return attributes;
 }
 
-uint32_t GPUSpectral::Mesh::getAttributeCount() const noexcept
-{
+uint32_t GPUSpectral::Mesh::getAttributeCount() const noexcept {
     return 3;
 }
 
-uint32_t GPUSpectral::Mesh::getID() const noexcept
-{
+uint32_t GPUSpectral::Mesh::getID() const noexcept {
     return id;
 }
 
-std::span<const Mesh::Vertex> GPUSpectral::Mesh::getVertices() const noexcept
-{
+std::span<const Mesh::Vertex> GPUSpectral::Mesh::getVertices() const noexcept {
     return { vertices.data(), vertices.size() };
 }

@@ -1,34 +1,34 @@
 #include "VulkanDevice.h"
-#include "VulkanWSI.h"
-#include "VulkanPipelineCache.h"
 #include <GPUSpectral/utils/Util.h>
+#include "VulkanPipelineCache.h"
+#include "VulkanWSI.h"
 
-VulkanDevice::VulkanDevice(GPUSpectral::Window* window) : semaphorePool(*this) {
+VulkanDevice::VulkanDevice(GPUSpectral::Window* window)
+    : semaphorePool(*this) {
     // Init vulkan instance
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{};
     physicalDeviceDescriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
     physicalDeviceDescriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
     physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-    physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray                     = VK_TRUE;
-    physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount   = VK_TRUE;
+    physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+    physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accelFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
     accelFeature.accelerationStructure = VK_TRUE;
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
     rtPipelineFeature.rayTracingPipeline = VK_TRUE;
     VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bdaFeature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR };
     bdaFeature.bufferDeviceAddress = VK_TRUE;
-    
-   
+
     vkb::InstanceBuilder builder;
 
     auto instRet = builder.set_app_name("Example Vulkan Application")
-                    .require_api_version(VK_API_VERSION_1_2)
-                      .request_validation_layers ()
-                    .enable_extension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)
-                      .use_default_debug_messenger ()
-                      .build ();
+                       .require_api_version(VK_API_VERSION_1_2)
+                       .request_validation_layers()
+                       .enable_extension(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)
+                       .use_default_debug_messenger()
+                       .build();
     if (!instRet) {
-      throw std::runtime_error("error init vulkan instance");
+        throw std::runtime_error("error init vulkan instance");
     }
     vkbInstance = instRet.value();
     instance = vkbInstance.instance;
@@ -39,41 +39,41 @@ VulkanDevice::VulkanDevice(GPUSpectral::Window* window) : semaphorePool(*this) {
     // Init vulkan device
     vkb::PhysicalDeviceSelector selector{ vkbInstance };
     auto physRet = selector.set_surface(wsi->surface)
-                    .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
-                    //.add_required_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME)
-        .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
-        .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
-                    .add_required_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)
-                    .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
-                    .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
-                    .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
-                    .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
-                    .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
-                    .add_required_extension_features(accelFeature)
-                    .add_required_extension_features(rtPipelineFeature)
-        .add_required_extension_features(bdaFeature)
+                       .add_required_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
+                       //.add_required_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME)
+                       .add_required_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+                       .add_required_extension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME)
+                       .add_required_extension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME)
+                       .add_required_extension(VK_EXT_SHADER_SUBGROUP_BALLOT_EXTENSION_NAME)
+                       .add_required_extension(VK_KHR_MAINTENANCE3_EXTENSION_NAME)
+                       .add_required_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME)
+                       .add_required_extension(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)
+                       .add_required_extension_features(physicalDeviceDescriptorIndexingFeatures)
+                       .add_required_extension_features(accelFeature)
+                       .add_required_extension_features(rtPipelineFeature)
+                       .add_required_extension_features(bdaFeature)
 
-                       .select ();
+                       .select();
     if (!physRet) {
-       throw std::runtime_error("error get physical device");
+        throw std::runtime_error("error get physical device");
     }
 
-    vkb::DeviceBuilder device_builder{ physRet.value () };
+    vkb::DeviceBuilder device_builder{ physRet.value() };
 
     auto devRet = device_builder
-        .build();
+                      .build();
     if (!devRet) {
-       throw std::runtime_error("error building device");
+        throw std::runtime_error("error building device");
     }
     vkbDevice = devRet.value();
     device = vkbDevice.device;
-    
+
     physicalDevice = vkbDevice.physical_device;
 
     // Init graphics queue
     auto graphicsQueueRet = vkbDevice.get_queue(vkb::QueueType::graphics);
     if (!graphicsQueueRet) {
-       throw std::runtime_error("error getting graphics queue");
+        throw std::runtime_error("error getting graphics queue");
     }
     graphicsQueue = graphicsQueueRet.value();
 
@@ -85,17 +85,17 @@ VulkanDevice::VulkanDevice(GPUSpectral::Window* window) : semaphorePool(*this) {
 
     auto fi = vk::FenceCreateInfo();
     auto ci = vk::CommandPoolCreateInfo()
-        .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
-        .setQueueFamilyIndex(vkbDevice.get_queue_index(vkb::QueueType::graphics).value());
-    
+                  .setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
+                  .setQueueFamilyIndex(vkbDevice.get_queue_index(vkb::QueueType::graphics).value());
+
     uploadContext.uploadFence = device.createFence(fi);
     uploadContext.commandPool = device.createCommandPool(ci);
 
     auto ci2 = vk::CommandPoolCreateInfo()
-        .setQueueFamilyIndex(vkbDevice.get_queue_index(vkb::QueueType::graphics).value());
+                   .setQueueFamilyIndex(vkbDevice.get_queue_index(vkb::QueueType::graphics).value());
     commandPool = device.createCommandPool(ci2);
 
-    // Init allocator    
+    // Init allocator
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = vkbDevice.physical_device.physical_device;
     allocatorInfo.device = vkbDevice.device;
@@ -130,24 +130,24 @@ VulkanDevice::~VulkanDevice() {
 
 void VulkanDevice::immediateSubmit(std::function<void(vk::CommandBuffer)> func) {
     auto cmdInfo = vk::CommandBufferAllocateInfo()
-        .setCommandBufferCount(1)
-        .setCommandPool(uploadContext.commandPool);
+                       .setCommandBufferCount(1)
+                       .setCommandPool(uploadContext.commandPool);
     auto cmd = device.allocateCommandBuffers(cmdInfo).front();
 
     auto beginInfo = vk::CommandBufferBeginInfo()
-        .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+                         .setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 
     cmd.begin(beginInfo);
-	func(cmd);
+    func(cmd);
     cmd.end();
 
     auto submitInfo = vk::SubmitInfo()
-        .setCommandBufferCount(1)
-        .setPCommandBuffers(&cmd);
+                          .setCommandBufferCount(1)
+                          .setPCommandBuffers(&cmd);
     graphicsQueue.submit(submitInfo, uploadContext.uploadFence);
 
     device.waitForFences(1, &uploadContext.uploadFence, true, UINT64_MAX);
-	device.resetFences(1, &uploadContext.uploadFence);
+    device.resetFences(1, &uploadContext.uploadFence);
 
     device.resetCommandPool(uploadContext.commandPool);
 }
@@ -160,9 +160,9 @@ AllocatedBuffer VulkanDevice::allocateBuffer(vk::BufferCreateInfo info, VmaMemor
     VmaAllocationCreateInfo alloc = {};
     alloc.usage = usage;
     if (vmaCreateBuffer(allocator, &ci, &alloc,
-        &buffer,
-        &out.allocation,
-        nullptr) != VK_SUCCESS) {
+                        &buffer,
+                        &out.allocation,
+                        nullptr) != VK_SUCCESS) {
         throw std::runtime_error("create buffer error");
     }
     out.buffer = buffer;
@@ -176,7 +176,7 @@ AllocatedImage VulkanDevice::allocateImage(vk::ImageCreateInfo info, VmaMemoryUs
     VkImage image;
     VmaAllocationCreateInfo alloc = {};
     alloc.usage = usage;
-	if (vmaCreateImage(allocator, &ie, &alloc, &image, &out.allocation, nullptr) != VK_SUCCESS) {
+    if (vmaCreateImage(allocator, &ie, &alloc, &image, &out.allocation, nullptr) != VK_SUCCESS) {
         throw std::runtime_error("create image error");
     }
     out.image = image;

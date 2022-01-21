@@ -1,9 +1,9 @@
 #pragma once
 
-#include <string>
+#include <GPUSpectral/backend/Handles.h>
 #include <filesystem>
 #include <map>
-#include <GPUSpectral/backend/Handles.h>
+#include <string>
 
 namespace tinygltf {
 class Model;
@@ -26,5 +26,5 @@ class Entity;
 class Mesh;
 class Renderer;
 struct Material;
-Scene loadScene(Engine& engine, Renderer& renderer, const std::string& path); 
+Scene loadScene(Engine& engine, Renderer& renderer, const std::string& path);
 }  // namespace GPUSpectral

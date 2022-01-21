@@ -1,8 +1,8 @@
 #pragma once
-#include <VkBootstrap.h>
 #include <GPUSpectral/engine/Window.h>
-#include <vulkan/vulkan.hpp>
+#include <VkBootstrap.h>
 #include <vector>
+#include <vulkan/vulkan.hpp>
 
 class VulkanDevice;
 
@@ -13,7 +13,7 @@ struct VulkanSwapChain {
 };
 
 class VulkanWSI {
-public:
+  public:
     VulkanWSI() = delete;
     VulkanWSI(GPUSpectral::Window* window, VulkanDevice* device);
     ~VulkanWSI();
@@ -26,7 +26,8 @@ public:
     vk::Extent2D getExtent();
 
     VkSurfaceKHR surface{};
-private:
+
+  private:
     GPUSpectral::Window* window;
     VulkanDevice* device;
 

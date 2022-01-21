@@ -1,10 +1,10 @@
 #pragma once
-#include <VkBootstrap.h>
 #include <GPUSpectral/engine/Window.h>
-#include "VulkanWSI.h"
-#include <vulkan/vulkan.hpp>
+#include <VkBootstrap.h>
 #include <vk_mem_alloc.h>
 #include <vector>
+#include <vulkan/vulkan.hpp>
+#include "VulkanWSI.h"
 
 #include "../DriverTypes.h"
 
@@ -14,15 +14,17 @@ struct VulkanSurfaceContext;
 class VulkanPipelineCache;
 
 class SemaphorePool {
-public:
+  public:
     SemaphorePool() = delete;
-    SemaphorePool(VulkanDevice& device) : device(device) { }
+    SemaphorePool(VulkanDevice& device)
+        : device(device) {
+    }
     ~SemaphorePool();
 
     void recycle(vk::Semaphore sem);
     vk::Semaphore acquire();
 
-private:
+  private:
     std::vector<vk::Semaphore> semaphores;
     VulkanDevice& device;
 };
@@ -44,7 +46,7 @@ struct AllocatedImage {
 };
 
 class VulkanDevice {
-public:
+  public:
     friend class VulkanWSI;
     friend class AllocatedBuffer;
     friend class AllocatedImage;
@@ -69,7 +71,8 @@ public:
     AllocatedBuffer allocateBuffer(vk::BufferCreateInfo info, VmaMemoryUsage usage);
     AllocatedImage allocateImage(vk::ImageCreateInfo info, VmaMemoryUsage usage);
     uint64_t getBufferDeviceAddress(vk::Buffer buffer);
-private:
+
+  private:
     vkb::Device vkbDevice{};
     vkb::Instance vkbInstance{};
 

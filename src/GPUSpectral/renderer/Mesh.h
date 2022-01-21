@@ -1,16 +1,16 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <vector>
 #include <span>
+#include <vector>
 #include "../backend/DriverTypes.h"
-#include "../backend/vulkan/VulkanDriver.h"
 #include "../backend/Handles.h"
+#include "../backend/vulkan/VulkanDriver.h"
 
 namespace GPUSpectral {
 
 class Mesh {
-public:
+  public:
     struct Vertex {
         alignas(16) glm::vec3 pos;
         alignas(16) glm::vec3 normal;
@@ -25,7 +25,7 @@ public:
 
     Mesh(const Mesh&) = delete;
     Mesh& operator=(const Mesh&) = delete;
-    
+
     [[nodiscard]] Handle<HwVertexBuffer> getVertexBuffer() const noexcept;
 
     [[nodiscard]] Handle<HwPrimitive> getPrimitive() const noexcept;
@@ -45,8 +45,8 @@ public:
     [[nodiscard]] uint32_t getID() const noexcept;
 
     [[nodiscard]] std::span<const Vertex> getVertices() const noexcept;
-    
-private:
+
+  private:
     uint32_t id;
     HwDriver& driver;
     Handle<HwVertexBuffer> vertexBuffer{};
@@ -62,4 +62,4 @@ private:
     // only single attributes format is supported
     AttributeArray attributes;
 };
-}
+}  // namespace GPUSpectral

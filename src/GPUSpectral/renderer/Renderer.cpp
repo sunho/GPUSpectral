@@ -2,8 +2,8 @@
 
 #include <GPUSpectral/utils/HalfFloat/umHalf.h>
 #include <tiny_gltf.h>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #include "../engine/Engine.h"
 #include "Scene.h"
@@ -14,7 +14,7 @@ using namespace GPUSpectral;
 template <class... Ts>
 struct overload : Ts... { using Ts::operator()...; };
 template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
+overload(Ts...)->overload<Ts...>;
 
 Renderer::Renderer(Engine& engine, Window* window)
     : engine(engine), window(window), driver(std::make_unique<VulkanDriver>(window, engine.getBasePath())) {
@@ -56,7 +56,7 @@ static std::vector<uint32_t> loadCompiledShader(const std::string& path) {
 }
 
 Handle<HwProgram> Renderer::loadShader(const std::string& filename) {
-    auto code = loadCompiledShader(engine.assetPath(filename)+".spv");
+    auto code = loadCompiledShader(engine.assetPath(filename) + ".spv");
     Program prog{ code };
     return driver->createProgram(prog);
 }
@@ -71,13 +71,11 @@ Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
     return program;
 }
 
-Handle<HwPrimitive> GPUSpectral::Renderer::getQuadPrimitive() const noexcept
-{
+Handle<HwPrimitive> GPUSpectral::Renderer::getQuadPrimitive() const noexcept {
     return quadPrimitive;
 }
 
-Handle<HwRenderTarget> GPUSpectral::Renderer::getSurfaceRenderTarget() const noexcept
-{
+Handle<HwRenderTarget> GPUSpectral::Renderer::getSurfaceRenderTarget() const noexcept {
     return surfaceRenderTarget;
 }
 
@@ -88,14 +86,13 @@ void Renderer::addRenderPassCreator(std::unique_ptr<RenderPassCreator> creator) 
     renderPassCreators.push_back(std::move(creator));
 }
 
-HwDriver& GPUSpectral::Renderer::getDriver() const noexcept
-{
+HwDriver& GPUSpectral::Renderer::getDriver() const noexcept {
     return *driver;
 }
 
 void Renderer::run(const Scene& scene) {
     FrameMarkStart("Frame")
-    InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
+        InflightData& inflight = inflights[currentFrame % MAX_INFLIGHTS];
     driver->waitFence(inflight.fence);
     if (inflight.handle) {
         driver->releaseInflight(inflight.handle);
@@ -122,8 +119,7 @@ MeshPtr Renderer::createMesh(const std::span<Mesh::Vertex> vertices, const std::
     return std::make_shared<Mesh>(*driver, nextMeshId++, vertices, indices);
 }
 
-Handle<HwBLAS> GPUSpectral::Renderer::getOrCreateBLAS(const MeshPtr& meshPtr)
-{
+Handle<HwBLAS> GPUSpectral::Renderer::getOrCreateBLAS(const MeshPtr& meshPtr) {
     auto it = blasCache.find(meshPtr->getID());
     if (it == blasCache.end()) {
         auto blas = driver->createBLAS(meshPtr->getPrimitive());

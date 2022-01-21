@@ -2,7 +2,7 @@
 #include <spirv_cross.hpp>
 
 inline static VkShaderModule createShaderModule(VulkanDevice& device, const uint32_t* code,
-    uint32_t codeSize) {
+                                                uint32_t codeSize) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = codeSize;
@@ -18,9 +18,8 @@ inline static VkShaderModule createShaderModule(VulkanDevice& device, const uint
 
 VulkanProgram::VulkanProgram(VulkanDevice& device, const Program& program)
     : HwProgram(program) {
-        shaderModule = createShaderModule(device, program.code().data(), program.code().size() * 4);
-        parseParameterLayout(program.code());
-
+    shaderModule = createShaderModule(device, program.code().data(), program.code().size() * 4);
+    parseParameterLayout(program.code());
 }
 
 void VulkanProgram::parseParameterLayout(const CompiledCode& code) {
@@ -86,14 +85,12 @@ vk::Extent2D VulkanRenderTarget::getExtent(VulkanDevice& device) const {
     auto outExtent = vk::Extent2D();
     if (width == HwTexture::FRAME_WIDTH) {
         outExtent.width = device.wsi->getExtent().width;
-    }
-    else {
+    } else {
         outExtent.width = width;
     }
     if (height == HwTexture::FRAME_HEIGHT) {
         outExtent.height = device.wsi->getExtent().height;
-    }
-    else {
+    } else {
         outExtent.height = height;
     }
     return outExtent;

@@ -18,9 +18,9 @@ enum class CompareOp : uint8_t {
 };
 
 struct DepthTest {
-    uint8_t enabled{0};
-    uint8_t write{0};
-    CompareOp compareOp{CompareOp::NEVER};
+    uint8_t enabled{ 0 };
+    uint8_t write{ 0 };
+    CompareOp compareOp{ CompareOp::NEVER };
     bool operator==(const DepthTest& other) const {
         return (bool)enabled == (bool)other.enabled && (bool)write == (bool)other.write && compareOp == other.compareOp;
     }
@@ -44,7 +44,7 @@ union BindingHandle {
 struct Binding {
     constexpr static size_t MAX_SIZE = 64;
     Binding() {
-        memset(handles.data(), 0xFF, handles.size() * sizeof(BindingHandle)); // TODO: this is based on internal of HandleBase should change it
+        memset(handles.data(), 0xFF, handles.size() * sizeof(BindingHandle));  // TODO: this is based on internal of HandleBase should change it
     }
     ProgramParameterType type{};
     std::array<BindingHandle, MAX_SIZE> handles{};
@@ -66,7 +66,7 @@ struct PipelineState {
     PipelineState& bindUniformBuffer(uint32_t set, uint32_t binding, Handle<HwBufferObject> buffer) {
         Binding b = {};
         b.type = ProgramParameterType::UNIFORM;
-        b.handles[0] = {.buffer = buffer};
+        b.handles[0] = { .buffer = buffer };
         bindings[{ set, binding }] = b;
         return *this;
     }
@@ -74,11 +74,10 @@ struct PipelineState {
     PipelineState& bindTLAS(uint32_t set, uint32_t binding, Handle<HwTLAS> tlas) {
         Binding b = {};
         b.type = ProgramParameterType::TLAS;
-        b.handles[0] = {.tlas = tlas};
+        b.handles[0] = { .tlas = tlas };
         bindings[{ set, binding }] = b;
         return *this;
     }
-
 
     template <typename It>
     PipelineState& bindStorageBufferArray(uint32_t set, uint32_t binding, It it, It end) {
@@ -136,7 +135,7 @@ struct PipelineState {
         return *this;
     }
 
-     PipelineState& bindStorageImage(uint32_t set, uint32_t binding, Handle<HwTexture> texture) {
+    PipelineState& bindStorageImage(uint32_t set, uint32_t binding, Handle<HwTexture> texture) {
         Binding b = {};
         b.type = ProgramParameterType::IMAGE;
         b.handles[0] = { .texture = texture };
@@ -147,7 +146,7 @@ struct PipelineState {
     PipelineState& bindStorageBuffer(uint32_t set, uint32_t binding, Handle<HwBufferObject> buffer) {
         Binding b = {};
         b.type = ProgramParameterType::STORAGE;
-        b.handles[0] = {.buffer = buffer};
+        b.handles[0] = { .buffer = buffer };
         bindings[{ set, binding }] = b;
         return *this;
     }
@@ -160,7 +159,7 @@ struct GraphicsPipeline : public PipelineState {
                       (uint32_t)std::numeric_limits<int32_t>::max() };
     DepthTest depthTest{};
 };
- 
+
 struct ComputePipeline : public PipelineState {
     Handle<HwProgram> program{};
 };

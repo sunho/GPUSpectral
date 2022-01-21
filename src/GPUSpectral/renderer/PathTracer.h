@@ -46,15 +46,18 @@ struct RenderState {
 };
 
 class PathTracer : public RenderPassCreator {
-public:
-    PathTracer(Renderer& renderer) : renderer(renderer), driver(renderer.getDriver()) {
+  public:
+    PathTracer(Renderer& renderer)
+        : renderer(renderer), driver(renderer.getDriver()) {
         setup();
     }
-    ~PathTracer() { }
+    ~PathTracer() {
+    }
 
     void setup();
     void createRenderPass(FrameGraph& fg, const Scene& scene) override;
-private:
+
+  private:
     void prepareScene(FrameGraph& rg, const Scene& scene);
     Handle<HwTexture> accumulateBuffer;
 
@@ -64,4 +67,4 @@ private:
     HwDriver& driver;
 };
 
-}
+}  // namespace GPUSpectral

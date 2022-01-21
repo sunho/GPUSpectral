@@ -1,8 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <map>
 #include <optional>
-#include <functional>
 
 template <typename K, typename V, typename Hasher>
 class GCPool {

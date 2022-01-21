@@ -27,7 +27,7 @@ template <>
 inline uint64_t hashStruct<VulkanAttachments>(const VulkanAttachments& attachment) {
     uint64_t seed = hashStruct(attachment.depth);
     for (size_t i = 0; i < RenderAttachments::MAX_MRT_NUM; ++i) {
-			seed ^= hashStruct(attachment.colors[i]);
+        seed ^= hashStruct(attachment.colors[i]);
     }
     return hashBase(seed);
 }
@@ -79,7 +79,7 @@ struct VulkanRTPipelineState {
 };
 
 template <>
-inline uint64_t hashStruct<VulkanRTPipelineState>(const VulkanRTPipelineState &state) {
+inline uint64_t hashStruct<VulkanRTPipelineState>(const VulkanRTPipelineState& state) {
     uint64_t seed = hashStruct(state.raygenGroup->program.hash);
     for (auto& p : state.hitGroups) {
         seed ^= hashStruct(p->program.hash);
@@ -97,17 +97,17 @@ inline uint64_t hashStruct<VulkanRTPipelineState>(const VulkanRTPipelineState &s
 struct VulkanPipelineState {
     AttributeArray attributes;
     size_t attributeCount;
-    VulkanProgram *vertex;
-    VulkanProgram *fragment;
+    VulkanProgram* vertex;
+    VulkanProgram* fragment;
     Viewport viewport;
     VkRenderPass renderPass;
     size_t attachmentCount;
     DepthTest depthTest;
     ProgramParameterLayout parameterLayout;
 
-    bool operator==(const VulkanPipelineState &other) const {
-        return parameterLayout == other.parameterLayout && attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && vertex->program.hash == other.vertex->program.hash && 
-            fragment->program.hash == other.fragment->program.hash && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
+    bool operator==(const VulkanPipelineState& other) const {
+        return parameterLayout == other.parameterLayout && attachmentCount == other.attachmentCount && attributes == other.attributes && attributeCount == other.attributeCount && vertex->program.hash == other.vertex->program.hash &&
+               fragment->program.hash == other.fragment->program.hash && viewport == other.viewport && renderPass == other.renderPass && depthTest == other.depthTest;
     }
 };
 
@@ -123,7 +123,7 @@ inline uint64_t hashStruct<Attribute>(const Attribute& attribute) {
 }
 
 template <>
-inline uint64_t hashStruct<VulkanPipelineState>(const VulkanPipelineState &pipelineKey) {
+inline uint64_t hashStruct<VulkanPipelineState>(const VulkanPipelineState& pipelineKey) {
     uint64_t seed = hashStruct(pipelineKey.attributeCount);
 
     for (size_t i = 0; i < MAX_VERTEX_ATTRIBUTE_COUNT; ++i) {
@@ -139,7 +139,7 @@ inline uint64_t hashStruct<VulkanPipelineState>(const VulkanPipelineState &pipel
     return hashBase(seed);
 }
 
-static bool operator==(const VkDescriptorImageInfo &lhs, const VkDescriptorImageInfo &rhs) {
+static bool operator==(const VkDescriptorImageInfo& lhs, const VkDescriptorImageInfo& rhs) {
     return lhs.imageLayout == rhs.imageLayout && lhs.imageView == rhs.imageView && lhs.sampler == rhs.sampler;
 };
 
@@ -209,7 +209,7 @@ struct VulkanShaderBindingTable {
     VulkanShaderBindingTable() = default;
     VulkanShaderBindingTable(VulkanDevice& device, size_t handlesCount) {
         buffer = new VulkanBufferObject(device, device.shaderGroupHandleSize * handlesCount, BufferUsage::SBT | BufferUsage::BDA, BufferType::HOST_COHERENT);
-        stridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(device,buffer->buffer, handlesCount);
+        stridedDeviceAddressRegion = getSbtEntryStridedDeviceAddressRegion(device, buffer->buffer, handlesCount);
     }
     VkStridedDeviceAddressRegionKHR stridedDeviceAddressRegion{};
     VulkanBufferObject* buffer{ nullptr };
@@ -224,16 +224,16 @@ struct VulkanShaderBindingTables {
 
 class VulkanPipelineCache {
   public:
-    VulkanPipelineCache(VulkanDevice &device);
-    VulkanPipeline getOrCreateGraphicsPipeline(const VulkanPipelineState &state);
-    VulkanPipeline getOrCreateComputePipeline(const VulkanProgram &program);
+    VulkanPipelineCache(VulkanDevice& device);
+    VulkanPipeline getOrCreateGraphicsPipeline(const VulkanPipelineState& state);
+    VulkanPipeline getOrCreateComputePipeline(const VulkanProgram& program);
     VulkanPipeline getOrCreateRTPipeline(const VulkanRTPipelineState& state);
     VulkanShaderBindingTables getOrCreateSBT(const VulkanRTPipelineState& state);
 
     vk::Framebuffer getOrCreateFrameBuffer(vk::RenderPass renderPass,
-                                         VulkanSwapChain swapchain, 
-                                         VulkanRenderTarget *renderTarget);
-    VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget *renderTarget);
+                                           VulkanSwapChain swapchain,
+                                           VulkanRenderTarget* renderTarget);
+    VkRenderPass getOrCreateRenderPass(VulkanSwapChain swapchain, VulkanRenderTarget* renderTarget);
     void bindDescriptor(vk::CommandBuffer cmd, const vk::PipelineBindPoint& bindPoint, const ProgramParameterLayout& layout, const VulkanBindings& bindings);
     void tick();
 
@@ -245,11 +245,11 @@ class VulkanPipelineCache {
 
     using DescriptorSets = std::array<vk::DescriptorSet, ProgramParameterLayout::MAX_SET>;
 
-    VulkanDescriptorAllocator &currentDescriptorAllocator() {
+    VulkanDescriptorAllocator& currentDescriptorAllocator() {
         return descriptorAllocators[currentFrame % descriptorAllocators.size()];
     }
-    PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout &layout);
-   
+    PipelineLayout getOrCreatePipelineLayout(const ProgramParameterLayout& layout);
+
     struct KeyHasher {
         std::size_t operator()(const VulkanRTPipelineState& k) const {
             return hashStruct<VulkanRTPipelineState>(k);
@@ -257,19 +257,19 @@ class VulkanPipelineCache {
         std::size_t operator()(const VulkanAttachments& k) const {
             return hashStruct<VulkanAttachments>(k);
         }
-        std::size_t operator()(const std::pair<VkRenderPass, VkImageView> &k) const {
+        std::size_t operator()(const std::pair<VkRenderPass, VkImageView>& k) const {
             return hashStruct(k.first) ^ hashStruct(k.second);
         }
-        std::size_t operator()(const VulkanPipelineState &k) const {
+        std::size_t operator()(const VulkanPipelineState& k) const {
             return hashStruct(k);
         }
-        std::size_t operator()(const ProgramParameterLayout &k) const {
+        std::size_t operator()(const ProgramParameterLayout& k) const {
             return hashStruct<ProgramParameterLayout>(k);
         }
-        std::size_t operator()(const BindingMap &k) const {
+        std::size_t operator()(const BindingMap& k) const {
             return hashStruct(k);
         }
-        std::size_t operator()(const ProgramHash &k) const {
+        std::size_t operator()(const ProgramHash& k) const {
             return k;
         }
     };
@@ -282,8 +282,8 @@ class VulkanPipelineCache {
     GCPool<VulkanAttachments, VkRenderPass, KeyHasher> renderpasses;
     GCPool<ProgramParameterLayout, PipelineLayout, KeyHasher> pipelineLayouts;
     std::array<VulkanDescriptorAllocator, 3> descriptorAllocators;
-    size_t currentFrame{0};
-	VkDescriptorPool descriptorPool;
+    size_t currentFrame{ 0 };
+    VkDescriptorPool descriptorPool;
 
     std::unique_ptr<VulkanTexture> dummyImage;
     VkDescriptorBufferInfo dummyBufferInfo = {};
@@ -294,5 +294,5 @@ class VulkanPipelineCache {
     VkWriteDescriptorSet dummyTargetWriteInfo = {};
 
     VulkanDevice& device;
-    VulkanBufferObject *dummyBuffer;
+    VulkanBufferObject* dummyBuffer;
 };

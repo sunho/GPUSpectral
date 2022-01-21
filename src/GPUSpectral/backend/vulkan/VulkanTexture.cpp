@@ -1,10 +1,10 @@
 #include "VulkanTexture.h"
 
-#include "VulkanBuffer.h"
 #include <Tracy.hpp>
+#include "VulkanBuffer.h"
 
 inline static AllocatedImage createImage(VulkanDevice &device, uint8_t levels, uint32_t width, uint32_t height, uint32_t layers, vk::Format format,
-                               vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags createFlags) {
+                                         vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags createFlags) {
     vk::ImageCreateInfo imageInfo = {};
     imageInfo.imageType = vk::ImageType::e2D;
     imageInfo.extent.width = width;
@@ -22,10 +22,10 @@ inline static AllocatedImage createImage(VulkanDevice &device, uint8_t levels, u
 }
 
 inline static VkImageView createImageView(VulkanDevice &device, vk::Image image, vk::Format format, uint8_t levels, uint32_t layers,
-                                   vk::ImageAspectFlags aspectFlags) {
+                                          vk::ImageAspectFlags aspectFlags) {
     vk::ImageViewCreateInfo viewInfo = {};
     viewInfo.image = image;
-    // TODO: 
+    // TODO:
     viewInfo.viewType = layers == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::eCube;
     viewInfo.format = format;
     viewInfo.subresourceRange.aspectMask = aspectFlags;
@@ -40,15 +40,14 @@ inline static VkImageView createImageView(VulkanDevice &device, vk::Image image,
 VulkanTexture::VulkanTexture(VulkanDevice &device, SamplerType type, TextureUsage usage,
                              uint8_t levels, TextureFormat format, uint32_t w, uint32_t h, uint32_t layers)
     : HwTexture(type, levels, format, w, h), device(device), layers(layers) {
-    ZoneScopedN("Texture create")
-    if (width == HwTexture::FRAME_WIDTH) {
+    ZoneScopedN("Texture create") if (width == HwTexture::FRAME_WIDTH) {
         width = device.wsi->getExtent().width;
     }
     if (height == HwTexture::FRAME_HEIGHT) {
         height = device.wsi->getExtent().height;
     }
-    
-    const vk::ImageUsageFlags blittable =  vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc;
+
+    const vk::ImageUsageFlags blittable = vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc;
     vk::ImageUsageFlags flags{};
     vk::ImageCreateFlags createFlags{};
     if (usage & TextureUsage::SAMPLEABLE) {
@@ -116,61 +115,60 @@ void VulkanTexture::copyInitialData(const BufferDescriptor &data, ImageLayout fi
     auto bi = vk::BufferCreateInfo().setSize(width * height * getTextureFormatSize(format)).setUsage(vk::BufferUsageFlagBits::eTransferSrc);
     auto staging = device.allocateBuffer(bi, VMA_MEMORY_USAGE_CPU_ONLY);
     {
-        ZoneScopedN("Texture staging") 
-        void *d;
+        ZoneScopedN("Texture staging") void *d;
         staging.map(device, &d);
         memcpy(d, data.data, width * height * getTextureFormatSize(format));
         staging.unmap(device);
     }
-    ZoneScopedN("Texture upload") 
-    device.immediateSubmit([&](vk::CommandBuffer cmd) {
-		vk::ImageSubresourceRange range;
-		range.baseMipLevel = 0;
-		range.levelCount = 1;
-		range.baseArrayLayer = 0;
-		range.layerCount = 1;
-        range.aspectMask = aspect;
+    ZoneScopedN("Texture upload")
+        device.immediateSubmit([&](vk::CommandBuffer cmd) {
+            vk::ImageSubresourceRange range;
+            range.baseMipLevel = 0;
+            range.levelCount = 1;
+            range.baseArrayLayer = 0;
+            range.layerCount = 1;
+            range.aspectMask = aspect;
 
-		vk::ImageMemoryBarrier imageBarrier_toTransfer = {};
-		imageBarrier_toTransfer.oldLayout = vk::ImageLayout::eUndefined;
-		imageBarrier_toTransfer.newLayout = vk::ImageLayout::eTransferDstOptimal;
-		imageBarrier_toTransfer.image = _image.image;
-		imageBarrier_toTransfer.subresourceRange = range;
+            vk::ImageMemoryBarrier imageBarrier_toTransfer = {};
+            imageBarrier_toTransfer.oldLayout = vk::ImageLayout::eUndefined;
+            imageBarrier_toTransfer.newLayout = vk::ImageLayout::eTransferDstOptimal;
+            imageBarrier_toTransfer.image = _image.image;
+            imageBarrier_toTransfer.subresourceRange = range;
 
-		imageBarrier_toTransfer.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
-		imageBarrier_toTransfer.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+            imageBarrier_toTransfer.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
+            imageBarrier_toTransfer.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {}, nullptr, nullptr, imageBarrier_toTransfer);
-        
-        vk::BufferImageCopy copyRegion = {};
-        copyRegion.bufferOffset = 0;
-        copyRegion.bufferRowLength = 0;
-        copyRegion.bufferImageHeight = 0;
+            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eTransfer, {}, nullptr, nullptr, imageBarrier_toTransfer);
 
-        copyRegion.imageSubresource.aspectMask = aspect;
-        copyRegion.imageSubresource.mipLevel = 0;
-        copyRegion.imageSubresource.baseArrayLayer = 0;
-        copyRegion.imageSubresource.layerCount = 1;
-        copyRegion.imageExtent = vk::Extent3D().setWidth(width).setHeight(height).setDepth(1);
+            vk::BufferImageCopy copyRegion = {};
+            copyRegion.bufferOffset = 0;
+            copyRegion.bufferRowLength = 0;
+            copyRegion.bufferImageHeight = 0;
 
-        cmd.copyBufferToImage(staging.buffer, _image.image, vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
-    
-        vk::ImageMemoryBarrier imageBarrier_toReadable = imageBarrier_toTransfer;
+            copyRegion.imageSubresource.aspectMask = aspect;
+            copyRegion.imageSubresource.mipLevel = 0;
+            copyRegion.imageSubresource.baseArrayLayer = 0;
+            copyRegion.imageSubresource.layerCount = 1;
+            copyRegion.imageExtent = vk::Extent3D().setWidth(width).setHeight(height).setDepth(1);
 
-        imageBarrier_toReadable.oldLayout = vk::ImageLayout::eTransferDstOptimal;
-        imageBarrier_toReadable.newLayout = translateImageLayout(finalLayout);
-        imageBarrier_toReadable.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
-        imageBarrier_toReadable.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+            cmd.copyBufferToImage(staging.buffer, _image.image, vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
 
-        cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, nullptr, nullptr, imageBarrier_toReadable);
-    });
+            vk::ImageMemoryBarrier imageBarrier_toReadable = imageBarrier_toTransfer;
+
+            imageBarrier_toReadable.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+            imageBarrier_toReadable.newLayout = translateImageLayout(finalLayout);
+            imageBarrier_toReadable.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+            imageBarrier_toReadable.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+            cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, {}, nullptr, nullptr, imageBarrier_toReadable);
+        });
     staging.destroy(device);
 
     imageLayout = finalLayout;
     vkImageLayout = translateImageLayout(finalLayout);
 }
 
-void VulkanTexture::copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_t width, uint32_t height, const ImageSubresource& subresource) {
+void VulkanTexture::copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_t width, uint32_t height, const ImageSubresource &subresource) {
     vk::BufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
@@ -184,12 +182,12 @@ void VulkanTexture::copyBuffer(vk::CommandBuffer cmd, vk::Buffer buffer, uint32_
     cmd.copyBufferToImage(buffer, image, vkImageLayout, 1, &region);
 }
 
-void VulkanTexture::blitImage(vk::CommandBuffer cmd, VulkanTexture& srcImage, uint32_t width, uint32_t height, const ImageSubresource& srcSubresource, const ImageSubresource& dstSubresource) {
+void VulkanTexture::blitImage(vk::CommandBuffer cmd, VulkanTexture &srcImage, uint32_t width, uint32_t height, const ImageSubresource &srcSubresource, const ImageSubresource &dstSubresource) {
     vk::ImageBlit blit{};
-    blit.srcOffsets[0] = vk::Offset3D{ 0,0,0 };
-    blit.srcOffsets[1] = vk::Offset3D{ (int32_t)width,(int32_t)height,1 };
-    blit.dstOffsets[0] = vk::Offset3D{ 0,0,0 };
-    blit.dstOffsets[1] = vk::Offset3D{ (int32_t)width,(int32_t)height,1 };
+    blit.srcOffsets[0] = vk::Offset3D{ 0, 0, 0 };
+    blit.srcOffsets[1] = vk::Offset3D{ (int32_t)width, (int32_t)height, 1 };
+    blit.dstOffsets[0] = vk::Offset3D{ 0, 0, 0 };
+    blit.dstOffsets[1] = vk::Offset3D{ (int32_t)width, (int32_t)height, 1 };
     blit.srcSubresource.aspectMask = aspect;
     blit.dstSubresource.aspectMask = aspect;
     blit.srcSubresource.baseArrayLayer = srcSubresource.baseLayer;
@@ -200,4 +198,3 @@ void VulkanTexture::blitImage(vk::CommandBuffer cmd, VulkanTexture& srcImage, ui
     blit.dstSubresource.layerCount = dstSubresource.layerCount;
     cmd.blitImage(srcImage.image, srcImage.vkImageLayout, image, vkImageLayout, 1, &blit, vk::Filter::eNearest);
 }
-

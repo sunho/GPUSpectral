@@ -1,12 +1,11 @@
 #pragma once
 
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
 
-#include "../../utils/FixedVector.h"
 #include "../../backend/vulkan/VulkanDriver.h"
+#include "../../utils/FixedVector.h"
 #include "Resource.h"
-
 
 class FrameGraph;
 struct FrameGraphContext;
@@ -37,7 +36,6 @@ static inline bool isWriteAccessType(const ResourceAccessType& access) {
             return false;
     }
 }
-
 
 static inline bool isReadAccessType(const ResourceAccessType& access) {
     switch (access) {
@@ -88,7 +86,7 @@ class ResourceHandle {
 
   private:
     HandleId id{ nullId };
-    ResourceType type{ResourceType::None};
+    ResourceType type{ ResourceType::None };
 };
 
 struct BakedPassResource {

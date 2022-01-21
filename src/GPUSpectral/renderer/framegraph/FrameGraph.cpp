@@ -1,8 +1,7 @@
 #include "FrameGraph.h"
-#include <stack>
 #include <Tracy.hpp>
 #include <iostream>
-
+#include <stack>
 
 FrameGraph::FrameGraph(HwDriver& driver)
     : driver(driver) {
@@ -33,11 +32,9 @@ Handle<HwBufferObject> FrameGraph::createTempStorageBuffer(const void* data, siz
     return buffer;
 }
 
-void FrameGraph::queueDispose(const DisposeFunc& func)
-{
+void FrameGraph::queueDispose(const DisposeFunc& func) {
     destroyers.push_back(func);
 }
-
 
 FrameGraph::~FrameGraph() {
     for (auto d : destroyers) {
@@ -67,7 +64,7 @@ static std::pair<BarrierStageMask, BarrierAccessFlag> convertAccessTypeToBarrier
         case ResourceAccessType::FragmentRead:
             return std::make_pair(BarrierStageMask::FRAGMENT_SHADER, BarrierAccessFlag::SHADER_READ);
         case ResourceAccessType::DepthWrite:
-            return std::make_pair(BarrierStageMask::EARLY_FRAGMENT_TESTS | BarrierStageMask::LATE_FRAGMENT_TESTS, BarrierAccessFlag::DEPTH_STENCIL_WRITE);     
+            return std::make_pair(BarrierStageMask::EARLY_FRAGMENT_TESTS | BarrierStageMask::LATE_FRAGMENT_TESTS, BarrierAccessFlag::DEPTH_STENCIL_WRITE);
         case ResourceAccessType::TransferRead:
             return std::make_pair(BarrierStageMask::TRANSFER, BarrierAccessFlag::TRANSFER_READ);
         case ResourceAccessType::TransferWrite:
@@ -129,7 +126,8 @@ static Barrier generateImageBarrier(const BakedPassResource& prev, const BakedPa
 
 void FrameGraph::compile() {
     ZoneScopedN("Frame graph compile")
-    std::unordered_map<size_t, size_t> resourceIdToRp;
+        std::unordered_map<size_t, size_t>
+            resourceIdToRp;
     std::vector<BakedPass> bakedPasses(passes.size());
     std::vector<std::vector<size_t>> graph(passes.size());
     for (size_t i = 0; i < passes.size(); ++i) {
@@ -188,7 +186,7 @@ void FrameGraph::compile() {
                 auto prevRes = prevPass.resources.at(iter->first);
                 auto res = pass.resources.at(iter->first);
                 auto type = res.resource.getType();
-                if (isWriteAccessType(prevRes.accessType)) { 
+                if (isWriteAccessType(prevRes.accessType)) {
                     if (type == ResourceType::Image) {
                         auto res = pass.resources.at(iter->first);
                         // hack: we should do this translation in vulkanrenderpass.attachments
@@ -258,7 +256,7 @@ void FrameGraph::compile() {
 void FrameGraph::run() {
     for (auto pass : bakedGraph.passes) {
         ZoneTransientN(zone, pass.name.c_str(), true)
-        driver.setProfileSectionName(pass.name.c_str());
+            driver.setProfileSectionName(pass.name.c_str());
         for (auto& barrier : pass.barriers) {
             driver.setBarrier(barrier);
         }
@@ -266,14 +264,14 @@ void FrameGraph::run() {
     }
 }
 
-FrameGraph::BakedPass::BakedPass(FrameGraph& fg, FramePass pass) : name(pass.name), func(pass.func) {
+FrameGraph::BakedPass::BakedPass(FrameGraph& fg, FramePass pass)
+    : name(pass.name), func(pass.func) {
     for (auto buf : pass.buffers) {
         for (auto b : buf.resource) {
             auto res = fg.getOrRegisterBufferResource(b);
             if (isWriteAccessType(buf.accessType)) {
                 outputs.push_back({ res, buf.accessType });
-            }
-            else {
+            } else {
                 inputs.push_back({ res, buf.accessType });
             }
             resources.emplace(res.getId(), BakedPassResource{ res, buf.accessType });
@@ -285,12 +283,10 @@ FrameGraph::BakedPass::BakedPass(FrameGraph& fg, FramePass pass) : name(pass.nam
             auto res = fg.getOrRegisterTextureResource(t);
             if (isWriteAccessType(tex.accessType)) {
                 outputs.push_back({ res, tex.accessType });
-            }
-            else {
+            } else {
                 inputs.push_back({ res, tex.accessType });
             }
             resources.emplace(res.getId(), BakedPassResource{ res, tex.accessType });
         }
     }
-
 }

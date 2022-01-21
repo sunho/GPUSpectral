@@ -1,7 +1,8 @@
 #include "VulkanWSI.h"
 #include "VulkanDevice.h"
 
-VulkanWSI::VulkanWSI(GPUSpectral::Window* window, VulkanDevice* device) : window(window), device(device) {
+VulkanWSI::VulkanWSI(GPUSpectral::Window* window, VulkanDevice* device)
+    : window(window), device(device) {
     surface = window->createSurface(device->instance);
 }
 
@@ -12,7 +13,7 @@ VulkanWSI::~VulkanWSI() {
 
 void VulkanWSI::initSwapchain() {
     vkb::SwapchainBuilder swapchain_builder{ device->vkbDevice };
-    auto swapRet = swapchain_builder.set_old_swapchain(vkbSwapchain).build ();
+    auto swapRet = swapchain_builder.set_old_swapchain(vkbSwapchain).build();
     if (!swapRet) {
         throw std::runtime_error("error create swap chain");
     }
@@ -23,7 +24,7 @@ void VulkanWSI::initSwapchain() {
 
     auto presentQueueRet = device->vkbDevice.get_queue(vkb::QueueType::present);
     if (!presentQueueRet) {
-       throw std::runtime_error("error getting present queue");
+        throw std::runtime_error("error getting present queue");
     }
     presentQueue = presentQueueRet.value();
 }
@@ -39,9 +40,9 @@ void VulkanWSI::endFrame(vk::Semaphore renderSemaphore) {
     std::array<vk::SwapchainKHR, 1> swapChains = { vkbSwapchain.swapchain };
     std::array<vk::Semaphore, 1> waitSemapohres = { renderSemaphore };
     auto pi = vk::PresentInfoKHR()
-        .setWaitSemaphores(waitSemapohres)
-        .setSwapchains(swapChains)
-        .setPImageIndices(&swapchainIndex);
+                  .setWaitSemaphores(waitSemapohres)
+                  .setSwapchains(swapChains)
+                  .setPImageIndices(&swapchainIndex);
 
     auto res = presentQueue.presentKHR(pi);
     if (res != vk::Result::eSuccess) {
@@ -60,4 +61,3 @@ VulkanSwapChain VulkanWSI::currentSwapChain() {
 vk::Extent2D VulkanWSI::getExtent() {
     return vkbSwapchain.extent;
 }
-

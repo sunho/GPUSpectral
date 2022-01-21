@@ -6,16 +6,16 @@ void PathTracer::setup() {
     accumulateBuffer = driver.createTexture(SamplerType::SAMPLER2D, TextureUsage::STORAGE | TextureUsage::SAMPLEABLE, TextureFormat::RGBA32F, 1, driver.getFrameSize().width, driver.getFrameSize().height, 1);
 }
 
-void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
+void PathTracer::createRenderPass(FrameGraph& fg, const Scene& scene) {
     std::unordered_map<uint32_t, uint32_t> primitiveIdToVB;
     std::vector<RTInstance> instances;
-    for (auto& obj: scene.renderObjects) {
+    for (auto& obj : scene.renderObjects) {
         RTInstance instance;
         instance.blas = renderer.getOrCreateBLAS(obj.mesh);
         instance.transfom = obj.transform;
         instances.push_back(instance);
     }
-    auto tlas = driver.createTLAS({ .instances=instances.data(), .count = (uint32_t)instances.size()});
+    auto tlas = driver.createTLAS({ .instances = instances.data(), .count = (uint32_t)instances.size() });
     fg.queueDispose([tlas, this]() { driver.destroyTLAS(tlas); });
 
     prepareScene(fg, scene);
@@ -23,7 +23,7 @@ void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
 
     fg.addFramePass({
         .textures = {
-            {{accumulateBuffer}, ResourceAccessType::RTWrite},
+            { { accumulateBuffer }, ResourceAccessType::RTWrite },
         },
         .func = [this, tlas, rsBuf](FrameGraph& rg) {
             RTPipeline pipeline = {};
@@ -40,12 +40,12 @@ void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
 
     fg.addFramePass({
         .textures = {
-            {{accumulateBuffer}, ResourceAccessType::FragmentRead},
+            { { accumulateBuffer }, ResourceAccessType::FragmentRead },
         },
         .func = [this, tlas](FrameGraph& rg) {
             GraphicsPipeline pipe = {};
             pipe.vertex = renderer.getShaderProgram("DrawTexture.vert");
-            pipe.fragment= renderer.getShaderProgram("DrawTexture.frag");
+            pipe.fragment = renderer.getShaderProgram("DrawTexture.frag");
             RenderPassParams params;
             driver.beginRenderPass(renderer.getSurfaceRenderTarget(), params);
             pipe.bindTexture(0, 0, accumulateBuffer);
@@ -53,7 +53,6 @@ void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
             driver.endRenderPass();
         },
     });
-
 }
 
 void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
@@ -64,21 +63,22 @@ void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
         ri.positionBuffer = driver.getDeviceAddress(obj.mesh->getPositionBuffer());
         ri.normalBuffer = driver.getDeviceAddress(obj.mesh->getNormalBuffer());
         const Material& material = scene.getMaterial(obj.material);
-        ri.emission = glm::vec4(material.emission,0.0);
+        ri.emission = glm::vec4(material.emission, 0.0);
         ri.bsdf = material.bsdf;
         ri.twofaced = material.twofaced;
         rinstances.push_back(ri);
     }
-    
+
     int size = sizeof(RenderState::Instance);
     auto instanceBuffer = rg.createTempStorageBuffer(rinstances.data(), rinstances.size() * sizeof(RenderState::Instance));
     renderState.scene.instances = driver.getDeviceAddress(instanceBuffer);
-#define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE) {\
-            if (!scene.BSDFFIELD##s.empty()) { \
-                auto bsdfBuffer = rg.createTempStorageBuffer(scene.BSDFFIELD##s.data(), scene.BSDFFIELD##s.size() * sizeof(BSDFNAME)); \
-                renderState.scene.BSDFFIELD##s = driver.getDeviceAddress(bsdfBuffer); \
-            }\
-        }
+#define BSDFDefinition(BSDFNAME, BSDFFIELD, BSDFTYPE)                                                                              \
+    {                                                                                                                              \
+        if (!scene.BSDFFIELD##s.empty()) {                                                                                         \
+            auto bsdfBuffer = rg.createTempStorageBuffer(scene.BSDFFIELD##s.data(), scene.BSDFFIELD##s.size() * sizeof(BSDFNAME)); \
+            renderState.scene.BSDFFIELD##s = driver.getDeviceAddress(bsdfBuffer);                                                  \
+        }                                                                                                                          \
+    }
 #include "../assets/shaders/BSDF.inc"
 #undef BSDFDefinition
 
@@ -90,5 +90,4 @@ void PathTracer::prepareScene(FrameGraph& rg, const Scene& scene) {
     renderState.camera.fov = scene.camera.getFov();
     renderState.params.timestamp = timestamp;
     timestamp++;
-
 }

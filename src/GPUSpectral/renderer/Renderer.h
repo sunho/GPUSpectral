@@ -2,11 +2,11 @@
 
 #include "framegraph/FrameGraph.h"
 
-#include "Camera.h"
-#include "Transform.h"
-#include "Mesh.h"
-#include "../engine/Window.h"
 #include "../backend/vulkan/VulkanDriver.h"
+#include "../engine/Window.h"
+#include "Camera.h"
+#include "Mesh.h"
+#include "Transform.h"
 
 namespace GPUSpectral {
 
@@ -17,10 +17,10 @@ struct SceneData;
 struct LightData;
 class Renderer;
 
-constexpr static size_t MAX_INFLIGHTS = 2; 
+constexpr static size_t MAX_INFLIGHTS = 2;
 
 class RenderPassCreator {
-public:
+  public:
     virtual void createRenderPass(FrameGraph& fg, const Scene& scene) = 0;
 };
 
@@ -43,7 +43,7 @@ class Renderer {
 
     void addRenderPassCreator(std::unique_ptr<RenderPassCreator> creator);
 
-    [[nodiscard]] HwDriver& getDriver() const noexcept;    
+    [[nodiscard]] HwDriver& getDriver() const noexcept;
     void run(const Scene& scene);
 
     [[nodiscard]] MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
@@ -55,13 +55,14 @@ class Renderer {
     [[nodiscard]] Handle<HwPrimitive> getQuadPrimitive() const noexcept;
 
     [[nodiscard]] Handle<HwRenderTarget> getSurfaceRenderTarget() const noexcept;
+
   private:
     Handle<HwProgram> loadShader(const std::string& filename);
 
     std::array<InflightData, MAX_INFLIGHTS> inflights;
 
     std::unordered_map<uint32_t, Handle<HwBLAS>> blasCache;
-    std::unordered_map<std::string, Handle<HwProgram> > programs;
+    std::unordered_map<std::string, Handle<HwProgram>> programs;
     std::list<std::unique_ptr<RenderPassCreator>> renderPassCreators;
 
     std::unique_ptr<HwDriver> driver;
@@ -70,7 +71,7 @@ class Renderer {
 
     uint32_t nextMeshId{ 1 };
 
-    size_t currentFrame{0};
+    size_t currentFrame{ 0 };
 
     Handle<HwRenderTarget> surfaceRenderTarget;
     Handle<HwPrimitive> quadPrimitive;

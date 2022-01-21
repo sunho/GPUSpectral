@@ -1,11 +1,11 @@
 #pragma once
 
+#include <GPUSpectral/utils/Hash.h>
 #include "../Handles.h"
 #include "VulkanBuffer.h"
 #include "VulkanDevice.h"
 #include "VulkanTexture.h"
 #include "VulkanTypes.h"
-#include <GPUSpectral/utils/Hash.h>
 
 #include <stdexcept>
 
@@ -16,7 +16,7 @@ static constexpr const size_t VULKAN_VERTEX_BUFFERS_MAX = 12;
 struct VulkanVertexBuffer : public HwVertexBuffer {
     VulkanVertexBuffer() = default;
     VulkanVertexBuffer(uint32_t vertexCount, uint8_t attributeCount,
-                                const AttributeArray &attributes)
+                       const AttributeArray &attributes)
         : HwVertexBuffer(vertexCount, attributeCount, attributes) {
     }
     std::array<VulkanBufferObject *, VULKAN_VERTEX_BUFFERS_MAX> buffers;
@@ -32,11 +32,12 @@ struct VulkanIndexBuffer : public HwIndexBuffer {
 
 struct VulkanProgram : public HwProgram {
     VulkanProgram() = default;
-    explicit VulkanProgram(VulkanDevice& device, const Program& program);
+    explicit VulkanProgram(VulkanDevice &device, const Program &program);
 
     VkShaderModule shaderModule;
-private:
-    void parseParameterLayout(const CompiledCode& code);
+
+  private:
+    void parseParameterLayout(const CompiledCode &code);
 };
 
 struct VulkanAttachment {
@@ -45,7 +46,9 @@ struct VulkanAttachment {
     VkFormat format{};
 
     VulkanAttachment() = default;
-    VulkanAttachment(VulkanTexture* texture) : view(texture->view), format((VkFormat)texture->vkFormat), valid(true) {}
+    VulkanAttachment(VulkanTexture *texture)
+        : view(texture->view), format((VkFormat)texture->vkFormat), valid(true) {
+    }
     bool operator==(const VulkanAttachment &other) const = default;
 };
 
@@ -58,7 +61,7 @@ struct VulkanAttachments {
 struct VulkanRenderTarget : public HwRenderTarget {
     VulkanRenderTarget();
     VulkanRenderTarget(uint32_t w, uint32_t h, VulkanAttachments attachments);
-    vk::Extent2D getExtent(VulkanDevice& device) const;
+    vk::Extent2D getExtent(VulkanDevice &device) const;
 
     bool surface;
     VulkanAttachments attachments;

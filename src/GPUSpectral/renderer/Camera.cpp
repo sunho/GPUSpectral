@@ -4,7 +4,8 @@ using namespace GPUSpectral;
 Camera::Camera() {
 }
 
-Camera::Camera(const glm::mat4& view, float fov) : view(view), toWorld(glm::inverse(toWorld)), fov(fov) {
+Camera::Camera(const glm::mat4& view, float fov)
+    : view(view), toWorld(glm::inverse(toWorld)), fov(fov) {
 }
 
 void Camera::lookAt(const glm::vec3& eye, const glm::vec3& center, const glm::vec3& up) {
@@ -16,19 +17,16 @@ void Camera::setView(glm::mat4 view) {
     toWorld = glm::inverse(view);
 }
 
-void Camera::setToWorld(glm::mat4 toWorld)
-{
+void Camera::setToWorld(glm::mat4 toWorld) {
     this->toWorld = toWorld;
     view = glm::inverse(toWorld);
 }
 
-glm::mat4 GPUSpectral::Camera::getToWorld() const noexcept
-{
+glm::mat4 GPUSpectral::Camera::getToWorld() const noexcept {
     return toWorld;
 }
 
-float GPUSpectral::Camera::getFov() const noexcept
-{
+float GPUSpectral::Camera::getFov() const noexcept {
     return fov;
 }
 
