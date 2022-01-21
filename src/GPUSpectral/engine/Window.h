@@ -15,8 +15,8 @@ class Window {
     explicit Window(size_t width, size_t height);
     ~Window();
 
-    size_t getWindowWidth() const;
-    size_t getWindowHeight() const;
+    [[nodiscard]] size_t getWindowWidth() const noexcept;
+    [[nodiscard]] size_t getWindowHeight() const noexcept;
 
     VkSurfaceKHR createSurface(VkInstance instance);
 

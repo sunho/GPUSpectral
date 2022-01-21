@@ -47,9 +47,9 @@ void PathTracer::createRenderPass(FrameGraph &fg, const Scene& scene) {
             pipe.vertex = renderer.getShaderProgram("DrawTexture.vert");
             pipe.fragment= renderer.getShaderProgram("DrawTexture.frag");
             RenderPassParams params;
-            driver.beginRenderPass(renderer.surfaceRenderTarget, params);
+            driver.beginRenderPass(renderer.getSurfaceRenderTarget(), params);
             pipe.bindTexture(0, 0, accumulateBuffer);
-            driver.draw(pipe, renderer.quadPrimitive);
+            driver.draw(pipe, renderer.getQuadPrimitive());
             driver.endRenderPass();
         },
     });

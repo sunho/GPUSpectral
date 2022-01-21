@@ -71,11 +71,26 @@ Handle<HwProgram> Renderer::getShaderProgram(const std::string& shaderName) {
     return program;
 }
 
+Handle<HwPrimitive> GPUSpectral::Renderer::getQuadPrimitive() const noexcept
+{
+    return quadPrimitive;
+}
+
+Handle<HwRenderTarget> GPUSpectral::Renderer::getSurfaceRenderTarget() const noexcept
+{
+    return surfaceRenderTarget;
+}
+
 Renderer::~Renderer() {
 }
 
 void Renderer::addRenderPassCreator(std::unique_ptr<RenderPassCreator> creator) {
     renderPassCreators.push_back(std::move(creator));
+}
+
+HwDriver& GPUSpectral::Renderer::getDriver() const noexcept
+{
+    return *driver;
 }
 
 void Renderer::run(const Scene& scene) {

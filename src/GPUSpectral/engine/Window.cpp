@@ -32,13 +32,13 @@ VkSurfaceKHR Window::createSurface(VkInstance instance) {
     return surface;
 }
 
-size_t Window::getWindowWidth() const {
+size_t Window::getWindowWidth() const noexcept {
     int width_, height_;
     glfwGetFramebufferSize(window, &width_, &height_);
     return width_;
 }
 
-size_t Window::getWindowHeight() const {
+size_t Window::getWindowHeight() const noexcept {
     int width_, height_;
     glfwGetFramebufferSize(window, &width_, &height_);
     return height_;

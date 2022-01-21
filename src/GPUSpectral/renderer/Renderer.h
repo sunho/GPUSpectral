@@ -36,19 +36,25 @@ class Renderer {
     Renderer(Engine& engine, Window* window);
     ~Renderer();
 
+    Renderer(const Renderer&) = delete;
+    Renderer& operator=(const Renderer&) = delete;
+    Renderer(Renderer&&) = delete;
+    Renderer& operator=(Renderer&&) = delete;
+
     void addRenderPassCreator(std::unique_ptr<RenderPassCreator> creator);
 
-    HwDriver& getDriver() {
-        return *driver;
-    }
+    [[nodiscard]] HwDriver& getDriver() const noexcept;    
     void run(const Scene& scene);
 
-    MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
-    Handle<HwBLAS> getOrCreateBLAS(const MeshPtr& meshPtr);
+    [[nodiscard]] MeshPtr createMesh(const std::span<Mesh::Vertex> vertices, const std::span<uint32_t>& indices);
 
-    Handle<HwRenderTarget> surfaceRenderTarget;
-    Handle<HwPrimitive> quadPrimitive;
-    Handle<HwProgram> getShaderProgram(const std::string& shaderName);
+    [[nodiscard]] Handle<HwBLAS> getOrCreateBLAS(const MeshPtr& meshPtr);
+
+    [[nodiscard]] Handle<HwProgram> getShaderProgram(const std::string& shaderName);
+
+    [[nodiscard]] Handle<HwPrimitive> getQuadPrimitive() const noexcept;
+
+    [[nodiscard]] Handle<HwRenderTarget> getSurfaceRenderTarget() const noexcept;
   private:
     Handle<HwProgram> loadShader(const std::string& filename);
 
@@ -65,6 +71,9 @@ class Renderer {
     uint32_t nextMeshId{ 1 };
 
     size_t currentFrame{0};
+
+    Handle<HwRenderTarget> surfaceRenderTarget;
+    Handle<HwPrimitive> quadPrimitive;
 };
 
 }  // namespace GPUSpectral
